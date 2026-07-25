@@ -56,13 +56,20 @@ export async function loadSimulationState(): Promise<unknown> {
       .eq('id', STATE_ID)
       .maybeSingle();
 
-    if (error || !data?.state) {
-      const local = localStorage.getItem('ggWorkspaceV2');
-      return local ? JSON.parse(local) : null;
+    if (error) {
+      console.warn('[Supabase Bridge] Fetch error:', error.message);
     }
 
-    return data.state;
+    if (data?.state) {
+      console.log('[Supabase Bridge] Successfully loaded state from Supabase DB');
+      localStorage.setItem('ggWorkspaceV2', JSON.stringify(data.state));
+      return data.state;
+    }
+
+    const local = localStorage.getItem('ggWorkspaceV2');
+    return local ? JSON.parse(local) : null;
   } catch (err) {
+    console.warn('[Supabase Bridge] Fetch exception:', err);
     const local = localStorage.getItem('ggWorkspaceV2');
     return local ? JSON.parse(local) : null;
   }
@@ -79,12 +86,14 @@ export async function saveSimulationState(state: unknown): Promise<boolean> {
     });
 
     if (error) {
-      console.warn('Supabase save error:', error.message);
+      console.warn('[Supabase Bridge] Save error:', error.message);
       return false;
     }
+
+    console.log('[Supabase Bridge] Successfully saved state to Supabase DB');
     return true;
   } catch (err) {
-    console.warn('Supabase save exception:', err);
+    console.warn('[Supabase Bridge] Save exception:', err);
     return false;
   }
 }
