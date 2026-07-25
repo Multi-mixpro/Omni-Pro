@@ -6,40 +6,40 @@ export const AccessSettingsPage: React.FC = () => {
 
   if (!isOwner) {
     return (
-      <div className="deny">
+      <div style={{ textAlign: 'center', maxWidth: '560px', margin: '90px auto' }}>
         <div style={{ fontSize: '52px' }}>🔒</div>
-        <h1>Akses khusus Owner</h1>
-        <p>Pengguna aktif tidak memiliki izin membuka halaman ini.</p>
+        <h1 className="h1-sim">Akses khusus Owner</h1>
+        <p className="p-sim">Pengguna aktif tidak memiliki izin membuka halaman ini.</p>
       </div>
     );
   }
 
   const P = [
-    ['create', 'Membuat Perintah'],
-    ['monitor', 'Monitoring Seluruh Task'],
-    ['brief', 'Mengubah Brief'],
-    ['supplier', 'Kelola Supplier'],
-    ['hpp', 'Input HPP'],
-    ['sample', 'Kelola Sampling'],
-    ['size', 'Kelola Size Chart'],
-    ['approve', 'Approval Final'],
-    ['access', 'Kelola Akses'],
+    ['create', 'MEMBUAT PERINTAH'],
+    ['monitor', 'MONITORING SELURUH TASK'],
+    ['brief', 'MENGUBAH BRIEF'],
+    ['supplier', 'KELOLA SUPPLIER'],
+    ['hpp', 'INPUT HPP'],
+    ['sample', 'KELOLA SAMPLING'],
+    ['size', 'KELOLA SIZE CHART'],
+    ['approve', 'APPROVAL FINAL'],
+    ['access', 'KELOLA AKSES'],
   ] as const;
 
   return (
     <div className="space-y-4">
       {/* Hero */}
-      <div className="hero">
+      <div className="hero-sim">
         <div>
-          <div className="eye">Role-based access control</div>
-          <h1>Pengaturan Akses Pengguna</h1>
-          <p>
+          <div className="eye-sim">Role-based access control</div>
+          <h1 className="h1-sim">Pengaturan Akses Pengguna</h1>
+          <p className="p-sim" style={{ maxWidth: '780px' }}>
             Owner menentukan siapa yang dapat membuat perintah kerja. Perintah dari pengguna berizin otomatis sinkron ke Kelola & Pantau. Monitoring seluruh task tetap khusus Owner.
           </p>
         </div>
-        <div className="actions">
+        <div className="actions-sim">
           <button
-            className="btn primary"
+            className="btn-sim primary"
             onClick={() => {
               const name = prompt('Nama pengguna:');
               if (name) addUser(name, 'Tim Kreatif');
@@ -51,7 +51,7 @@ export const AccessSettingsPage: React.FC = () => {
       </div>
 
       {/* Notice */}
-      <div className="notice warn">
+      <div className="notice-sim warn">
         <span>⚠</span>
         <div>
           <b>Rekomendasi:</b> izin membuat perintah hanya diberikan kepada Owner atau koordinator. Tim produksi fokus memperbarui pekerjaan yang ditugaskan.
@@ -59,34 +59,34 @@ export const AccessSettingsPage: React.FC = () => {
       </div>
 
       {/* Table Wrap matching HTML simulation perfectly */}
-      <div className="card" style={{ marginTop: '15px' }}>
-        <div className="tablewrap">
-          <table>
+      <div className="card-sim" style={{ marginTop: '15px' }}>
+        <div className="tablewrap-sim">
+          <table className="table-sim">
             <thead>
               <tr>
-                <th>Pengguna</th>
+                <th style={{ minWidth: '220px' }}>PENGGUNA</th>
                 {P.map((x) => (
-                  <th key={x[0]} style={{ textTransform: 'uppercase' }}>{x[1]}</th>
+                  <th key={x[0]} style={{ textAlign: 'center' }}>{x[1]}</th>
                 ))}
-                <th>Aktif</th>
+                <th style={{ textAlign: 'center' }}>AKTIF</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>
-                    <div className="product">
-                      <div className="mav" style={{ width: '37px', height: '37px', borderRadius: '10px', fontSize: '11px' }}>
+                    <div className="product-sim">
+                      <div className="av-sim" style={{ width: '37px', height: '37px', borderRadius: '10px', fontSize: '11px' }}>
                         {u.ini}
                       </div>
                       <div>
-                        <b>{u.name}</b>
-                        <small>{u.role} • {u.title}</small>
+                        <b style={{ fontSize: '12px', color: 'var(--txt)' }}>{u.name}</b>
+                        <small style={{ fontSize: '10px', color: 'var(--mut)' }}>{u.role} • {u.title}</small>
                       </div>
                     </div>
                   </td>
                   {P.map((x) => (
-                    <td key={x[0]}>
+                    <td key={x[0]} style={{ textAlign: 'center' }}>
                       <label className="toggle-sim">
                         <input
                           type="checkbox"
@@ -98,7 +98,7 @@ export const AccessSettingsPage: React.FC = () => {
                       </label>
                     </td>
                   ))}
-                  <td>
+                  <td style={{ textAlign: 'center' }}>
                     <label className="toggle-sim">
                       <input
                         type="checkbox"
