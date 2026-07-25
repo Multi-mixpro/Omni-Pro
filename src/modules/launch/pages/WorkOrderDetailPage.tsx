@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { workOrderRepository } from '../data/workOrderRepository';
+import { HppCalculatorTab } from '../components/HppCalculatorTab';
+import { MaterialResearchTab } from '../components/MaterialResearchTab';
 import { ArrowLeft, CheckCircle2, Clock, AlertTriangle, Layers } from 'lucide-react';
 
 export const WorkOrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'workflow' | 'hpp' | 'qc'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'workflow' | 'material' | 'hpp' | 'qc'>('overview');
 
   const { data: wo, isLoading: woLoading } = useQuery({
     queryKey: ['work-order-detail', id],
@@ -110,7 +112,7 @@ export const WorkOrderDetailPage: React.FC = () => {
 
       {/* Tabs Menu */}
       <div className="flex space-x-2 border-b border-slate-800">
-        {(['overview', 'workflow', 'hpp', 'qc'] as const).map((tab) => (
+        {(['overview', 'workflow', 'material', 'hpp', 'qc'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -144,7 +146,11 @@ export const WorkOrderDetailPage: React.FC = () => {
           </div>
         )}
 
-        {activeTab !== 'overview' && (
+        {activeTab === 'material' && <MaterialResearchTab workOrderId={id || ''} />}
+
+        {activeTab === 'hpp' && <HppCalculatorTab workOrderId={id || ''} />}
+
+        {(activeTab === 'workflow' || activeTab === 'qc') && (
           <div className="p-8 text-center text-slate-500 text-xs">
             <Layers className="w-8 h-8 text-slate-600 mx-auto mb-2" />
             <p>Modul {activeTab.toUpperCase()} siap dihubungkan dengan Service Layer.</p>
