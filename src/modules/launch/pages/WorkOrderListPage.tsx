@@ -1,114 +1,226 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { workOrderRepository } from '../data/workOrderRepository';
-import { Rocket, Plus, Layers, Search, AlertCircle } from 'lucide-react';
 
 export const WorkOrderListPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const { data: workOrders = [], isLoading, error } = useQuery({
-    queryKey: ['work-orders'],
-    queryFn: () => workOrderRepository.getWorkOrders(),
-  });
+  // Mock data matching simulation HTML exactly for seamless display
+  const orders = [
+    {
+      id: 'o1',
+      code: 'GS-WB-001',
+      brand: 'GG Supply',
+      name: 'Windbreaker Polos Kombinasi',
+      stage: 'Fix Sampel',
+      pic: 'Yadi',
+      priority: 'Tinggi',
+      due: '06 Agt 2026',
+      prog: 63,
+      status: 'doing',
+      users: ['DA', 'YD', 'SY'],
+    },
+    {
+      id: 'o2',
+      code: 'GD-VR-001',
+      brand: 'GUDSKUY',
+      name: 'Varsity Classic Jade',
+      stage: 'Riset Bahan',
+      pic: 'Dodi Awaludin',
+      priority: 'Tinggi',
+      due: '12 Agt 2026',
+      prog: 25,
+      status: 'doing',
+      users: ['YD', 'DA', 'SY'],
+    },
+    {
+      id: 'o3',
+      code: 'GS-PL-001',
+      brand: 'GG Supply',
+      name: 'Polo Shirt Corporate',
+      stage: 'Fix Warna',
+      pic: 'Dodi Awaludin',
+      priority: 'Normal',
+      due: '02 Agt 2026',
+      prog: 38,
+      status: 'review',
+      users: ['DA', 'YD', 'SY'],
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Top Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto font-sans">
+      {/* Hero */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center space-x-2">
-            <Rocket className="w-5 h-5 text-blue-500" />
-            <span>Perintah Kerja Artikel</span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Daftar alur pengerjaan launching artikel GG Supply & GUDSKUY
+          <span className="text-[10px] font-black uppercase tracking-widest text-orange-500">
+            EXECUTION BOARD
+          </span>
+          <h1 className="text-2xl font-black tracking-tight text-white mt-1">Perintah Kerja</h1>
+          <p className="text-xs text-slate-400 max-w-2xl mt-1 leading-relaxed">
+            Owner memantau seluruh task. Anggota tim hanya melihat artikel yang ditugaskan dan memperbarui bagian sesuai izin akses.
           </p>
         </div>
 
         <button
           onClick={() => navigate('/app/launch/work-orders/new')}
-          className="py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-blue-500/20 flex items-center justify-center space-x-2 shrink-0"
+          className="py-2.5 px-5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-orange-500/20 flex items-center space-x-2 shrink-0 transition"
         >
-          <Plus className="w-4 h-4" />
-          <span>Buat Perintah Kerja</span>
+          <span>＋ Perintah Baru</span>
         </button>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="flex items-center space-x-3 bg-slate-950 p-2 rounded-xl border border-slate-800">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+      {/* Notice */}
+      <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 flex items-center space-x-3">
+        <span className="text-orange-400 font-bold">◉</span>
+        <div>
+          <strong className="text-white">Mode Owner:</strong> seluruh perintah, task lintas tim, bottleneck, dan keterlambatan terlihat di halaman ini.
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center space-x-2 overflow-x-auto">
+          <button className="px-3 py-1.5 rounded-full bg-white text-slate-950 font-bold text-xs">
+            Semua
+          </button>
+          <button className="px-3 py-1.5 rounded-full bg-slate-900 text-slate-400 font-semibold text-xs border border-slate-800 hover:text-white">
+            GG Supply
+          </button>
+          <button className="px-3 py-1.5 rounded-full bg-slate-900 text-slate-400 font-semibold text-xs border border-slate-800 hover:text-white">
+            GUDSKUY
+          </button>
+          <button className="px-3 py-1.5 rounded-full bg-slate-900 text-slate-400 font-semibold text-xs border border-slate-800 hover:text-white">
+            Terlambat
+          </button>
+        </div>
+
+        <div className="relative w-full sm:w-64">
           <input
             type="text"
-            placeholder="Cari kode artikel atau nama produk..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 pl-9 pr-3 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+            placeholder="Cari artikel, kode, PIC..."
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none"
           />
         </div>
       </div>
 
-      {/* Content Area */}
-      {isLoading ? (
-        <div className="p-8 text-center text-slate-400 text-xs">Memuat daftar perintah kerja...</div>
-      ) : error ? (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4" />
-          <span>Gagal mengambil data dari Supabase. Pastikan tabel & RLS sudah terkonfigurasi.</span>
+      {/* Kanban Columns */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Column 1: Belum Dimulai */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3 min-h-[400px] space-y-3">
+          <div className="flex justify-between items-center text-xs font-bold text-slate-300 px-1">
+            <span>Belum Dimulai</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px]">0</span>
+          </div>
+          <div className="p-8 text-center text-slate-500 text-xs border border-dashed border-slate-800/60 rounded-xl">
+            Belum ada artikel
+          </div>
         </div>
-      ) : workOrders.length === 0 ? (
-        <div className="p-12 text-center bg-slate-950 border border-slate-800 rounded-2xl">
-          <Layers className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-slate-200">Belum Ada Perintah Kerja Artikel</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
-            Buat perintah kerja pertama untuk memulai alur launching 8-stage artikel produk.
-          </p>
-          <button
-            onClick={() => navigate('/app/launch/work-orders/new')}
-            className="py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl transition"
-          >
-            Buat Perintah Kerja Baru
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {workOrders.map((wo) => (
+
+        {/* Column 2: Sedang Dikerjakan */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3 min-h-[400px] space-y-3">
+          <div className="flex justify-between items-center text-xs font-bold text-slate-300 px-1">
+            <span>Sedang Dikerjakan</span>
+            <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px]">2</span>
+          </div>
+
+          {orders.filter(o => o.status === 'doing').map((o) => (
             <div
-              key={wo.id}
-              onClick={() => navigate(`/app/launch/work-orders/${wo.id}`)}
-              className="p-5 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-2xl cursor-pointer transition space-y-4 group"
+              key={o.id}
+              onClick={() => navigate(`/app/launch/work-orders/${o.id}`)}
+              className="p-4 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition cursor-pointer space-y-3 shadow-md"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    {wo.launch_brands?.name || 'Brand'}
-                  </span>
-                  <h3 className="font-bold text-sm text-white group-hover:text-blue-400 transition mt-2">
-                    {wo.article_name}
-                  </h3>
-                  <p className="text-xs font-mono text-slate-400">{wo.article_code}</p>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
-                  {wo.overall_status}
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                    o.brand === 'GG Supply' ? 'bg-orange-500/20 text-orange-400' : 'bg-purple-500/20 text-purple-400'
+                  }`}
+                >
+                  {o.brand}
                 </span>
+                <span className="text-[10px] text-red-400 font-semibold">{o.priority}</span>
               </div>
 
-              {/* Progress Bar */}
               <div>
-                <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                  <span>Stage: {wo.current_stage_code}</span>
-                  <span>{wo.progress_percent}%</span>
+                <h4 className="text-xs font-bold text-white">{o.name}</h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">{o.code} • {o.stage}</p>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+                  <span>Progres</span>
+                  <span>{o.prog}%</span>
                 </div>
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-blue-500 h-full transition-all duration-300"
-                    style={{ width: `${wo.progress_percent}%` }}
-                  />
+                <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-orange-500 h-full" style={{ width: `${o.prog}%` }} />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                <div className="flex -space-x-1.5">
+                  {o.users.map((u, i) => (
+                    <div
+                      key={i}
+                      className="w-5 h-5 rounded-md bg-purple-600 text-white font-black text-[8px] flex items-center justify-center border border-slate-900"
+                    >
+                      {u}
+                    </div>
+                  ))}
+                </div>
+                <span className="text-[10px] text-slate-400">{o.due}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Column 3: Menunggu Review */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3 min-h-[400px] space-y-3">
+          <div className="flex justify-between items-center text-xs font-bold text-slate-300 px-1">
+            <span>Menunggu Review</span>
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px]">1</span>
+          </div>
+
+          {orders.filter(o => o.status === 'review').map((o) => (
+            <div
+              key={o.id}
+              onClick={() => navigate(`/app/launch/work-orders/${o.id}`)}
+              className="p-4 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition cursor-pointer space-y-3 shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">
+                  {o.brand}
+                </span>
+                <span className="text-[10px] text-slate-400">{o.priority}</span>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-white">{o.name}</h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">{o.code} • {o.stage}</p>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+                  <span>Progres</span>
+                  <span>{o.prog}%</span>
+                </div>
+                <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-amber-500 h-full" style={{ width: `${o.prog}%` }} />
                 </div>
               </div>
             </div>
           ))}
         </div>
-      )}
+
+        {/* Column 4: Artikel Final */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3 min-h-[400px] space-y-3">
+          <div className="flex justify-between items-center text-xs font-bold text-slate-300 px-1">
+            <span>Artikel Final</span>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px]">0</span>
+          </div>
+          <div className="p-8 text-center text-slate-500 text-xs border border-dashed border-slate-800/60 rounded-xl">
+            Belum ada artikel final
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
