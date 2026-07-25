@@ -1,0 +1,324 @@
+/* Copy exact CSS from Sistem_Operasional_GG_Supply_GUDSKUY_UIUX_Simulation.html */
+
+:root {
+  --bg: #f4f6fa;
+  --card: #fff;
+  --card2: #f8fafc;
+  --txt: #172033;
+  --mut: #667085;
+  --line: #e4e8ef;
+  --orange: #f97316;
+  --os: #fff0e5;
+  --purple: #6d5dfc;
+  --ps: #efedff;
+  --blue: #2878e6;
+  --bs: #eaf3ff;
+  --green: #1e9a68;
+  --gs: #e9f8f1;
+  --yellow: #d99a00;
+  --ys: #fff6d9;
+  --red: #d64a4a;
+  --rs: #ffeded;
+  --shadow: 0 10px 30px rgba(24, 34, 52, 0.08);
+  --rad: 18px;
+}
+
+html[data-theme='dark'] {
+  --bg: #0d1421;
+  --card: #151e2d;
+  --card2: #101827;
+  --txt: #edf2f8;
+  --mut: #aab4c4;
+  --line: #29364b;
+  --os: #3a2416;
+  --ps: #292442;
+  --bs: #172d49;
+  --gs: #15372c;
+  --ys: #3a3016;
+  --rs: #3e2024;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--txt);
+  font: 14px/1.5 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+.app-simulation {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.side-sim {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: linear-gradient(180deg, #111827, #182136);
+  color: #fff;
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+}
+
+.brand-sim {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  padding: 0 8px 18px;
+  border-bottom: 1px solid #ffffff17;
+}
+
+.logo-sim {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--orange), #ffae68);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+}
+
+.brand-sim b {
+  display: block;
+}
+
+.brand-sim small {
+  color: #9eabc0;
+}
+
+.navlabel-sim {
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #718096;
+  margin: 18px 10px 7px;
+}
+
+.nav-sim {
+  display: grid;
+  gap: 4px;
+}
+
+.nav-sim button, .nav-sim a {
+  border: 0;
+  background: transparent;
+  color: #b8c1d1;
+  padding: 11px;
+  border-radius: 11px;
+  text-align: left;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  text-decoration: none;
+}
+
+.nav-sim button:hover, .nav-sim a:hover, .nav-sim button.on, .nav-sim a.active {
+  background: #ffffff10;
+  color: #fff;
+}
+
+.nav-sim button.on, .nav-sim a.active {
+  box-shadow: inset 3px 0 var(--orange);
+}
+
+.nav-sim i {
+  width: 22px;
+  text-align: center;
+  font-style: normal;
+}
+
+.badge-sim {
+  margin-left: auto;
+  background: #ffffff16;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+}
+
+.sidefoot-sim {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid #ffffff17;
+}
+
+.launch-sim {
+  border: 1px solid #ffffff17;
+  border-radius: 13px;
+  padding: 12px;
+  background: #ffffff08;
+}
+
+.bar-sim {
+  height: 8px;
+  background: var(--card2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-sim span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange), #ffb777);
+  border-radius: inherit;
+}
+
+.side-sim .bar-sim {
+  background: #ffffff16;
+}
+
+.main-sim {
+  min-width: 0;
+}
+
+.top-sim {
+  height: 70px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 25px;
+}
+
+.topl-sim {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.crumb-sim {
+  font-size: 12px;
+  color: var(--mut);
+}
+
+.crumb-sim b {
+  color: var(--txt);
+}
+
+.topr-sim {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.ibtn-sim, .btn-sim {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--txt);
+  border-radius: 11px;
+  min-height: 39px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+}
+
+.ibtn-sim {
+  width: 39px;
+  padding: 0;
+}
+
+.btn-sim.primary {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  font-weight: 800;
+}
+
+.switch-sim {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: var(--card);
+  padding: 4px 7px;
+  border-radius: 12px;
+}
+
+.switch-sim select {
+  border: 0;
+  background: transparent;
+  color: var(--txt);
+  outline: 0;
+  font-size: 11px;
+  max-width: 175px;
+}
+
+.av-sim {
+  width: 31px;
+  height: 31px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, var(--purple), #9489ff);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 900;
+  margin-right: 6px;
+}
+
+.content-sim {
+  padding: 26px;
+  max-width: 1580px;
+  margin: auto;
+}
+
+/* Custom Table & Toggle Styles matching HTML exactly */
+.toggle-sim {
+  display: inline-block;
+  width: 39px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  cursor: pointer;
+}
+
+.toggle-sim input {
+  display: none;
+}
+
+.toggle-sim span {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px #0003;
+  transition: .2s;
+}
+
+.toggle-sim:has(input:checked) {
+  background: var(--green);
+}
+
+.toggle-sim input:checked + span {
+  left: 19px;
+}
