@@ -1,114 +1,68 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, UserRoleCode } from './types';
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: { id: string; username: string } | null;
   profile: UserProfile | null;
   roles: UserRoleCode[];
   permissions: string[];
   isLoading: boolean;
   isOwner: boolean;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  bypassAuthAsOwner: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Dummy Profile Owner untuk bypass / pengujian awal tanpa barrier login email
+const DUMMY_OWNER_PROFILE: UserProfile = {
+  id: '00000000-0000-0000-0000-000000000001',
+  full_name: 'Owner GG Product OS',
+  email: 'owner@ggproductos.internal',
+  is_active: true,
+  job_title: 'Owner & Super Admin',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [roles, setRoles] = useState<UserRoleCode[]>([]);
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      // Fetch Profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (profileData) {
-        setProfile(profileData as UserProfile);
-      }
-
-      // Fetch User Roles
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('roles(code)')
-        .eq('user_id', userId);
-
-      if (rolesData) {
-        const extractedRoles = rolesData
-          .map((item: any) => item.roles?.code)
-          .filter(Boolean) as UserRoleCode[];
-        setRoles(extractedRoles);
-      }
-    } catch (err) {
-      console.error('Error fetching user profile/roles:', err);
-    }
-  };
+  const [user, setUser] = useState<{ id: string; username: string } | null>({
+    id: DUMMY_OWNER_PROFILE.id,
+    username: 'owner',
+  });
+  const [profile, setProfile] = useState<UserProfile | null>(DUMMY_OWNER_PROFILE);
+  const [roles, setRoles] = useState<UserRoleCode[]>(['owner']);
+  const [permissions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    // 1. Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-      }
-      setIsLoading(false);
-    });
-
-    // 2. Listen to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchUserProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setRoles([]);
-        setPermissions([]);
-      }
-      setIsLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Mode Bypass Login Aktif: Langsung menganggap sesi sebagai Owner aktif
+    setIsLoading(false);
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setRoles([]);
   };
 
-  const refreshProfile = async () => {
-    if (user) {
-      await fetchUserProfile(user.id);
-    }
+  const bypassAuthAsOwner = () => {
+    setUser({ id: DUMMY_OWNER_PROFILE.id, username: 'owner' });
+    setProfile(DUMMY_OWNER_PROFILE);
+    setRoles(['owner']);
   };
-
-  const isOwner = roles.includes('owner');
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        session,
         profile,
         roles,
         permissions,
         isLoading,
-        isOwner,
+        isOwner: true,
         signOut,
-        refreshProfile,
+        bypassAuthAsOwner,
       }}
     >
       {children}
