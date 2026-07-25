@@ -4,12 +4,18 @@ import { useQuery } from '@tanstack/react-query';
 import { workOrderRepository } from '../data/workOrderRepository';
 import { HppCalculatorTab } from '../components/HppCalculatorTab';
 import { MaterialResearchTab } from '../components/MaterialResearchTab';
+import { ColorFixTab } from '../components/ColorFixTab';
+import { SampleFixTab } from '../components/SampleFixTab';
+import { SizeChartFixTab } from '../components/SizeChartFixTab';
+import { QcFinalTab } from '../components/QcFinalTab';
 import { ArrowLeft, CheckCircle2, Clock, AlertTriangle, Layers } from 'lucide-react';
 
 export const WorkOrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'workflow' | 'material' | 'hpp' | 'qc'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'workflow' | 'material' | 'color' | 'sample' | 'hpp' | 'sizechart' | 'qc'
+  >('overview');
 
   const { data: wo, isLoading: woLoading } = useQuery({
     queryKey: ['work-order-detail', id],
@@ -111,12 +117,12 @@ export const WorkOrderDetailPage: React.FC = () => {
       </div>
 
       {/* Tabs Menu */}
-      <div className="flex space-x-2 border-b border-slate-800">
-        {(['overview', 'workflow', 'material', 'hpp', 'qc'] as const).map((tab) => (
+      <div className="flex space-x-2 border-b border-slate-800 overflow-x-auto">
+        {(['overview', 'workflow', 'material', 'color', 'sample', 'hpp', 'sizechart', 'qc'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`py-2.5 px-4 text-xs font-semibold uppercase tracking-wider border-b-2 transition ${
+            className={`py-2.5 px-4 text-xs font-semibold uppercase tracking-wider border-b-2 transition shrink-0 ${
               activeTab === tab
                 ? 'border-blue-500 text-blue-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -147,10 +153,13 @@ export const WorkOrderDetailPage: React.FC = () => {
         )}
 
         {activeTab === 'material' && <MaterialResearchTab workOrderId={id || ''} />}
-
+        {activeTab === 'color' && <ColorFixTab workOrderId={id || ''} />}
+        {activeTab === 'sample' && <SampleFixTab workOrderId={id || ''} />}
         {activeTab === 'hpp' && <HppCalculatorTab workOrderId={id || ''} />}
+        {activeTab === 'sizechart' && <SizeChartFixTab workOrderId={id || ''} />}
+        {activeTab === 'qc' && <QcFinalTab workOrderId={id || ''} />}
 
-        {(activeTab === 'workflow' || activeTab === 'qc') && (
+        {activeTab === 'workflow' && (
           <div className="p-8 text-center text-slate-500 text-xs">
             <Layers className="w-8 h-8 text-slate-600 mx-auto mb-2" />
             <p>Modul {activeTab.toUpperCase()} siap dihubungkan dengan Service Layer.</p>
