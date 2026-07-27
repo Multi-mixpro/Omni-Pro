@@ -9,6 +9,7 @@ import { LibraryPage, ProjectDetailPage, ProjectsPage, TeamPage, TodayPage } fro
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
 
 const NewProjectBriefPage = lazy(() => import('@/modules/launch/new-project/NewProjectBriefPage').then(module => ({ default: module.NewProjectBriefPage })));
+const SettingsPage = lazy(() => import('@/modules/launch/settings/SettingsPage').then(module => ({ default: module.SettingsPage })));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false } } });
 
@@ -45,6 +46,7 @@ function RouteView() {
   else if (/^\/launch\/app\/projects\/[^/]+\/?$/.test(pathname)) page = <ProjectDetailPage />;
   else if (pathname === '/launch/app/library') page = <LibraryPage />;
   else if (pathname === '/launch/app/team') page = <TeamPage />;
+  else if (pathname === '/launch/app/settings') page = <Suspense fallback={<BootScreen />}><SettingsPage /></Suspense>;
   else return <Navigate to="/" replace />;
 
   return <ProtectedLaunchApp>{page}</ProtectedLaunchApp>;

@@ -41,6 +41,19 @@ const emptyMaterial = (supplierRole: 'PRIMARY' | 'ALTERNATIVE' = 'PRIMARY'): Mat
 const emptyHpp = (): HppLineDraft => ({ category: 'MATERIAL', item_name: '', quantity: 1, unit: 'pcs', unit_price: '', waste_percent: 0, notes: '' });
 
 function numberValue(value: string): number | '' { return value === '' ? '' : Number(value); }
+// Halaman produk (mis. marketplace) sering tertempel di kolom URL gambar dan
+// menghasilkan gambar rusak tanpa peringatan. Terima hanya URL berkas gambar.
+function imageUrlIssue(value: string) {
+  const url = value.trim();
+  if (!url) return null;
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return 'URL tidak valid. Awali dengan https://'; }
+  if (!/^https?:$/.test(parsed.protocol)) return 'Gunakan alamat http:// atau https://';
+  if (!/\.(jpe?g|png|webp|gif|avif)$/i.test(parsed.pathname)) {
+    return 'Ini sepertinya link halaman, bukan berkas gambar. Pakai URL yang berakhiran .jpg/.png/.webp, atau pindahkan ke "Link yang perlu dipelajari".';
+  }
+  return null;
+}
 function offsetDate(value: string, days: number) {
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -71,7 +84,9 @@ export function NewProjectBriefPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [createdProject, setCreatedProject] = useState<{ id: string; failedUploads: number } | null>(null);
 
-  const referenceCount = localImages.length + imageLinks.filter(item => item.image_url?.trim()).length + studyLinks.filter(item => item.source_url?.trim()).length;
+  const imageLinkIssues = imageLinks.map(item => imageUrlIssue(item.image_url ?? ''));
+  const validImageLinks = imageLinks.filter((item, index) => item.image_url?.trim() && !imageLinkIssues[index]);
+  const referenceCount = localImages.length + validImageLinks.length + studyLinks.filter(item => item.source_url?.trim()).length;
   const validColors = colors.filter(item => item.name.trim());
   const validMaterials = materials.filter(item => item.proposed_name.trim());
   const validHpp = hppLines.filter(item => item.item_name.trim());
@@ -126,7 +141,7 @@ export function NewProjectBriefPage() {
     setSubmitError(null);
     setUploadProgress('Menyimpan brief dan menyiapkan ruang kerja…');
     try {
-      const externalImages = imageLinks.filter(item => item.image_url?.trim()).map((item, index) => ({ ...item, sort_order: localImages.length + index, is_primary: localImages.length === 0 && index === 0 }));
+      const externalImages = validImageLinks.map((item, index) => ({ ...item, sort_order: localImages.length + index, is_primary: localImages.length === 0 && index === 0 }));
       const learningLinks = studyLinks.filter(item => item.source_url?.trim()).map((item, index) => ({ ...item, sort_order: localImages.length + externalImages.length + index, is_primary: false }));
       const payload: NewProjectInput = {
         ...form,
@@ -194,7 +209,7 @@ export function NewProjectBriefPage() {
             {localImages.length > 0 && <div className="local-reference-grid">{localImages.map((item, index) => <article key={item.id}><img src={item.preview} alt={`Referensi lokal ${index + 1}`} /><span>{index === 0 ? 'Cover utama' : `Gambar ${index + 1}`}</span><button type="button" aria-label={`Hapus ${item.file.name}`} onClick={() => removeLocalImage(item.id)}><Trash2 size={16} /></button><small>{item.file.name}</small></article>)}</div>}
 
             <div className="subsection-title"><div><FileImage size={18} /><span><b>Gambar dari URL</b><small>Untuk gambar yang sudah tersedia online</small></span></div><button type="button" className="text-button" onClick={() => setImageLinks(current => [...current, emptyImageLink()])}><Plus size={16} /> Tambah URL gambar</button></div>
-            <div className="repeat-list">{imageLinks.map((item, index) => <div className="reference-row" key={`image-${index}`}><span className="row-index">{index + 1}</span><label className="field"><span>Judul gambar</span><input placeholder="Contoh: Tampak belakang" value={item.title} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} /></label><label className="field field-grow"><span>URL gambar</span><div className="input-icon"><Link2 size={16} /><input type="url" placeholder="https://…/gambar.jpg" value={item.image_url} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, image_url: e.target.value } : row))} /></div></label><label className="field field-grow"><span>Hal penting</span><input placeholder="Detail yang perlu dipelajari" value={item.insight} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, insight: e.target.value } : row))} /></label>{imageLinks.length > 1 && <button type="button" className="remove-row" onClick={() => setImageLinks(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div>)}</div>
+            <div className="repeat-list">{imageLinks.map((item, index) => <div className="reference-row" key={`image-${index}`}><span className="row-index">{index + 1}</span><label className="field"><span>Judul gambar</span><input placeholder="Contoh: Tampak belakang" value={item.title} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} /></label><label className="field field-grow"><span>URL gambar</span><div className={`input-icon ${imageLinkIssues[index] ? 'input-invalid' : ''}`}><Link2 size={16} /><input type="url" placeholder="https://…/gambar.jpg" value={item.image_url} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, image_url: e.target.value } : row))} /></div>{imageLinkIssues[index] && <small className="field-hint-error">{imageLinkIssues[index]}</small>}</label><label className="field field-grow"><span>Hal penting</span><input placeholder="Detail yang perlu dipelajari" value={item.insight} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, insight: e.target.value } : row))} /></label>{imageLinks.length > 1 && <button type="button" className="remove-row" onClick={() => setImageLinks(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div>)}</div>
 
             <div className="subsection-title"><div><ExternalLink size={18} /><span><b>Link referensi untuk dipelajari</b><small>Produk pembanding, supplier, material, harga, atau tren</small></span></div><button type="button" className="text-button" onClick={() => setStudyLinks(current => [...current, emptyStudyLink()])}><Plus size={16} /> Tambah link</button></div>
             <div className="repeat-list">{studyLinks.map((item, index) => <div className="reference-row reference-link-row" key={`link-${index}`}><span className="row-index">{index + 1}</span><label className="field"><span>Jenis</span><select value={item.reference_type} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, reference_type: e.target.value as ReferenceDraft['reference_type'] } : row))}><option value="PRODUCT">Produk</option><option value="MATERIAL">Material</option><option value="PRICE">Harga</option><option value="CONSTRUCTION">Konstruksi</option><option value="MARKET">Pasar/tren</option><option value="OTHER">Lainnya</option></select></label><label className="field"><span>Judul</span><input placeholder="Nama sumber" value={item.title} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} /></label><label className="field field-grow"><span>Link aktif</span><input type="url" placeholder="https://…" value={item.source_url} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, source_url: e.target.value } : row))} /></label><label className="field field-grow"><span>Alasan dipakai</span><input placeholder="Apa yang harus dipelajari?" value={item.insight} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, insight: e.target.value } : row))} /></label>{studyLinks.length > 1 && <button type="button" className="remove-row" onClick={() => setStudyLinks(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div>)}</div>

@@ -49,6 +49,7 @@ export interface LaunchProject {
   target_date: string | null;
   target_fix_date: string | null;
   target_launch_date: string | null;
+  research_summary: string | null;
   created_at: string;
   updated_at: string;
   owner_id: string;
@@ -122,9 +123,10 @@ export interface ProjectWorkspace {
     }>;
   }>;
   colorways: Array<{ id: string; name: string; hex_code: string | null; status: string }>;
-  hpp: Array<{ id: string; version: number; total_hpp: number; recommended_price: number | null; status: string }>;
+  hpp: Array<{ id: string; version: number; total_hpp: number; recommended_price: number | null; target_margin_percent: number | null; status: string }>;
   sizeCharts: Array<{ id: string; name: string; status: string; sizes: string[] }>;
   qc: Array<{ id: string; result: string; summary: string | null; checked_at: string | null }>;
+  samples: Array<{ id: string; version: number; sample_type: string; status: string; is_master: boolean; material_notes: string | null; pattern_notes: string | null; construction_notes: string | null; revision_notes: string | null }>;
 }
 
 export interface NewProjectInput {
@@ -151,9 +153,31 @@ export interface NewProjectInput {
   target_margin_percent?: number | '';
 }
 
+export interface SampleDraft {
+  sample_type: 'DEVELOPMENT' | 'FIT' | 'PRE_PRODUCTION' | 'PRODUCTION';
+  material_notes?: string;
+  pattern_notes?: string;
+  construction_notes?: string;
+  revision_notes?: string;
+}
+
+export interface ProjectEditInput {
+  article_name: string;
+  business_unit_id: string;
+  category: string;
+  concept?: string;
+  source_notes?: string;
+  priority: Priority;
+  target_date?: string;
+  target_fix_date?: string;
+  target_launch_date?: string;
+}
+
+export type ReferenceType = 'PRODUCT' | 'MATERIAL' | 'PRICE' | 'CONSTRUCTION' | 'MARKET' | 'OTHER';
+
 export interface ReferenceDraft {
   title: string;
-  reference_type: 'PRODUCT' | 'MATERIAL' | 'PRICE' | 'CONSTRUCTION' | 'MARKET' | 'OTHER';
+  reference_type: ReferenceType;
   source_url?: string;
   image_url?: string;
   insight?: string;

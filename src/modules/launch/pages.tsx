@@ -1,11 +1,19 @@
 import { FormEvent, ReactNode, useState } from 'react';
-import { Activity, AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, Factory, FileSearch, Filter, ImagePlus, Layers3, MoreHorizontal, PackageCheck, Palette, Plus, Search, Shirt, Sparkles, Target, Users } from 'lucide-react';
+import { Activity, AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, Factory, FileSearch, Filter, ImagePlus, Layers3, MoreHorizontal, PackageCheck, Palette, Pencil, Plus, Search, Shirt, Sparkles, Target, Users } from 'lucide-react';
 import { Link, useNavigate, useParams } from '@/app/router/simpleRouter';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/core/auth/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { uploadProjectReference } from './data/launchRepository';
 import { BriefSnapshot } from './components/BriefSnapshot';
+import { ResearchPanel } from './components/ResearchPanel';
+import { SafeImage } from './components/SafeImage';
+import { EditProjectPanel } from './components/EditProjectPanel';
+import { SourcingPanel } from './components/SourcingPanel';
+import { SamplingPanel } from './components/SamplingPanel';
+import { CostingPanel } from './components/CostingPanel';
+import { SpecificationPanel } from './components/SpecificationPanel';
+import { QcPanel } from './components/QcPanel';
 import type { LaunchProject, LaunchStage, LaunchTask, NewProjectInput, Priority, ProjectStatus, StageCode } from './domain/types';
 import { STAGE_ORDER } from './domain/types';
 import { useBusinessUnits, useCompleteTask, useCreateProject, useMyTasks, useProfiles, useProject, useProjects, useUpdateStage } from './hooks/useLaunch';
@@ -46,7 +54,7 @@ function ProjectCard({ project }: { project: LaunchProject }) {
   return (
     <Link to={`/launch/app/projects/${project.id}`} className="project-card">
       <div className="project-thumb">
-        {project.reference_image_url ? <img src={project.reference_image_url} alt={`Referensi ${project.article_name}`} /> : <Shirt size={34} />}
+        <SafeImage src={project.reference_image_url} alt={`Referensi ${project.article_name}`} fallback={<Shirt size={34} />} />
         <span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name ?? 'GG'}</span>
       </div>
       <div className="project-card-body">
@@ -109,7 +117,7 @@ export function TodayPage() {
       <div className="dashboard-columns">
         <section className="content-card">
           <div className="section-head"><div><span className="eyebrow">Sedang bergerak</span><h3>Artikel terbaru</h3></div><Link to="/launch/app/projects">Semua artikel <ChevronRight size={17} /></Link></div>
-          {data.length ? <div className="project-list-compact">{data.slice(0, 4).map(project => <Link to={`/launch/app/projects/${project.id}`} key={project.id}><span className="compact-thumb">{project.reference_image_url ? <img src={project.reference_image_url} alt="" /> : <Shirt size={22} />}</span><div><b>{project.article_name}</b><small>{project.code} · {stageMeta[project.current_stage].short}</small></div><Progress value={project.progress} compact /><ChevronRight size={18} /></Link>)}</div> : <EmptyPanel icon={<Boxes size={28} />} title="Belum ada artikel" detail="Mulai dari gambar referensi pertama yang diberikan owner." action={<Link className="button button-primary" to="/launch/app/projects/new">Buat artikel pertama</Link>} />}
+          {data.length ? <div className="project-list-compact">{data.slice(0, 4).map(project => <Link to={`/launch/app/projects/${project.id}`} key={project.id}><span className="compact-thumb"><SafeImage src={project.reference_image_url} alt="" fallback={<Shirt size={22} />} /></span><div><b>{project.article_name}</b><small>{project.code} · {stageMeta[project.current_stage].short}</small></div><Progress value={project.progress} compact /><ChevronRight size={18} /></Link>)}</div> : <EmptyPanel icon={<Boxes size={28} />} title="Belum ada artikel" detail="Mulai dari gambar referensi pertama yang diberikan owner." action={<Link className="button button-primary" to="/launch/app/projects/new">Buat artikel pertama</Link>} />}
         </section>
         <section className="content-card">
           <div className="section-head"><div><span className="eyebrow">Fokus personal</span><h3>Tugas saya</h3></div><span className="count-badge">{tasks.data?.length ?? 0}</span></div>
@@ -179,15 +187,20 @@ export function ProjectDetailPage() {
   const completeTaskMutation = useCompleteTask(projectId);
   const stageMutation = useUpdateStage(projectId);
   const [tab, setTab] = useState<'overview' | 'work' | 'tasks' | 'activity'>('overview');
+  const [activeWorkstream, setActiveWorkstream] = useState<StageCode | null>(null);
+  const [editing, setEditing] = useState(false);
   if (workspace.isLoading) return <LoadingBlocks />;
   if (workspace.error || !workspace.data) return <ErrorPanel title="Artikel tidak dapat dibuka" />;
-  const { project, stages, tasks, activity, references, materials, colorways, hpp, sizeCharts, qc } = workspace.data;
+  const { project, stages, tasks, activity, references, materials, colorways, hpp, sizeCharts, qc, samples } = workspace.data;
   const currentStage = stages.find(stage => stage.code === project.current_stage) ?? stages.find(stage => stage.status !== 'COMPLETED');
+  const stageOf = (code: StageCode) => stages.find(stage => stage.code === code);
   const openTasks = tasks.filter(task => task.status !== 'DONE');
   const latestHpp = hpp[0];
 
   return <div className="project-page"><Link className="back-link" to="/launch/app/projects"><ArrowLeft size={18} /> Semua artikel</Link>
-    <section className="project-hero"><div className="project-hero-image">{project.reference_image_url ? <img src={project.reference_image_url} alt={project.article_name} /> : <Shirt size={44} />}<span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name}</span></div><div className="project-hero-copy"><div className="project-meta"><span>{project.code}</span><StatusPill status={project.status} /><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div><h2>{project.article_name}</h2><p>{project.concept || 'Konsep artikel belum dilengkapi.'}</p><div className="hero-facts"><span><Target size={16} /> {project.category}</span><span><CalendarDays size={16} /> {project.target_date ? date.format(new Date(project.target_date)) : 'Target belum ada'}</span><span><Users size={16} /> Owner: {project.owner?.full_name ?? 'Belum ditetapkan'}</span></div></div><div className="hero-progress"><div className="progress-ring" style={{ '--progress': `${project.progress * 3.6}deg` } as React.CSSProperties}><span><b>{project.progress}%</b><small>kesiapan</small></span></div></div></section>
+    <section className="project-hero"><div className="project-hero-image"><SafeImage src={project.reference_image_url} alt={project.article_name} fallback={<Shirt size={44} />} /><span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name}</span></div><div className="project-hero-copy"><div className="project-meta"><span>{project.code}</span><StatusPill status={project.status} /><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div><h2>{project.article_name}</h2><p>{project.concept || 'Konsep artikel belum dilengkapi.'}</p><div className="hero-facts"><span><Target size={16} /> {project.category}</span><span><CalendarDays size={16} /> {project.target_date ? date.format(new Date(project.target_date)) : 'Target belum ada'}</span><span><Users size={16} /> Owner: {project.owner?.full_name ?? 'Belum ditetapkan'}</span></div><button type="button" className="button button-secondary hero-edit" onClick={() => setEditing(true)}><Pencil size={16} /> Ubah artikel</button></div><div className="hero-progress"><div className="progress-ring" style={{ '--progress': `${project.progress * 3.6}deg` } as React.CSSProperties}><span><b>{project.progress}%</b><small>kesiapan</small></span></div></div></section>
+
+    {editing && <EditProjectPanel project={project} onClose={() => setEditing(false)} />}
 
     <section className="stage-card"><div className="section-head"><div><span className="eyebrow">Alur utama</span><h3>{currentStage ? `Sekarang: ${stageMeta[currentStage.code].label}` : 'Seluruh tahap selesai'}</h3></div>{currentStage && currentStage.status === 'NOT_STARTED' && <button className="button button-secondary" onClick={() => stageMutation.mutate({ stageId: currentStage.id, status: 'IN_PROGRESS' })}>Mulai tahap <ArrowRight size={16} /></button>}</div><StageRail stages={stages} active={project.current_stage} /></section>
 
@@ -197,14 +210,30 @@ export function ProjectDetailPage() {
       <section className="content-card"><div className="section-head"><div><span className="eyebrow">Kelengkapan artikel</span><h3>Gate produksi</h3></div></div><div className="gate-list"><div className={colorways.length ? 'done' : ''}><span>{colorways.length ? <Check size={15} /> : <Palette size={16} />}</span><b>Varian warna</b><small>{colorways.length} final/kandidat</small></div><div className={latestHpp?.status === 'FINAL' ? 'done' : ''}><span>{latestHpp?.status === 'FINAL' ? <Check size={15} /> : <CircleDollarSign size={16} />}</span><b>HPP final</b><small>{latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'}</small></div><div className={sizeCharts.some(item => item.status === 'FINAL') ? 'done' : ''}><span>{sizeCharts.some(item => item.status === 'FINAL') ? <Check size={15} /> : <Layers3 size={16} />}</span><b>Size chart</b><small>{sizeCharts.length ? sizeCharts[0].status : 'Belum tersedia'}</small></div><div className={qc.some(item => item.result === 'PASS') ? 'done' : ''}><span>{qc.some(item => item.result === 'PASS') ? <Check size={15} /> : <PackageCheck size={16} />}</span><b>QC sample</b><small>{qc.length ? qc[0].result : 'Belum diperiksa'}</small></div></div></section>
       <section className="content-card"><div className="section-head"><div><span className="eyebrow">Tugas terbuka</span><h3>Yang perlu diselesaikan</h3></div><button className="text-button" onClick={() => setTab('tasks')}>Lihat semua</button></div>{openTasks.length ? <div className="task-list">{openTasks.slice(0, 5).map(task => <TaskRow task={task} key={task.id} onComplete={() => completeTaskMutation.mutate(task.id)} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={27} />} title="Semua tugas selesai" detail="Tidak ada tugas terbuka pada artikel ini." />}</section></div>}
 
-    {tab === 'work' && <><BriefSnapshot references={references} materials={materials} colorways={colorways} sizeCharts={sizeCharts} hpp={hpp} /><section className="workstream-grid"><Workstream icon={<BookOpen />} tone="blue" title="Riset & referensi" metric={`${references.length} referensi`} detail="Benchmark, fungsi, target pengguna, dan insight artikel." /><Workstream icon={<Factory />} tone="purple" title="Bahan & supplier" metric={`${materials.length} kandidat`} detail="Kandidat bahan, quotation, MOQ, lead time, dan supplier terpilih." /><Workstream icon={<Shirt />} tone="orange" title="Sampling" metric="Versi sample" detail="Konstruksi, pola, revisi, foto, dan master sample." /><Workstream icon={<CircleDollarSign />} tone="green" title="HPP & harga" metric={latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'} detail="Bahan, aksesori, jasa, overhead, margin, dan harga rekomendasi." /><Workstream icon={<Palette />} tone="pink" title="Warna & size chart" metric={`${colorways.length} warna · ${sizeCharts.length} chart`} detail="Varian final, titik ukur, toleransi, dan standar produksi." /><Workstream icon={<PackageCheck />} tone="yellow" title="QC & approval" metric={qc[0]?.result ?? 'Belum diperiksa'} detail="Checklist kualitas, bukti pemeriksaan, revisi, dan persetujuan owner." /></section></>}
+    {tab === 'work' && (activeWorkstream === 'RESEARCH'
+      ? <ResearchPanel projectId={project.id} stage={stageOf('RESEARCH')} references={references} researchSummary={project.research_summary} onBack={() => setActiveWorkstream(null)} />
+      : activeWorkstream === 'SOURCING'
+      ? <SourcingPanel projectId={project.id} stage={stageOf('SOURCING')} materials={materials} onBack={() => setActiveWorkstream(null)} />
+      : activeWorkstream === 'SAMPLING'
+      ? <SamplingPanel projectId={project.id} stage={stageOf('SAMPLING')} samples={samples} onBack={() => setActiveWorkstream(null)} />
+      : activeWorkstream === 'COSTING'
+      ? <CostingPanel projectId={project.id} stage={stageOf('COSTING')} hpp={hpp} onBack={() => setActiveWorkstream(null)} />
+      : activeWorkstream === 'SPECIFICATION'
+      ? <SpecificationPanel projectId={project.id} stage={stageOf('SPECIFICATION')} colorways={colorways} sizeCharts={sizeCharts} onBack={() => setActiveWorkstream(null)} />
+      : activeWorkstream === 'QC'
+      ? <QcPanel projectId={project.id} stage={stageOf('QC')} qc={qc} samples={samples} onBack={() => setActiveWorkstream(null)} />
+      : <><BriefSnapshot references={references} materials={materials} colorways={colorways} sizeCharts={sizeCharts} hpp={hpp} /><section className="workstream-grid"><Workstream icon={<BookOpen />} tone="blue" title="Riset & referensi" metric={`${references.length} referensi`} detail="Benchmark, fungsi, target pengguna, dan insight artikel." onClick={() => setActiveWorkstream('RESEARCH')} /><Workstream icon={<Factory />} tone="purple" title="Bahan & supplier" metric={`${materials.length} kandidat`} detail="Kandidat bahan, quotation, MOQ, lead time, dan supplier terpilih." onClick={() => setActiveWorkstream('SOURCING')} /><Workstream icon={<Shirt />} tone="orange" title="Sampling" metric={samples.length ? `${samples.length} versi sample` : 'Belum ada sample'} detail="Konstruksi, pola, revisi, foto, dan master sample." onClick={() => setActiveWorkstream('SAMPLING')} /><Workstream icon={<CircleDollarSign />} tone="green" title="HPP & harga" metric={latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'} detail="Bahan, aksesori, jasa, overhead, margin, dan harga rekomendasi." onClick={() => setActiveWorkstream('COSTING')} /><Workstream icon={<Palette />} tone="pink" title="Warna & size chart" metric={`${colorways.length} warna · ${sizeCharts.length} chart`} detail="Varian final, titik ukur, toleransi, dan standar produksi." onClick={() => setActiveWorkstream('SPECIFICATION')} /><Workstream icon={<PackageCheck />} tone="yellow" title="QC & approval" metric={qc[0]?.result ?? 'Belum diperiksa'} detail="Checklist kualitas, bukti pemeriksaan, revisi, dan persetujuan owner." onClick={() => setActiveWorkstream('QC')} /></section></>)}
 
     {tab === 'tasks' && <section className="content-card tasks-full"><div className="section-head"><div><span className="eyebrow">Eksekusi tim</span><h3>Daftar tugas artikel</h3></div></div>{tasks.length ? <div className="task-list">{tasks.map(task => <TaskRow key={task.id} task={task} onComplete={task.status === 'DONE' ? undefined : () => completeTaskMutation.mutate(task.id)} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={28} />} title="Belum ada tugas" detail="Tugas otomatis akan muncul ketika tahapan mulai dikerjakan." />}</section>}
     {tab === 'activity' && <section className="content-card activity-card"><div className="section-head"><div><span className="eyebrow">Jejak keputusan</span><h3>Aktivitas artikel</h3></div></div>{activity.length ? <div className="activity-list">{activity.map(item => <div key={item.id}><span className="avatar avatar-small">{initials(item.actor?.full_name)}</span><div><p><b>{item.actor?.full_name ?? 'Sistem'}</b> {item.message}</p><small>{date.format(new Date(item.created_at))}</small></div></div>)}</div> : <EmptyPanel icon={<Activity size={28} />} title="Belum ada aktivitas" detail="Perubahan dan keputusan penting akan tercatat di sini." />}</section>}
   </div>;
 }
 
-function Workstream({ icon, tone, title, metric, detail }: { icon: ReactNode; tone: string; title: string; metric: string; detail: string }) { return <article className="workstream-card"><span className={`workstream-icon ${tone}`}>{icon}</span><div><small>MODUL KERJA</small><h3>{title}</h3><b>{metric}</b><p>{detail}</p></div><span className="workstream-arrow" aria-hidden="true"><ChevronRight size={19} /></span></article>; }
+function Workstream({ icon, tone, title, metric, detail, onClick }: { icon: ReactNode; tone: string; title: string; metric: string; detail: string; onClick?: () => void }) {
+  const inner = <><span className={`workstream-icon ${tone}`}>{icon}</span><div><small>MODUL KERJA</small><h3>{title}</h3><b>{metric}</b><p>{detail}</p></div><span className="workstream-arrow" aria-hidden="true"><ChevronRight size={19} /></span></>;
+  if (onClick) return <button type="button" className="workstream-card workstream-card-clickable" onClick={onClick}>{inner}</button>;
+  return <article className="workstream-card">{inner}</article>;
+}
 
 export function LibraryPage() {
   const library = useQuery({ queryKey: ['launch-library'], queryFn: async () => { const [suppliers, materials] = await Promise.all([supabase.from('suppliers').select('*').eq('is_active', true).order('name'), supabase.from('materials').select('*').eq('is_active', true).order('name')]); if (suppliers.error) throw suppliers.error; if (materials.error) throw materials.error; return { suppliers: suppliers.data ?? [], materials: materials.data ?? [] }; } });

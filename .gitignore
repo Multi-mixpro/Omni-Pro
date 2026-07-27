@@ -20,6 +20,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Local agent settings may embed access tokens; keep them out of the repo
+.claude/settings.local.json
+
 # Editor / IDE files
 .vscode/*
 !.vscode/extensions.json

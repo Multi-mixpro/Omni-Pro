@@ -57,7 +57,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <div><b>Product Launch OS</b><small>Sistem aktif · 01</small></div>
           </div>
           <button className="side-settings" onClick={() => navigate('/')}><Grid2X2 size={18} /> Portal semua sistem</button>
-          <button className="side-settings"><Settings2 size={18} /> Pengaturan</button>
+          <button className="side-settings" onClick={() => navigate('/launch/app/settings')}><Settings2 size={18} /> Pengaturan</button>
         </div>
       </aside>
       {menuOpen && <button className="menu-scrim" aria-label="Tutup menu" onClick={() => setMenuOpen(false)} />}
