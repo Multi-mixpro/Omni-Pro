@@ -1,12 +1,14 @@
-import { ReactNode } from 'react';
+import { lazy, ReactNode, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLayout } from '@/app/layouts/AppLayout';
 import { SystemPortal } from '@/app/pages/SystemPortal';
 import { AuthGate } from '@/core/auth/AuthGate';
 import { ModuleLoginPreview } from '@/core/auth/ModuleLoginPreview';
 import { useAuth } from '@/core/auth/useAuth';
-import { LibraryPage, NewProjectPage, ProjectDetailPage, ProjectsPage, TeamPage, TodayPage } from '@/modules/launch/pages';
+import { LibraryPage, ProjectDetailPage, ProjectsPage, TeamPage, TodayPage } from '@/modules/launch/pages';
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
+
+const NewProjectBriefPage = lazy(() => import('@/modules/launch/new-project/NewProjectBriefPage').then(module => ({ default: module.NewProjectBriefPage })));
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false } } });
 
@@ -39,7 +41,7 @@ function RouteView() {
   let page: ReactNode;
   if (pathname === '/launch/app/today') page = <TodayPage />;
   else if (pathname === '/launch/app/projects') page = <ProjectsPage />;
-  else if (pathname === '/launch/app/projects/new') page = <NewProjectPage />;
+  else if (pathname === '/launch/app/projects/new') page = <Suspense fallback={<BootScreen />}><NewProjectBriefPage /></Suspense>;
   else if (/^\/launch\/app\/projects\/[^/]+\/?$/.test(pathname)) page = <ProjectDetailPage />;
   else if (pathname === '/launch/app/library') page = <LibraryPage />;
   else if (pathname === '/launch/app/team') page = <TeamPage />;

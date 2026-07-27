@@ -36,18 +36,20 @@ export async function listMyTasks(userId: string) {
 }
 
 export async function getProjectWorkspace(projectId: string): Promise<ProjectWorkspace> {
-  const [projectResult, stagesResult, tasksResult, activityResult, colorResult, hppResult, sizeResult, qcResult] = await Promise.all([
+  const [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, hppResult, sizeResult, qcResult] = await Promise.all([
     supabase.from('launch_projects').select(PROJECT_FIELDS).eq('id', projectId).single(),
     supabase.from('launch_stage_runs').select('*, owner:profiles!launch_stage_runs_owner_id_fkey(*)').eq('project_id', projectId).order('position'),
     supabase.from('launch_tasks').select('*, assignee:profiles!launch_tasks_assignee_id_fkey(*)').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_activity').select('*, actor:profiles!launch_activity_actor_id_fkey(*)').eq('project_id', projectId).order('created_at', { ascending: false }).limit(20),
+    supabase.from('launch_references').select('id, title, reference_type, source_url, image_url, insight, is_primary').eq('project_id', projectId).order('sort_order'),
+    supabase.from('launch_material_candidates').select('id, proposed_name, role, composition, gsm, width_cm, color_notes, status, quotes:launch_supplier_quotes(id, supplier_role, price, unit, moq, lead_time_days, status, supplier:suppliers(id, name, contact_name, phone, city))').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_colorways').select('id, name, hex_code, status').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_hpp_versions').select('id, version, total_hpp, recommended_price, status').eq('project_id', projectId).order('version', { ascending: false }),
-    supabase.from('launch_size_charts').select('id, name, status').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('launch_size_charts').select('id, name, status, sizes').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('launch_qc_checks').select('id, result, summary, checked_at').eq('project_id', projectId).order('created_at', { ascending: false }),
   ]);
 
-  const failure = [projectResult, stagesResult, tasksResult, activityResult, colorResult, hppResult, sizeResult, qcResult].find(result => result.error);
+  const failure = [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, hppResult, sizeResult, qcResult].find(result => result.error);
   if (failure?.error) throw failure.error;
 
   return {
@@ -55,6 +57,8 @@ export async function getProjectWorkspace(projectId: string): Promise<ProjectWor
     stages: (stagesResult.data ?? []) as unknown as LaunchStage[],
     tasks: (tasksResult.data ?? []) as unknown as LaunchTask[],
     activity: (activityResult.data ?? []) as ProjectWorkspace['activity'],
+    references: (referenceResult.data ?? []) as ProjectWorkspace['references'],
+    materials: (materialResult.data ?? []) as unknown as ProjectWorkspace['materials'],
     colorways: (colorResult.data ?? []) as ProjectWorkspace['colorways'],
     hpp: (hppResult.data ?? []) as ProjectWorkspace['hpp'],
     sizeCharts: (sizeResult.data ?? []) as ProjectWorkspace['sizeCharts'],
@@ -78,9 +82,16 @@ export async function updateStage(stageId: string, status: string) {
   if (error) throw error;
 }
 
-export async function uploadProjectReference(projectId: string, file: File) {
+export async function uploadProjectReference(
+  projectId: string,
+  file: File,
+  options: { isPrimary?: boolean; sortOrder?: number; title?: string } = {},
+) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error(`${file.name}: format gambar tidak didukung.`);
+  if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name}: ukuran gambar melebihi 10 MB.`);
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
+  const userId = sessionData.session?.user.id;
   if (!token) throw new Error('Sesi upload tidak tersedia.');
 
   const folder = `gg-indo-apparel/product-launch/${projectId}`;
@@ -111,10 +122,25 @@ export async function uploadProjectReference(projectId: string, file: File) {
     height: uploaded.height,
     format: uploaded.format,
     bytes: uploaded.bytes,
+    metadata: { original_name: file.name },
   }).select('id').single();
   if (mediaError) throw mediaError;
 
-  const { error } = await supabase.from('launch_projects').update({ reference_media_id: media.id, reference_image_url: uploaded.secure_url }).eq('id', projectId);
-  if (error) throw error;
+  const { error: referenceError } = await supabase.from('launch_references').insert({
+    project_id: projectId,
+    title: options.title || file.name.replace(/\.[^.]+$/, ''),
+    reference_type: 'PRODUCT',
+    image_url: uploaded.secure_url,
+    media_asset_id: media.id,
+    sort_order: options.sortOrder ?? 0,
+    is_primary: options.isPrimary ?? false,
+    created_by: userId,
+  });
+  if (referenceError) throw referenceError;
+
+  if (options.isPrimary) {
+    const { error } = await supabase.from('launch_projects').update({ reference_media_id: media.id, reference_image_url: uploaded.secure_url }).eq('id', projectId);
+    if (error) throw error;
+  }
   return uploaded.secure_url;
 }

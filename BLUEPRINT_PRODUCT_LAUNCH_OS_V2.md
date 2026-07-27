@@ -422,15 +422,16 @@ Desktop memakai dua kolom pada bagian bawah. Mobile memakai satu kolom, bottom n
 - target sentuh minimum 42 px;
 - filter horizontal pada layar kecil.
 
-### Form Perintah Artikel
+### Brief Builder — Perintah Artikel
 
-Tiga blok:
+Empat area kerja:
 
-1. gambar dan identitas;
-2. arah produk;
-3. prioritas dan target.
+1. **Referensi dan identitas** — multi-upload gambar lokal, URL gambar, link pembanding yang dapat diklik, jenis sumber, insight, nama artikel, unit, kategori, konsep, dan arahan owner;
+2. **Varian dan ukuran** — kandidat warna, kode/hex/panel, rentang ukuran, titik ukur, nilai per ukuran, serta toleransi;
+3. **Material dan supplier** — bahan utama/lining/rib/aksesori/kemasan, komposisi, GSM, lebar, konsumsi, supplier utama atau alternatif, kontak, kota, harga, MOQ, dan lead time;
+4. **Draft HPP dan target** — komponen material/jasa/overhead, kuantitas, harga satuan, waste, estimasi total, margin, prioritas, dan target siap produksi.
 
-Sistem membuat sembilan tahap dan tugas awal secara otomatis. Upload gambar dilakukan setelah project tercipta agar folder Cloudinary memakai project ID.
+Brief menampilkan skor kelengkapan dan hanya dapat dibuat setelah identitas serta minimal satu referensi tersedia. Sistem menyimpan data terstruktur secara atomik di Supabase, membuat sembilan tahap dan tugas awal, lalu mengunggah file lokal ke folder Cloudinary berbasis project ID. Jika sebagian upload gagal, project tetap dapat dibuka tanpa membuat duplikasi dan gambar dapat ditambahkan ulang dari workspace.
 
 ### Ruang Kerja Artikel
 

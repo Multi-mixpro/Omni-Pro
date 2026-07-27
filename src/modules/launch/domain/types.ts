@@ -98,9 +98,30 @@ export interface ProjectWorkspace {
   stages: LaunchStage[];
   tasks: LaunchTask[];
   activity: ActivityItem[];
+  references: Array<{ id: string; title: string; reference_type: string; source_url: string | null; image_url: string | null; insight: string | null; is_primary: boolean }>;
+  materials: Array<{
+    id: string;
+    proposed_name: string;
+    role: string;
+    composition: string | null;
+    gsm: number | null;
+    width_cm: number | null;
+    color_notes: string | null;
+    status: string;
+    quotes?: Array<{
+      id: string;
+      supplier_role: string;
+      price: number;
+      unit: string;
+      moq: number | null;
+      lead_time_days: number | null;
+      status: string;
+      supplier?: { id: string; name: string; contact_name: string | null; phone: string | null; city: string | null } | null;
+    }>;
+  }>;
   colorways: Array<{ id: string; name: string; hex_code: string | null; status: string }>;
   hpp: Array<{ id: string; version: number; total_hpp: number; recommended_price: number | null; status: string }>;
-  sizeCharts: Array<{ id: string; name: string; status: string }>;
+  sizeCharts: Array<{ id: string; name: string; status: string; sizes: string[] }>;
   qc: Array<{ id: string; result: string; summary: string | null; checked_at: string | null }>;
 }
 
@@ -112,4 +133,73 @@ export interface NewProjectInput {
   source_notes?: string;
   priority: Priority;
   target_date?: string;
+  references?: ReferenceDraft[];
+  colorways?: ColorwayDraft[];
+  sizes?: string[];
+  size_chart_name?: string;
+  size_unit?: string;
+  measurements?: MeasurementDraft[];
+  materials?: MaterialSupplierDraft[];
+  hpp_lines?: HppLineDraft[];
+  target_margin_percent?: number | '';
+}
+
+export interface ReferenceDraft {
+  title: string;
+  reference_type: 'PRODUCT' | 'MATERIAL' | 'PRICE' | 'CONSTRUCTION' | 'MARKET' | 'OTHER';
+  source_url?: string;
+  image_url?: string;
+  insight?: string;
+  sort_order: number;
+  is_primary?: boolean;
+}
+
+export interface ColorwayDraft {
+  name: string;
+  color_code?: string;
+  hex_code?: string;
+  panel_notes?: string;
+}
+
+export interface MeasurementDraft {
+  point_code: string;
+  point_name: string;
+  position: number;
+  tolerance_plus: number | '';
+  tolerance_minus: number | '';
+  values: Record<string, number | ''>;
+}
+
+export interface MaterialSupplierDraft {
+  proposed_name: string;
+  role: 'MAIN' | 'LINING' | 'RIB' | 'ACCESSORY' | 'PACKAGING' | 'OTHER';
+  composition?: string;
+  gsm?: number | '';
+  width_cm?: number | '';
+  color_notes?: string;
+  estimated_consumption?: number | '';
+  unit: string;
+  suitability_notes?: string;
+  risk_notes?: string;
+  supplier_name?: string;
+  supplier_role: 'PRIMARY' | 'ALTERNATIVE';
+  contact_name?: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  unit_price?: number | '';
+  moq?: number | '';
+  moq_notes?: string;
+  lead_time_days?: number | '';
+  supplier_notes?: string;
+}
+
+export interface HppLineDraft {
+  category: 'MATERIAL' | 'ACCESSORY' | 'LABOR' | 'PRINTING' | 'EMBROIDERY' | 'PACKAGING' | 'OVERHEAD' | 'OTHER';
+  item_name: string;
+  quantity: number | '';
+  unit: string;
+  unit_price: number | '';
+  waste_percent: number | '';
+  notes?: string;
 }
