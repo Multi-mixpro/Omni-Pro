@@ -16,7 +16,9 @@ import { SpecificationPanel } from './components/SpecificationPanel';
 import { QcPanel } from './components/QcPanel';
 import type { LaunchProject, LaunchStage, LaunchTask, NewProjectInput, Priority, ProjectStatus, StageCode } from './domain/types';
 import { STAGE_ORDER } from './domain/types';
+import { COST_CONFIDENCE_LABEL, SCHEDULE_HEALTH_LABEL, costConfidence, dataReadiness, dataReadinessItems, scheduleHealth } from './domain/indicators';
 import { useBusinessUnits, useCompleteTask, useCreateProject, useMyTasks, useProfiles, useProject, useProjects, useUpdateStage } from './hooks/useLaunch';
+import type { ProjectWorkspace as ProjectWorkspaceData } from './domain/types';
 
 const stageMeta: Record<StageCode, { short: string; label: string }> = {
   BRIEF: { short: 'Brief', label: 'Brief & arahan' },
@@ -51,6 +53,9 @@ function Progress({ value, compact = false }: { value: number; compact?: boolean
 }
 
 function ProjectCard({ project }: { project: LaunchProject }) {
+  // The list query stays light, so health is derived from the article fields
+  // alone; the workspace adds stage-level detail once the article is opened.
+  const health = scheduleHealth(project, []);
   return (
     <Link to={`/launch/app/projects/${project.id}`} className="project-card">
       <div className="project-thumb">
@@ -62,7 +67,7 @@ function ProjectCard({ project }: { project: LaunchProject }) {
         <h3>{project.article_name}</h3>
         <p>{project.category} · {stageMeta[project.current_stage]?.label ?? project.current_stage}</p>
         <Progress value={project.progress} />
-        <div className="project-card-footer"><StatusPill status={project.status} /><span><Clock3 size={14} /> {dueText(project.target_date)}</span></div>
+        <div className="project-card-footer"><StatusPill status={project.status} /><span className={`health-chip health-${health.toLowerCase()}`}>{SCHEDULE_HEALTH_LABEL[health]}</span><span><Clock3 size={14} /> {dueText(project.target_date)}</span></div>
       </div>
     </Link>
   );
@@ -177,6 +182,42 @@ export function NewProjectPage() {
   </div>;
 }
 
+function IndicatorPanel({ workspace }: { workspace: ProjectWorkspaceData }) {
+  const { project, stages } = workspace;
+  const readinessItems = dataReadinessItems({ ...workspace, project });
+  const readiness = dataReadiness({ ...workspace, project });
+  const health = scheduleHealth(project, stages);
+  const cost = costConfidence(workspace);
+  const missing = readinessItems.filter(item => !item.done);
+
+  return (
+    <section className="indicator-grid">
+      <article className="indicator-card">
+        <small>Progress tahapan</small>
+        <b>{project.progress}%</b>
+        <Progress value={project.progress} compact />
+        <span>{stages.filter(stage => stage.status === 'COMPLETED').length} dari {stages.length} tahap selesai</span>
+      </article>
+      <article className="indicator-card">
+        <small>Kelengkapan data</small>
+        <b>{readiness}%</b>
+        <Progress value={readiness} compact />
+        <span>{missing.length ? `Belum ada: ${missing.slice(0, 2).map(item => item.label.toLowerCase()).join(', ')}${missing.length > 2 ? `, +${missing.length - 2}` : ''}` : 'Seluruh data utama lengkap'}</span>
+      </article>
+      <article className={`indicator-card health-${health.toLowerCase()}`}>
+        <small>Kondisi jadwal</small>
+        <b>{SCHEDULE_HEALTH_LABEL[health]}</b>
+        <span>{project.target_date ? `Target produksi ${date.format(new Date(project.target_date))}` : 'Target produksi belum ditetapkan'}</span>
+      </article>
+      <article className={`indicator-card cost-${cost.toLowerCase()}`}>
+        <small>Keyakinan biaya</small>
+        <b>{COST_CONFIDENCE_LABEL[cost]}</b>
+        <span>{workspace.hpp[0] ? money.format(workspace.hpp[0].total_hpp) : 'HPP belum disusun'}</span>
+      </article>
+    </section>
+  );
+}
+
 function StageRail({ stages, active }: { stages: LaunchStage[]; active: StageCode }) {
   return <div className="stage-rail">{stages.map(stage => <div className={`stage-node stage-${stage.status.toLowerCase()} ${stage.code === active ? 'current' : ''}`} key={stage.id}><span>{stage.status === 'COMPLETED' ? <Check size={15} /> : stage.position}</span><div><b>{stageMeta[stage.code].short}</b><small>{stage.progress}%</small></div></div>)}</div>;
 }
@@ -206,9 +247,9 @@ export function ProjectDetailPage() {
 
     <div className="project-tabs">{([['overview', 'Ringkasan'], ['work', 'Ruang kerja'], ['tasks', `Tugas (${openTasks.length})`], ['activity', 'Aktivitas']] as const).map(item => <button key={item[0]} className={tab === item[0] ? 'active' : ''} onClick={() => setTab(item[0])}>{item[1]}</button>)}</div>
 
-    {tab === 'overview' && <div className="workspace-grid"><section className="content-card next-action"><div className="next-icon"><ArrowUpRight size={23} /></div><div><span className="eyebrow">Tindakan terbaik berikutnya</span><h3>{currentStage?.status === 'BLOCKED' ? 'Buka hambatan tahap ini' : `Lanjutkan ${currentStage ? stageMeta[currentStage.code].label.toLowerCase() : 'persiapan produksi'}`}</h3><p>{currentStage?.blocking_note || 'Lengkapi data wajib dan selesaikan tugas terbuka sebelum mengajukan review.'}</p></div><button className="button button-primary" onClick={() => setTab('work')}>Buka ruang kerja</button></section>
+    {tab === 'overview' && <><IndicatorPanel workspace={workspace.data} /><div className="workspace-grid"><section className="content-card next-action"><div className="next-icon"><ArrowUpRight size={23} /></div><div><span className="eyebrow">Tindakan terbaik berikutnya</span><h3>{currentStage?.status === 'BLOCKED' ? 'Buka hambatan tahap ini' : `Lanjutkan ${currentStage ? stageMeta[currentStage.code].label.toLowerCase() : 'persiapan produksi'}`}</h3><p>{currentStage?.blocking_note || 'Lengkapi data wajib dan selesaikan tugas terbuka sebelum mengajukan review.'}</p></div><button className="button button-primary" onClick={() => setTab('work')}>Buka ruang kerja</button></section>
       <section className="content-card"><div className="section-head"><div><span className="eyebrow">Kelengkapan artikel</span><h3>Gate produksi</h3></div></div><div className="gate-list"><div className={colorways.length ? 'done' : ''}><span>{colorways.length ? <Check size={15} /> : <Palette size={16} />}</span><b>Varian warna</b><small>{colorways.length} final/kandidat</small></div><div className={latestHpp?.status === 'FINAL' ? 'done' : ''}><span>{latestHpp?.status === 'FINAL' ? <Check size={15} /> : <CircleDollarSign size={16} />}</span><b>HPP final</b><small>{latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'}</small></div><div className={sizeCharts.some(item => item.status === 'FINAL') ? 'done' : ''}><span>{sizeCharts.some(item => item.status === 'FINAL') ? <Check size={15} /> : <Layers3 size={16} />}</span><b>Size chart</b><small>{sizeCharts.length ? sizeCharts[0].status : 'Belum tersedia'}</small></div><div className={qc.some(item => item.result === 'PASS') ? 'done' : ''}><span>{qc.some(item => item.result === 'PASS') ? <Check size={15} /> : <PackageCheck size={16} />}</span><b>QC sample</b><small>{qc.length ? qc[0].result : 'Belum diperiksa'}</small></div></div></section>
-      <section className="content-card"><div className="section-head"><div><span className="eyebrow">Tugas terbuka</span><h3>Yang perlu diselesaikan</h3></div><button className="text-button" onClick={() => setTab('tasks')}>Lihat semua</button></div>{openTasks.length ? <div className="task-list">{openTasks.slice(0, 5).map(task => <TaskRow task={task} key={task.id} onComplete={() => completeTaskMutation.mutate(task.id)} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={27} />} title="Semua tugas selesai" detail="Tidak ada tugas terbuka pada artikel ini." />}</section></div>}
+      <section className="content-card"><div className="section-head"><div><span className="eyebrow">Tugas terbuka</span><h3>Yang perlu diselesaikan</h3></div><button className="text-button" onClick={() => setTab('tasks')}>Lihat semua</button></div>{openTasks.length ? <div className="task-list">{openTasks.slice(0, 5).map(task => <TaskRow task={task} key={task.id} onComplete={() => completeTaskMutation.mutate(task.id)} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={27} />} title="Semua tugas selesai" detail="Tidak ada tugas terbuka pada artikel ini." />}</section></div></>}
 
     {tab === 'work' && (activeWorkstream === 'RESEARCH'
       ? <ResearchPanel projectId={project.id} stage={stageOf('RESEARCH')} references={references} researchSummary={project.research_summary} onBack={() => setActiveWorkstream(null)} />
