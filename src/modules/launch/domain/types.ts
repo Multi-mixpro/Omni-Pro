@@ -47,6 +47,8 @@ export interface LaunchProject {
   current_stage: StageCode;
   progress: number;
   target_date: string | null;
+  target_fix_date: string | null;
+  target_launch_date: string | null;
   created_at: string;
   updated_at: string;
   owner_id: string;
@@ -133,6 +135,11 @@ export interface NewProjectInput {
   source_notes?: string;
   priority: Priority;
   target_date?: string;
+  target_research_date?: string;
+  target_sourcing_date?: string;
+  target_fix_date?: string;
+  target_costing_date?: string;
+  target_launch_date?: string;
   references?: ReferenceDraft[];
   colorways?: ColorwayDraft[];
   sizes?: string[];
@@ -183,6 +190,7 @@ export interface MaterialSupplierDraft {
   risk_notes?: string;
   supplier_name?: string;
   supplier_role: 'PRIMARY' | 'ALTERNATIVE';
+  price_unit: string;
   contact_name?: string;
   phone?: string;
   city?: string;

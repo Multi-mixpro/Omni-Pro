@@ -67,9 +67,18 @@ export async function getProjectWorkspace(projectId: string): Promise<ProjectWor
 }
 
 export async function createProject(input: NewProjectInput) {
-  const { data, error } = await supabase.rpc('create_launch_project', { p_payload: input });
-  if (error) throw error;
-  return String(data);
+  const planned = await supabase.rpc('create_launch_project_brief', { p_payload: input });
+  if (!planned.error) return String(planned.data);
+
+  // Keep creation available during a rolling deployment where the frontend can
+  // arrive shortly before the milestone RPC migration reaches Supabase.
+  if (planned.error.code === 'PGRST202') {
+    const fallback = await supabase.rpc('create_launch_project', { p_payload: input });
+    if (fallback.error) throw fallback.error;
+    return String(fallback.data);
+  }
+
+  throw planned.error;
 }
 
 export async function completeTask(taskId: string) {

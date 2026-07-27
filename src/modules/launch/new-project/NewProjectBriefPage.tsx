@@ -15,6 +15,12 @@ import { useBusinessUnits, useCreateProject } from '../hooks/useLaunch';
 const SIZE_PRESETS = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
 const MATERIAL_ROLES = [['MAIN', 'Bahan utama'], ['LINING', 'Lining'], ['RIB', 'Rib'], ['ACCESSORY', 'Aksesori'], ['PACKAGING', 'Kemasan'], ['OTHER', 'Lainnya']] as const;
 const HPP_CATEGORIES = [['MATERIAL', 'Material'], ['ACCESSORY', 'Aksesori'], ['LABOR', 'Jahit/tenaga'], ['PRINTING', 'Sablon'], ['EMBROIDERY', 'Bordir'], ['PACKAGING', 'Kemasan'], ['OVERHEAD', 'Overhead'], ['OTHER', 'Lainnya']] as const;
+const MATERIAL_UNITS = ['meter', 'yard', 'kg', 'gram', 'pcs', 'set', 'pasang', 'roll', 'lembar', 'lusin', 'box', 'liter'];
+const PURCHASE_UNITS = [
+  ['meter', 'Per meter'], ['yard', 'Per yard'], ['kg', 'Per kilogram'], ['gram', 'Per gram'],
+  ['pcs', 'Per pcs'], ['set', 'Per set'], ['pasang', 'Per pasang'], ['roll', 'Per roll'],
+  ['lembar', 'Per lembar'], ['lusin', 'Per lusin'], ['box', 'Per box'], ['liter', 'Per liter'],
+] as const;
 
 interface LocalReference {
   id: string;
@@ -30,11 +36,17 @@ const emptyMeasurement = (position: number): MeasurementDraft => ({ point_code: 
 const emptyMaterial = (supplierRole: 'PRIMARY' | 'ALTERNATIVE' = 'PRIMARY'): MaterialSupplierDraft => ({
   proposed_name: '', role: 'MAIN', composition: '', gsm: '', width_cm: '', color_notes: '', estimated_consumption: '', unit: 'meter',
   suitability_notes: '', risk_notes: '', supplier_name: '', supplier_role: supplierRole, contact_name: '', phone: '', city: '', address: '',
-  unit_price: '', moq: '', moq_notes: '', lead_time_days: '', supplier_notes: '',
+  unit_price: '', price_unit: 'meter', moq: '', moq_notes: '', lead_time_days: '', supplier_notes: '',
 });
 const emptyHpp = (): HppLineDraft => ({ category: 'MATERIAL', item_name: '', quantity: 1, unit: 'pcs', unit_price: '', waste_percent: 0, notes: '' });
 
 function numberValue(value: string): number | '' { return value === '' ? '' : Number(value); }
+function offsetDate(value: string, days: number) {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 
 export function NewProjectBriefPage() {
   const navigate = useNavigate();
@@ -73,6 +85,8 @@ export function NewProjectBriefPage() {
   const readyToSubmit = identityReady && referenceCount > 0;
   const completionItems = [identityReady, referenceCount > 0, validMaterials.length > 0, validColors.length > 0 && sizes.length > 0, validHpp.length > 0];
   const completion = Math.round(completionItems.filter(Boolean).length / completionItems.length * 100);
+  const orderedMilestones = [form.target_research_date, form.target_sourcing_date, form.target_fix_date, form.target_costing_date, form.target_date, form.target_launch_date].filter((value): value is string => Boolean(value));
+  const hasMilestoneConflict = orderedMilestones.some((value, index) => index > 0 && value < orderedMilestones[index - 1]);
 
   function addFiles(files: FileList | null) {
     if (!files) return;
@@ -91,6 +105,19 @@ export function NewProjectBriefPage() {
 
   function toggleSize(size: string) { setSizes(current => current.includes(size) ? current.filter(item => item !== size) : [...current, size]); }
   function addCustomSize() { const value = customSize.trim().toUpperCase(); if (value && !sizes.includes(value)) setSizes(current => [...current, value]); setCustomSize(''); }
+  function buildSchedule() {
+    const today = new Date().toISOString().slice(0, 10);
+    const readyDate = form.target_date || (form.target_launch_date ? offsetDate(form.target_launch_date, -14) : offsetDate(today, 35));
+    setForm(current => ({
+      ...current,
+      target_research_date: current.target_research_date || offsetDate(readyDate, -21),
+      target_sourcing_date: current.target_sourcing_date || offsetDate(readyDate, -17),
+      target_fix_date: current.target_fix_date || offsetDate(readyDate, -10),
+      target_costing_date: current.target_costing_date || offsetDate(readyDate, -7),
+      target_date: readyDate,
+      target_launch_date: current.target_launch_date || offsetDate(readyDate, 14),
+    }));
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -189,13 +216,37 @@ export function NewProjectBriefPage() {
           <section className="brief-section" id="brief-sourcing">
             <div className="brief-section-heading"><span className="section-number">03</span><div><span className="eyebrow">Kesiapan sourcing</span><h3>Material & supplier</h3><p>Catat bahan baku, konsumsi, supplier utama atau alternatif, kontak, harga, MOQ, dan lead time.</p></div><button type="button" className="button button-secondary" onClick={() => setMaterials(current => [...current, emptyMaterial('ALTERNATIVE')])}><PackagePlus size={17} /> Tambah kandidat</button></div>
             <div className="material-card-list">{materials.map((item, index) => <article className="material-draft-card" key={`material-${index}`}><div className="material-card-head"><span className="material-card-icon"><Layers3 size={20} /></span><div><b>Kandidat {index + 1}</b><small>{item.supplier_role === 'PRIMARY' ? 'Supplier utama' : 'Supplier alternatif'}</small></div><select value={item.supplier_role} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, supplier_role: e.target.value as MaterialSupplierDraft['supplier_role'] } : row))}><option value="PRIMARY">Utama</option><option value="ALTERNATIVE">Alternatif</option></select>{materials.length > 1 && <button type="button" className="remove-row" onClick={() => setMaterials(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div><div className="material-form-grid"><label className="field field-span-2"><span>Nama bahan/komponen</span><input placeholder="Contoh: Taslan balon coating" value={item.proposed_name} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, proposed_name: e.target.value } : row))} /></label><label className="field"><span>Peran bahan</span><select value={item.role} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, role: e.target.value as MaterialSupplierDraft['role'] } : row))}>{MATERIAL_ROLES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label className="field"><span>Komposisi</span><input placeholder="100% nylon" value={item.composition} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, composition: e.target.value } : row))} /></label><label className="field"><span>GSM</span><input type="number" min="0" placeholder="120" value={item.gsm} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, gsm: numberValue(e.target.value) } : row))} /></label><label className="field"><span>Lebar bahan (cm)</span><input type="number" min="0" placeholder="150" value={item.width_cm} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, width_cm: numberValue(e.target.value) } : row))} /></label><label className="field"><span>Konsumsi</span><div className="joined-input"><input type="number" min="0" step="0.01" placeholder="1.5" value={item.estimated_consumption} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, estimated_consumption: numberValue(e.target.value) } : row))} /><select value={item.unit} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, unit: e.target.value } : row))}><option>meter</option><option>kg</option><option>pcs</option><option>set</option><option>roll</option></select></div></label><label className="field field-span-3"><span>Warna & karakter bahan</span><input placeholder="Pilihan warna, handfeel, stretch, coating, ketebalan…" value={item.color_notes} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, color_notes: e.target.value } : row))} /></label></div><div className="supplier-divider"><Truck size={17} /><span>Data supplier</span></div><div className="material-form-grid"><label className="field field-span-2"><span>Nama supplier</span><input placeholder="Nama toko, pabrik, atau distributor" value={item.supplier_name} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, supplier_name: e.target.value } : row))} /></label><label className="field"><span>Kontak person</span><input placeholder="Nama PIC" value={item.contact_name} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, contact_name: e.target.value } : row))} /></label><label className="field"><span>WhatsApp/telepon</span><input inputMode="tel" placeholder="08…" value={item.phone} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, phone: e.target.value } : row))} /></label><label className="field"><span>Kota</span><input placeholder="Bandung" value={item.city} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, city: e.target.value } : row))} /></label><label className="field"><span>Harga per {item.unit}</span><input type="number" min="0" placeholder="0" value={item.unit_price} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, unit_price: numberValue(e.target.value) } : row))} /></label><label className="field"><span>MOQ</span><input type="number" min="0" placeholder="0" value={item.moq} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, moq: numberValue(e.target.value) } : row))} /></label><label className="field"><span>Lead time (hari)</span><input type="number" min="0" placeholder="7" value={item.lead_time_days} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, lead_time_days: numberValue(e.target.value) } : row))} /></label><label className="field field-span-3"><span>Catatan supplier</span><input placeholder="Kualitas, cara pemesanan, risiko, masa berlaku harga…" value={item.supplier_notes} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, supplier_notes: e.target.value } : row))} /></label></div></article>)}</div>
+            <div className="supplier-unit-planner">
+              <div className="supplier-unit-head">
+                <div><span className="eyebrow">Standar perhitungan</span><h4>Konsumsi produksi & harga beli supplier</h4><p>Satuan pemakaian produksi boleh berbeda dengan satuan penawaran supplier. Sistem menyimpannya terpisah agar HPP tidak salah hitung.</p></div>
+              </div>
+              <div className="supplier-unit-list">
+                {materials.map((item, index) => <div className="supplier-unit-row" key={`unit-${index}`}>
+                  <div className="supplier-unit-name"><span>{index + 1}</span><p><b>{item.proposed_name || `Kandidat material ${index + 1}`}</b><small>{item.supplier_name || (item.supplier_role === 'PRIMARY' ? 'Supplier utama' : 'Supplier alternatif')}</small></p></div>
+                  <label className="field"><span>Konsumsi produksi</span><div className="joined-input"><input type="number" min="0" step="0.01" placeholder="1.5" value={item.estimated_consumption} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, estimated_consumption: numberValue(e.target.value) } : row))} /><select value={item.unit} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, unit: e.target.value } : row))}>{MATERIAL_UNITS.map(unit => <option value={unit} key={unit}>{unit}</option>)}</select></div></label>
+                  <label className="field"><span>Harga beli supplier</span><div className="joined-input purchase-unit-input"><input type="number" min="0" placeholder="0" value={item.unit_price} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, unit_price: numberValue(e.target.value) } : row))} /><select value={item.price_unit} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, price_unit: e.target.value } : row))}>{PURCHASE_UNITS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div></label>
+                </div>)}
+              </div>
+            </div>
           </section>
 
           <section className="brief-section" id="brief-costing">
             <div className="brief-section-heading"><span className="section-number">04</span><div><span className="eyebrow">Estimasi awal</span><h3>Draft HPP & target</h3><p>Owner boleh memberi angka awal; tim costing wajib memvalidasi sebelum status final.</p></div><button type="button" className="button button-secondary" onClick={() => setHppLines(current => [...current, emptyHpp()])}><Plus size={17} /> Komponen biaya</button></div>
             <div className="hpp-table-wrap"><div className="hpp-table-head"><span>Komponen</span><span>Jumlah</span><span>Satuan</span><span>Harga satuan</span><span>Waste</span><span>Total</span><span /></div>{hppLines.map((line, index) => { const total = (Number(line.quantity) || 0) * (Number(line.unit_price) || 0) * (1 + (Number(line.waste_percent) || 0) / 100); return <div className="hpp-table-row" key={`hpp-${index}`}><div><select value={line.category} aria-label="Kategori biaya" onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, category: e.target.value as HppLineDraft['category'] } : row))}>{HPP_CATEGORIES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><input placeholder="Nama bahan/jasa" value={line.item_name} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, item_name: e.target.value } : row))} /></div><input type="number" min="0" step="0.01" value={line.quantity} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, quantity: numberValue(e.target.value) } : row))} /><input value={line.unit} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, unit: e.target.value } : row))} /><input type="number" min="0" placeholder="0" value={line.unit_price} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, unit_price: numberValue(e.target.value) } : row))} /><div className="percent-input"><input type="number" min="0" value={line.waste_percent} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, waste_percent: numberValue(e.target.value) } : row))} /><span>%</span></div><b>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(total)}</b>{hppLines.length > 1 && <button type="button" onClick={() => setHppLines(current => current.filter((_, i) => i !== index))}><Trash2 size={16} /></button>}</div>; })}</div>
             <div className="cost-summary-strip"><div><Calculator size={21} /><span><small>Estimasi HPP awal</small><b>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(hppTotal)}</b></span></div><label><span>Target margin</span><div><input type="number" min="0" max="100" value={targetMargin} onChange={e => setTargetMargin(numberValue(e.target.value))} /><b>%</b></div></label><div><small>Harga rekomendasi awal</small><b>{targetMargin !== '' && Number(targetMargin) < 100 ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(hppTotal / (1 - Number(targetMargin) / 100)) : '—'}</b></div></div>
-            <div className="field-grid priority-grid"><label className="field"><span>Prioritas</span><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as Priority })}><option value="NORMAL">Normal</option><option value="HIGH">Tinggi</option><option value="URGENT">Mendesak</option></select></label><label className="field"><span>Target siap produksi</span><input type="date" value={form.target_date} onChange={e => setForm({ ...form, target_date: e.target.value })} /></label></div>
+            <div className="target-planner">
+              <div className="target-planner-head"><div><span className="eyebrow">Rencana waktu</span><h4>Target artikel dari riset sampai rilis</h4><p>Artikel dinyatakan <b>fix</b> setelah fit, konstruksi, material, warna, dan chart size master sample disetujui.</p></div><button type="button" className="button button-secondary" onClick={buildSchedule}><Sparkles size={16} /> Susun otomatis</button></div>
+              <div className="milestone-grid">
+                <label className="field milestone-card"><span>Prioritas</span><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as Priority })}><option value="NORMAL">Normal</option><option value="HIGH">Tinggi</option><option value="URGENT">Mendesak</option></select><small>Menentukan urgensi seluruh tugas.</small></label>
+                <label className="field milestone-card"><span>01 · Riset selesai</span><input type="date" value={form.target_research_date ?? ''} onChange={e => setForm({ ...form, target_research_date: e.target.value })} /><small>Referensi dan arah produk lengkap.</small></label>
+                <label className="field milestone-card"><span>02 · Supplier terkunci</span><input type="date" value={form.target_sourcing_date ?? ''} onChange={e => setForm({ ...form, target_sourcing_date: e.target.value })} /><small>Bahan, harga, MOQ, dan lead time valid.</small></label>
+                <label className="field milestone-card milestone-fix"><span>03 · Artikel / master sample fix</span><input type="date" value={form.target_fix_date ?? ''} onChange={e => setForm({ ...form, target_fix_date: e.target.value })} /><small>Spesifikasi final siap dikunci.</small></label>
+                <label className="field milestone-card"><span>04 · HPP final</span><input type="date" value={form.target_costing_date ?? ''} onChange={e => setForm({ ...form, target_costing_date: e.target.value })} /><small>Biaya dan harga jual disetujui.</small></label>
+                <label className="field milestone-card milestone-ready"><span>05 · Siap produksi massal</span><input type="date" value={form.target_date} onChange={e => setForm({ ...form, target_date: e.target.value })} /><small>PO dan kapasitas produksi siap.</small></label>
+                <label className="field milestone-card milestone-launch"><span>06 · Target rilis produk</span><input type="date" value={form.target_launch_date ?? ''} onChange={e => setForm({ ...form, target_launch_date: e.target.value })} /><small>Stok, foto, katalog, dan kanal jual siap.</small></label>
+              </div>
+              {hasMilestoneConflict && <div className="milestone-warning"><AlertTriangle size={16} /><span>Urutan tanggal belum logis. Pastikan target riset, sourcing, artikel fix, HPP, produksi, lalu rilis bergerak maju.</span></div>}
+            </div>
           </section>
         </div>
 
