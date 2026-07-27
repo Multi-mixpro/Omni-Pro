@@ -11,17 +11,19 @@
 
 ## 1. Keputusan arsitektur induk
 
-Ketiga sistem dibangun sebagai modul yang berbeda, tetapi memakai fondasi bersama:
+Ketiga sistem adalah aplikasi kerja yang terpisah. Satu halaman home hanya berfungsi sebagai portal pemilih sistem; Attendance dan POS Seller tidak tampil sebagai menu di dalam Product Launch OS. Ketiganya tetap memakai satu project Supabase, satu project Vercel, dan satu akun Cloudinary agar biaya serta pengelolaan infrastruktur efisien.
 
-| Fondasi bersama | Product Launch OS | Attendance | POS Seller |
+| Batas sistem | Product Launch OS | Attendance | POS Seller |
 |---|---|---|---|
-| Supabase Auth dan profil | Aktif sekarang | Memakai profil yang sama | Memakai profil yang sama |
-| Role dan permission | `launch.*` | Disiapkan kelak sebagai `attendance.*` | Disiapkan kelak sebagai `pos.*` |
-| Business unit | GG Supply dan Gudskuy | Unit kerja yang sama | Outlet/unit penjualan yang sama |
-| Supplier dan material master | Aktif sekarang | Tidak digunakan | Dapat dipakai inventory/pembelian |
-| Audit log dan media | Aktif sekarang | Dipakai sesuai kebutuhan | Dipakai sesuai kebutuhan |
-| Vercel | Satu aplikasi dengan modul bertahap | Modul 02 | Modul 03 |
-| Cloudinary | Folder `gg-indo-apparel/product-launch/*` | Folder attendance kelak | Folder POS kelak |
+| Jalur aplikasi | `/launch/*` | `/attendance/*` | `/pos/*` |
+| Halaman login | `/launch/login` | `/attendance/login` | `/pos/login` |
+| Permission | hanya `launch.*` | hanya `attendance.*` | hanya `pos.*` |
+| Pengguna | tim pengembangan produk | karyawan/anggota operasional | seller, kasir, dan pengelola outlet |
+| Navigasi internal | riset sampai siap produksi | kehadiran dan jadwal | penjualan, stok, dan laporan |
+| Data | tabel `launch_*` | tabel `attendance_*` | tabel `pos_*` |
+| Cloudinary | `gg-indo-apparel/product-launch/*` | `gg-indo-apparel/attendance/*` | `gg-indo-apparel/pos/*` |
+
+Portal home berada di `/` dan menampilkan tiga kartu akses. Memilih kartu selalu membuka halaman login sistem tersebut. Login pada satu sistem tidak otomatis memberi hak akses ke sistem lain; otorisasi tetap diperiksa melalui permission dan RLS pada domain masing-masing.
 
 Nama tabel menggunakan batas domain agar tidak saling bertabrakan:
 
@@ -30,7 +32,7 @@ Nama tabel menggunakan batas domain agar tidak saling bertabrakan:
 - attendance kelak: seluruh tabel berawalan `attendance_`;
 - POS kelak: seluruh tabel berawalan `pos_`.
 
-Fase ini tidak membuat tabel Attendance atau POS. Hanya batas modul dan fondasi bersama yang disiapkan.
+Fase ini tidak membuat tabel bisnis Attendance atau POS. Hanya portal, halaman login terpisah, namespace rute, dan batas fondasinya yang disiapkan.
 
 ---
 
@@ -397,7 +399,7 @@ Navigasi utama Product Launch OS:
 4. **Tim** — peran, kapasitas, dan tanggung jawab;
 5. tombol aksi cepat **Artikel baru**.
 
-Attendance dan POS Seller muncul sebagai modul berikutnya, tetapi dinonaktifkan sampai fasenya dimulai.
+Attendance dan POS Seller tidak muncul di navigasi Product Launch OS. Keduanya hanya tersedia sebagai kartu pada portal utama dan mempunyai halaman login masing-masing sampai fasenya mulai dibangun.
 
 ### Halaman Hari Ini
 
@@ -488,7 +490,8 @@ Visual direction:
 
 ### Vercel
 
-- frontend Vite tetap menggunakan project Vercel yang sama;
+- frontend Vite tetap menggunakan project Vercel yang sama, dengan portal `/` dan namespace aplikasi yang terpisah;
+- setiap sistem memiliki login dan shell navigasi sendiri; tidak ada perpindahan modul dari sidebar aplikasi lain;
 - serverless functions menangani signature dan delete Cloudinary;
 - environment production menyimpan public key dan secret server secara terpisah;
 - SPA rewrite tetap diarahkan ke `index.html`, sedangkan `/api/*` ditangani functions.
@@ -538,6 +541,8 @@ Migration tersebut:
 Fase Product Launch OS dinyatakan siap ketika:
 
 - seluruh halaman utama dapat digunakan pada lebar 360 px tanpa overflow yang merusak;
+- halaman `/` menampilkan tiga kartu sistem dan setiap kartu membuka login sistem yang sesuai;
+- Product Launch OS hanya dapat diakses melalui `/launch/*` dan tidak menampilkan menu Attendance/POS;
 - login memakai Supabase Auth dan profil aktif;
 - owner dapat membuat artikel dari gambar;
 - gambar tersimpan ke folder Cloudinary yang benar;

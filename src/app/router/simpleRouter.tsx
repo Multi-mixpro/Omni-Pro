@@ -26,7 +26,7 @@ export function RouterProvider({ children }: { children: ReactNode }) {
 function useRouter() { const value = useContext(RouterContext); if (!value) throw new Error('RouterProvider tidak tersedia.'); return value; }
 export function useNavigate() { return useRouter().navigate; }
 export function useLocation() { const { pathname, search } = useRouter(); return { pathname, search }; }
-export function useParams() { const { pathname } = useRouter(); const match = pathname.match(/^\/app\/projects\/([^/]+)\/?$/); return { projectId: match?.[1] ? decodeURIComponent(match[1]) : undefined }; }
+export function useParams() { const { pathname } = useRouter(); const match = pathname.match(/^\/launch\/app\/projects\/([^/]+)\/?$/); return { projectId: match?.[1] ? decodeURIComponent(match[1]) : undefined }; }
 
 interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> { to: string }
 export function Link({ to, onClick, children, ...props }: LinkProps) {
@@ -43,7 +43,7 @@ export function Link({ to, onClick, children, ...props }: LinkProps) {
 interface NavLinkProps extends Omit<LinkProps, 'className'> { className?: string | ((state: { isActive: boolean }) => string) }
 export function NavLink({ className, ...props }: NavLinkProps) {
   const { pathname } = useLocation();
-  const active = pathname === props.to || (props.to !== '/app/today' && pathname.startsWith(`${props.to}/`));
+  const active = pathname === props.to || (props.to !== '/launch/app/today' && pathname.startsWith(`${props.to}/`));
   return <Link {...props} className={typeof className === 'function' ? className({ isActive: active }) : className} />;
 }
 

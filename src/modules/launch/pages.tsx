@@ -43,7 +43,7 @@ function Progress({ value, compact = false }: { value: number; compact?: boolean
 
 function ProjectCard({ project }: { project: LaunchProject }) {
   return (
-    <Link to={`/app/projects/${project.id}`} className="project-card">
+    <Link to={`/launch/app/projects/${project.id}`} className="project-card">
       <div className="project-thumb">
         {project.reference_image_url ? <img src={project.reference_image_url} alt={`Referensi ${project.article_name}`} /> : <Shirt size={34} />}
         <span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name ?? 'GG'}</span>
@@ -82,13 +82,13 @@ export function TodayPage() {
     <div className="page-stack">
       <section className="welcome-row">
         <div><span className="eyebrow">Minggu peluncuran · {date.format(new Date())}</span><h2>Selamat bekerja, {name}.</h2><p>Berikut fokus yang paling mendekatkan artikel ke produksi hari ini.</p></div>
-        <Link to="/app/projects/new" className="button button-primary"><Plus size={18} /> Perintah artikel baru</Link>
+        <Link to="/launch/app/projects/new" className="button button-primary"><Plus size={18} /> Perintah artikel baru</Link>
       </section>
 
       <section className="decision-banner">
         <div className="decision-icon"><Sparkles size={24} /></div>
         <div><span>PRIORITAS OWNER</span><h3>{review.length ? `${review.length} artikel menunggu keputusan Anda` : 'Tidak ada keputusan yang tertahan'}</h3><p>{review.length ? 'Review HPP, hasil sample, atau persetujuan produksi agar pekerjaan tim terus bergerak.' : 'Seluruh approval terkini sudah tertangani. Pantau artikel aktif di bawah.'}</p></div>
-        <Link to="/app/projects?status=IN_REVIEW" className="button button-light">{review.length ? 'Buka antrean' : 'Lihat artikel'} <ArrowRight size={17} /></Link>
+        <Link to="/launch/app/projects?status=IN_REVIEW" className="button button-light">{review.length ? 'Buka antrean' : 'Lihat artikel'} <ArrowRight size={17} /></Link>
       </section>
 
       <section className="metric-grid">
@@ -99,7 +99,7 @@ export function TodayPage() {
       </section>
 
       <section className="content-card launch-lane-card">
-        <div className="section-head"><div><span className="eyebrow">Pipeline langsung</span><h3>Posisi seluruh artikel</h3></div><Link to="/app/projects">Lihat semua <ChevronRight size={17} /></Link></div>
+        <div className="section-head"><div><span className="eyebrow">Pipeline langsung</span><h3>Posisi seluruh artikel</h3></div><Link to="/launch/app/projects">Lihat semua <ChevronRight size={17} /></Link></div>
         <div className="launch-lane">
           {stageCounts.map((stage, index) => <div className={`lane-step ${stage.count ? 'lane-active' : ''}`} key={stage.code}><span>{String(index + 1).padStart(2, '0')}</span><div><b>{stageMeta[stage.code].short}</b><small>{stage.count} artikel</small></div>{index < stageCounts.length - 1 && <i />}</div>)}
         </div>
@@ -107,8 +107,8 @@ export function TodayPage() {
 
       <div className="dashboard-columns">
         <section className="content-card">
-          <div className="section-head"><div><span className="eyebrow">Sedang bergerak</span><h3>Artikel terbaru</h3></div><Link to="/app/projects">Semua artikel <ChevronRight size={17} /></Link></div>
-          {data.length ? <div className="project-list-compact">{data.slice(0, 4).map(project => <Link to={`/app/projects/${project.id}`} key={project.id}><span className="compact-thumb">{project.reference_image_url ? <img src={project.reference_image_url} alt="" /> : <Shirt size={22} />}</span><div><b>{project.article_name}</b><small>{project.code} · {stageMeta[project.current_stage].short}</small></div><Progress value={project.progress} compact /><ChevronRight size={18} /></Link>)}</div> : <EmptyPanel icon={<Boxes size={28} />} title="Belum ada artikel" detail="Mulai dari gambar referensi pertama yang diberikan owner." action={<Link className="button button-primary" to="/app/projects/new">Buat artikel pertama</Link>} />}
+          <div className="section-head"><div><span className="eyebrow">Sedang bergerak</span><h3>Artikel terbaru</h3></div><Link to="/launch/app/projects">Semua artikel <ChevronRight size={17} /></Link></div>
+          {data.length ? <div className="project-list-compact">{data.slice(0, 4).map(project => <Link to={`/launch/app/projects/${project.id}`} key={project.id}><span className="compact-thumb">{project.reference_image_url ? <img src={project.reference_image_url} alt="" /> : <Shirt size={22} />}</span><div><b>{project.article_name}</b><small>{project.code} · {stageMeta[project.current_stage].short}</small></div><Progress value={project.progress} compact /><ChevronRight size={18} /></Link>)}</div> : <EmptyPanel icon={<Boxes size={28} />} title="Belum ada artikel" detail="Mulai dari gambar referensi pertama yang diberikan owner." action={<Link className="button button-primary" to="/launch/app/projects/new">Buat artikel pertama</Link>} />}
         </section>
         <section className="content-card">
           <div className="section-head"><div><span className="eyebrow">Fokus personal</span><h3>Tugas saya</h3></div><span className="count-badge">{tasks.data?.length ?? 0}</span></div>
@@ -126,7 +126,7 @@ export function ProjectsPage() {
   const filtered = (projects.data ?? []).filter(item => `${item.article_name} ${item.code} ${item.category}`.toLowerCase().includes(query.toLowerCase()));
   const filters = [['ALL', 'Semua'], ['ACTIVE', 'Berjalan'], ['IN_REVIEW', 'Review'], ['BLOCKED', 'Terhambat'], ['READY_FOR_PRODUCTION', 'Siap produksi']];
 
-  return <div className="page-stack"><section className="page-intro"><div><span className="eyebrow">Portfolio artikel</span><h2>Kelola seluruh peluncuran.</h2><p>Urutkan pekerjaan berdasarkan status, brand, atau kebutuhan keputusan.</p></div><Link className="button button-primary" to="/app/projects/new"><Plus size={18} /> Artikel baru</Link></section>
+  return <div className="page-stack"><section className="page-intro"><div><span className="eyebrow">Portfolio artikel</span><h2>Kelola seluruh peluncuran.</h2><p>Urutkan pekerjaan berdasarkan status, brand, atau kebutuhan keputusan.</p></div><Link className="button button-primary" to="/launch/app/projects/new"><Plus size={18} /> Artikel baru</Link></section>
     <section className="toolbar-card"><div className="search-field"><Search size={18} /><input placeholder="Cari nama artikel, kode, atau kategori…" value={query} onChange={event => setQuery(event.target.value)} /></div><div className="filter-scroll">{filters.map(([value, label]) => <button className={status === value ? 'active' : ''} key={value} onClick={() => setStatus(value)}>{label}</button>)}</div><button className="icon-button filter-button"><Filter size={19} /></button></section>
     {projects.isLoading ? <LoadingBlocks /> : projects.error ? <ErrorPanel /> : filtered.length ? <section className="project-grid">{filtered.map(project => <ProjectCard project={project} key={project.id} />)}</section> : <EmptyPanel icon={<FileSearch size={30} />} title="Tidak ada artikel yang cocok" detail="Ubah kata pencarian atau filter status untuk melihat artikel lainnya." />}
   </div>;
@@ -147,7 +147,7 @@ export function NewProjectPage() {
     try {
       const projectId = await create.mutateAsync(form);
       if (image) await uploadProjectReference(projectId, image);
-      navigate(`/app/projects/${projectId}`);
+      navigate(`/launch/app/projects/${projectId}`);
     } catch (reason) { setSubmitError(reason instanceof Error ? reason.message : 'Perintah artikel belum dapat dibuat.'); }
   }
 
@@ -185,7 +185,7 @@ export function ProjectDetailPage() {
   const openTasks = tasks.filter(task => task.status !== 'DONE');
   const latestHpp = hpp[0];
 
-  return <div className="project-page"><Link className="back-link" to="/app/projects"><ArrowLeft size={18} /> Semua artikel</Link>
+  return <div className="project-page"><Link className="back-link" to="/launch/app/projects"><ArrowLeft size={18} /> Semua artikel</Link>
     <section className="project-hero"><div className="project-hero-image">{project.reference_image_url ? <img src={project.reference_image_url} alt={project.article_name} /> : <Shirt size={44} />}<span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name}</span></div><div className="project-hero-copy"><div className="project-meta"><span>{project.code}</span><StatusPill status={project.status} /><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div><h2>{project.article_name}</h2><p>{project.concept || 'Konsep artikel belum dilengkapi.'}</p><div className="hero-facts"><span><Target size={16} /> {project.category}</span><span><CalendarDays size={16} /> {project.target_date ? date.format(new Date(project.target_date)) : 'Target belum ada'}</span><span><Users size={16} /> Owner: {project.owner?.full_name ?? 'Belum ditetapkan'}</span></div></div><div className="hero-progress"><div className="progress-ring" style={{ '--progress': `${project.progress * 3.6}deg` } as React.CSSProperties}><span><b>{project.progress}%</b><small>kesiapan</small></span></div></div></section>
 
     <section className="stage-card"><div className="section-head"><div><span className="eyebrow">Alur utama</span><h3>{currentStage ? `Sekarang: ${stageMeta[currentStage.code].label}` : 'Seluruh tahap selesai'}</h3></div>{currentStage && currentStage.status === 'NOT_STARTED' && <button className="button button-secondary" onClick={() => stageMutation.mutate({ stageId: currentStage.id, status: 'IN_PROGRESS' })}>Mulai tahap <ArrowRight size={16} /></button>}</div><StageRail stages={stages} active={project.current_stage} /></section>

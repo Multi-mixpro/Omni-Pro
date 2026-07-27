@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
-import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
-import { Navigate } from '@/app/router/simpleRouter';
-import { signIn, useAuth } from './useAuth';
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { Link, Navigate } from '@/app/router/simpleRouter';
+import { signIn, signOut, useAuth } from './useAuth';
 
 export function AuthGate() {
   const auth = useAuth();
@@ -11,7 +11,17 @@ export function AuthGate() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (auth.data?.session && auth.data.profile) return <Navigate to="/app/today" replace />;
+  const hasLaunchAccess = auth.data?.permissions.includes('launch.view') || auth.data?.permissions.includes('launch.admin');
+
+  if (auth.data?.session && auth.data.profile && hasLaunchAccess) return <Navigate to="/launch/app/today" replace />;
+
+  if (auth.data?.session && auth.data.profile && !hasLaunchAccess) {
+    return (
+      <main className="access-denied-page">
+        <div className="access-denied-card"><span className="module-login-icon"><LockKeyhole size={28} /></span><span className="eyebrow">Akses Product Launch</span><h1>Akun ini tidak memiliki akses.</h1><p>Gunakan akun yang telah diberi peran Product Launch OS oleh owner.</p><button className="button button-primary" onClick={() => void signOut()}>Gunakan akun lain</button><Link to="/">Kembali ke portal sistem</Link></div>
+      </main>
+    );
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -29,6 +39,7 @@ export function AuthGate() {
   return (
     <main className="login-page">
       <section className="login-story">
+        <Link className="portal-back portal-back-light" to="/"><ArrowLeft size={18} /> Semua sistem</Link>
         <div className="login-brand"><span className="brand-mark">GG</span><div><b>GG Indo Apparel</b><small>Product Launch OS</small></div></div>
         <div className="login-copy">
           <span className="eyebrow eyebrow-light">Satu ruang kerja. Satu tujuan.</span>
@@ -43,6 +54,7 @@ export function AuthGate() {
 
       <section className="login-panel">
         <form className="login-card" onSubmit={submit}>
+          <Link className="portal-back login-mobile-back" to="/"><ArrowLeft size={18} /> Semua sistem</Link>
           <div className="login-mobile-brand"><span className="brand-mark">GG</span><b>Product Launch OS</b></div>
           <span className="eyebrow">Workspace internal</span>
           <h2>Selamat datang kembali</h2>

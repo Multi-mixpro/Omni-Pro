@@ -1,13 +1,13 @@
 import { ReactNode, useState } from 'react';
-import { Archive, BookOpen, Boxes, ChevronDown, CircleUserRound, Command, Home, LogOut, Menu, Plus, Search, Settings2, Users, X } from 'lucide-react';
+import { BookOpen, Boxes, ChevronDown, Command, Grid2X2, Home, LogOut, Menu, Plus, Search, Settings2, Users, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut, useAuth } from '@/core/auth/useAuth';
 
 const navigation = [
-  { to: '/app/today', label: 'Hari ini', icon: Home },
-  { to: '/app/projects', label: 'Artikel', icon: Boxes },
-  { to: '/app/library', label: 'Pustaka', icon: BookOpen },
-  { to: '/app/team', label: 'Tim', icon: Users },
+  { to: '/launch/app/today', label: 'Hari ini', icon: Home },
+  { to: '/launch/app/projects', label: 'Artikel', icon: Boxes },
+  { to: '/launch/app/library', label: 'Pustaka', icon: BookOpen },
+  { to: '/launch/app/team', label: 'Tim', icon: Users },
 ];
 
 function pageTitle(pathname: string) {
@@ -30,7 +30,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   async function handleSignOut() {
     await signOut();
-    navigate('/login');
+    navigate('/launch/login');
   }
 
   return (
@@ -42,16 +42,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <button className="icon-button side-close" aria-label="Tutup menu" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
 
-        <nav className="side-nav" aria-label="Navigasi utama">
+        <nav className="side-nav" aria-label="Navigasi Product Launch OS">
           <span className="nav-caption">Workspace</span>
           {navigation.map(item => (
             <NavLink key={item.to} to={item.to} onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'active' : ''}>
               <item.icon size={20} /><span>{item.label}</span>
             </NavLink>
           ))}
-          <span className="nav-caption nav-caption-spaced">Akan hadir</span>
-          <div className="future-module"><CircleUserRound size={19} /><span>Attendance</span><small>02</small></div>
-          <div className="future-module"><Archive size={19} /><span>POS Seller</span><small>03</small></div>
         </nav>
 
         <div className="side-bottom">
@@ -59,6 +56,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Command size={18} />
             <div><b>Product Launch OS</b><small>Sistem aktif · 01</small></div>
           </div>
+          <button className="side-settings" onClick={() => navigate('/')}><Grid2X2 size={18} /> Portal semua sistem</button>
           <button className="side-settings"><Settings2 size={18} /> Pengaturan</button>
         </div>
       </aside>
@@ -71,8 +69,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <div><span className="topbar-kicker">Product Launch OS</span><h1>{pageTitle(location.pathname)}</h1></div>
           </div>
           <div className="topbar-actions">
-            <button className="command-search" onClick={() => navigate('/app/projects')}><Search size={18} /><span>Cari artikel atau kode…</span><kbd>⌘ K</kbd></button>
-            <button className="button button-primary top-create" onClick={() => navigate('/app/projects/new')}><Plus size={18} /><span>Artikel baru</span></button>
+            <button className="command-search" onClick={() => navigate('/launch/app/projects')}><Search size={18} /><span>Cari artikel atau kode…</span><kbd>⌘ K</kbd></button>
+            <button className="button button-primary top-create" onClick={() => navigate('/launch/app/projects/new')}><Plus size={18} /><span>Artikel baru</span></button>
             <div className="profile-menu">
               <button className="profile-trigger" onClick={() => setProfileOpen(open => !open)} aria-expanded={profileOpen}>
                 <span className="avatar">{initials}</span><span className="profile-copy"><b>{profile?.full_name}</b><small>{profile?.job_title ?? 'Tim Product Launch'}</small></span><ChevronDown size={16} />
@@ -91,7 +89,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         ))}
       </nav>
 
-      <button className="mobile-fab" onClick={() => navigate('/app/projects/new')} aria-label="Buat artikel baru"><Plus size={23} /></button>
+      <button className="mobile-fab" onClick={() => navigate('/launch/app/projects/new')} aria-label="Buat artikel baru"><Plus size={23} /></button>
     </div>
   );
 }
