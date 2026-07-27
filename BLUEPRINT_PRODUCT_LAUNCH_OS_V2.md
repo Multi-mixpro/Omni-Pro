@@ -25,7 +25,7 @@ Ketiga sistem dibangun sebagai modul yang berbeda, tetapi memakai fondasi bersam
 
 Nama tabel menggunakan batas domain agar tidak saling bertabrakan:
 
-- shared: `profiles`, `roles`, `permissions`, `business_units`, `suppliers`, `materials`, `audit_logs`, `media_assets`;
+- shared: `profiles`, `roles`, `permissions`, `team_invites`, `business_units`, `suppliers`, `materials`, `audit_logs`, `media_assets`;
 - product launch: seluruh tabel berawalan `launch_`;
 - attendance kelak: seluruh tabel berawalan `attendance_`;
 - POS kelak: seluruh tabel berawalan `pos_`.
@@ -103,6 +103,8 @@ Gudskuy mengambil pelajaran dari konsistensi dan kelengkapan brand besar, tetapi
 ## 4. Peran tim
 
 Hak sistem diberikan melalui role dan permission, bukan nama yang ditulis di frontend. Pembagian berikut adalah default awal dan dapat diubah owner.
+
+Undangan anggota disiapkan lebih dahulu di `team_invites`. Ketika user Auth dibuat, trigger provisioning mencocokkan email undangan, membuat profil, lalu menetapkan role. Metadata yang dapat diubah pengguna tidak pernah dipercaya untuk menaikkan hak akses.
 
 ### Gugun — Owner dan Launch Director
 

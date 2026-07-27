@@ -38,6 +38,8 @@ Migration reset akan:
 - menetapkan user Auth paling awal sebagai owner jika nama Gugun tidak terdeteksi;
 - membuat tabel, RLS, permission, workflow, dan gate baru.
 
+Setelah reset, jalankan `supabase/migrations/20260727020000_team_user_provisioning.sql`. Migration ini membuat allowlist undangan tim, trigger Auth, provisioning profil otomatis, role fallback `product_team`, dan RLS khusus owner untuk pengelolaan undangan.
+
 ## 3. Periksa role setelah migration
 
 Pastikan pembagian awal:
