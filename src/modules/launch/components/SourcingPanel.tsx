@@ -1,15 +1,17 @@
 import { FormEvent, useState } from 'react';
 import { AlertCircle, ArrowLeft, Check, Factory, PackagePlus, Phone, Truck } from 'lucide-react';
-import { useAddMaterial, useDeleteMaterial, useSelectQuote, useUpdateStage } from '../hooks/useLaunch';
+import { useAddMaterial, useDeleteMaterial, useMasterMaterials, useMasterSuppliers, useSelectQuote, useUpdateStage } from '../hooks/useLaunch';
+import { findOrCreateMasterMaterial, findOrCreateMasterSupplier } from '../data/launchRepository';
 import { DeleteButton } from './DeleteButton';
+import { BOM_COMPONENT_ROLES, bomRoleLabel } from '../domain/types';
 import type { LaunchStage, MaterialSupplierDraft, ProjectWorkspace } from '../domain/types';
 
-const MATERIAL_ROLES = [['MAIN', 'Bahan utama'], ['LINING', 'Lining'], ['RIB', 'Rib'], ['ACCESSORY', 'Aksesori'], ['PACKAGING', 'Kemasan'], ['OTHER', 'Lainnya']] as const;
+const MATERIAL_ROLES = BOM_COMPONENT_ROLES;
 const UNITS = ['meter', 'yard', 'kg', 'gram', 'pcs', 'set', 'pasang', 'roll', 'lembar', 'lusin', 'box', 'liter'];
 const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 
 const emptyMaterial = (): MaterialSupplierDraft => ({
-  proposed_name: '', role: 'MAIN', composition: '', gsm: '', width_cm: '', color_notes: '', estimated_consumption: '', unit: 'meter',
+  proposed_name: '', role: 'MAIN_FABRIC', composition: '', gsm: '', width_cm: '', color_notes: '', estimated_consumption: '', unit: 'meter',
   suitability_notes: '', risk_notes: '', supplier_name: '', supplier_role: 'PRIMARY', contact_name: '', phone: '', city: '', address: '',
   unit_price: '', price_unit: 'meter', moq: '', moq_notes: '', lead_time_days: '', supplier_notes: '',
 });
@@ -28,6 +30,8 @@ export function SourcingPanel({ projectId, stage, materials, onBack }: SourcingP
   const deleteMaterial = useDeleteMaterial(projectId);
   const selectQuote = useSelectQuote(projectId);
   const updateStageMutation = useUpdateStage(projectId);
+  const masterMaterials = useMasterMaterials();
+  const masterSuppliers = useMasterSuppliers();
   const [draft, setDraft] = useState<MaterialSupplierDraft>(emptyMaterial());
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +43,16 @@ export function SourcingPanel({ projectId, stage, materials, onBack }: SourcingP
     event.preventDefault();
     setError(null);
     if (!draft.proposed_name.trim()) { setError('Nama bahan wajib diisi.'); return; }
-    try { await addMaterial.mutateAsync(draft); setDraft(emptyMaterial()); setShowForm(false); }
+    try {
+      await addMaterial.mutateAsync(draft);
+      // Kandidat baru yang diketik manual (bukan dipilih dari datalist) langsung
+      // tersimpan ke data master; kegagalan di sini tidak menahan alur sourcing.
+      await Promise.allSettled([
+        findOrCreateMasterMaterial({ name: draft.proposed_name, category: draft.role, composition: draft.composition, gsm: draft.gsm, width_cm: draft.width_cm, unit: draft.unit }),
+        draft.supplier_name?.trim() ? findOrCreateMasterSupplier({ name: draft.supplier_name, contact_name: draft.contact_name, phone: draft.phone, city: draft.city, address: draft.address, lead_time_days: draft.lead_time_days }) : Promise.resolve(),
+      ]);
+      setDraft(emptyMaterial()); setShowForm(false);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Kandidat bahan belum dapat disimpan.'); }
   }
 
@@ -62,7 +75,7 @@ export function SourcingPanel({ projectId, stage, materials, onBack }: SourcingP
         {materials.length ? <div className="sourcing-list">{materials.map(item => {
           const selected = item.quotes?.find(quote => quote.status === 'SELECTED');
           return <article key={item.id} className={`sourcing-card ${selected ? 'sourcing-locked' : ''}`}>
-            <div className="sourcing-card-head"><span className="material-role">{item.role}</span><div><b>{item.proposed_name}</b><small>{[item.composition, item.gsm ? `${item.gsm} GSM` : null, item.width_cm ? `lebar ${item.width_cm} cm` : null].filter(Boolean).join(' · ') || 'Spesifikasi belum lengkap'}</small></div>{selected && <span className="sourcing-badge"><Check size={13} /> Terkunci</span>}<DeleteButton label={`bahan ${item.proposed_name}`} pending={deleteMaterial.isPending} onConfirm={() => deleteMaterial.mutate(item.id)} /></div>
+            <div className="sourcing-card-head"><span className="material-role">{bomRoleLabel(item.role)}</span><div><b>{item.proposed_name}</b><small>{[item.composition, item.gsm ? `${item.gsm} GSM` : null, item.width_cm ? `lebar ${item.width_cm} cm` : null].filter(Boolean).join(' · ') || 'Spesifikasi belum lengkap'}</small></div>{selected && <span className="sourcing-badge"><Check size={13} /> Terkunci</span>}<DeleteButton label={`bahan ${item.proposed_name}`} pending={deleteMaterial.isPending} onConfirm={() => deleteMaterial.mutate(item.id)} /></div>
             {item.quotes?.length ? <div className="quote-list">{item.quotes.map(quote => <div className={`quote-row ${quote.status === 'SELECTED' ? 'quote-selected' : ''}`} key={quote.id}>
               <div><small>{quote.supplier_role === 'PRIMARY' ? 'Supplier utama' : 'Supplier alternatif'}</small><b>{quote.supplier?.name ?? 'Supplier belum diberi nama'}</b>{quote.supplier?.phone && <a href={`tel:${quote.supplier.phone}`}><Phone size={12} /> {quote.supplier.phone}</a>}</div>
               <div><small>Harga</small><b>{money.format(quote.price)} / {quote.unit}</b><span>{quote.lead_time_days ? `${quote.lead_time_days} hari` : 'Lead time belum ada'}{quote.moq ? ` · MOQ ${quote.moq}` : ''}</span></div>
@@ -74,9 +87,11 @@ export function SourcingPanel({ projectId, stage, materials, onBack }: SourcingP
 
       {showForm && <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Kandidat baru</span><h3>Bahan & penawaran supplier</h3></div></div>
+        <datalist id="master-material-names">{masterMaterials.data?.map(m => <option value={m.name} key={m.id} />)}</datalist>
+        <datalist id="master-supplier-names">{masterSuppliers.data?.map(s => <option value={s.name} key={s.id} />)}</datalist>
         <form onSubmit={submit}>
           <div className="field-grid">
-            <label className="field field-wide"><span>Nama bahan/komponen *</span><input required placeholder="Contoh: Taslan balon coating" value={draft.proposed_name} onChange={e => update({ proposed_name: e.target.value })} /></label>
+            <label className="field field-wide"><span>Nama bahan/komponen *</span><input required list="master-material-names" placeholder="Pilih dari daftar atau ketik nama baru" value={draft.proposed_name} onChange={e => { const value = e.target.value; const match = masterMaterials.data?.find(m => m.name.toLowerCase() === value.toLowerCase()); update(match ? { proposed_name: value, composition: match.composition ?? draft.composition, gsm: match.gsm ?? draft.gsm, width_cm: match.width_cm ?? draft.width_cm, unit: match.unit } : { proposed_name: value }); }} /></label>
             <label className="field"><span>Peran bahan</span><select value={draft.role} onChange={e => update({ role: e.target.value as MaterialSupplierDraft['role'] })}>{MATERIAL_ROLES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
             <label className="field"><span>Komposisi</span><input placeholder="100% nylon" value={draft.composition} onChange={e => update({ composition: e.target.value })} /></label>
             <label className="field"><span>GSM</span><input type="number" min="0" value={draft.gsm} onChange={e => update({ gsm: numberValue(e.target.value) })} /></label>
@@ -86,7 +101,7 @@ export function SourcingPanel({ projectId, stage, materials, onBack }: SourcingP
           </div>
           <div className="supplier-divider"><Truck size={17} /><span>Data supplier</span></div>
           <div className="field-grid">
-            <label className="field field-wide"><span>Nama supplier</span><input placeholder="Nama toko, pabrik, atau distributor" value={draft.supplier_name} onChange={e => update({ supplier_name: e.target.value })} /></label>
+            <label className="field field-wide"><span>Nama supplier</span><input list="master-supplier-names" placeholder="Pilih dari daftar atau ketik nama baru" value={draft.supplier_name} onChange={e => { const value = e.target.value; const match = masterSuppliers.data?.find(s => s.name.toLowerCase() === value.toLowerCase()); update(match ? { supplier_name: value, contact_name: match.contact_name ?? draft.contact_name, phone: match.phone ?? draft.phone, city: match.city ?? draft.city, address: match.address ?? draft.address, lead_time_days: match.lead_time_days ?? draft.lead_time_days } : { supplier_name: value }); }} /></label>
             <label className="field"><span>Kontak person</span><input value={draft.contact_name} onChange={e => update({ contact_name: e.target.value })} /></label>
             <label className="field"><span>WhatsApp/telepon</span><input inputMode="tel" placeholder="08…" value={draft.phone} onChange={e => update({ phone: e.target.value })} /></label>
             <label className="field"><span>Kota</span><input value={draft.city} onChange={e => update({ city: e.target.value })} /></label>

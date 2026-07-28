@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/core/auth/useAuth';
-import { addColorway, addHppVersion, addMaterialCandidate, addProjectReference, addQcCheck, addSample, approveMasterSample, completeTask, createProject, deleteColorway, deleteHppVersion, deleteMaterialCandidate, deleteQcCheck, deleteReference, deleteSample, finalizeHpp, finalizeSizeChart, getProjectWorkspace, listBusinessUnits, listMyTasks, listProfiles, listProjects, selectSupplierQuote, setColorwayStatus, updateProject, updateResearchSummary, updateStage } from '../data/launchRepository';
-import type { ColorwayDraft, HppLineDraft, MaterialSupplierDraft, ProjectEditInput, SampleDraft } from '../domain/types';
+import { addColorway, addComment, addHppVersion, addMaterialCandidate, addProjectReference, addQcCheck, addSample, approveMasterSample, completeTask, createMasterMaterial, createMasterSupplier, createProject, deactivateMasterMaterial, deactivateMasterSupplier, decideApproval, decideCommentRequest, deleteColorway, deleteComment, deleteHppVersion, deleteMaterialCandidate, deleteProject, deleteQcCheck, deleteReference, deleteSample, deleteVariantMatrixRow, finalizeHpp, finalizeSizeChart, generateVariantMatrix, getProjectWorkspace, linkMaterialSupplier, listBusinessUnits, listMasterMaterials, listMasterSuppliers, listMaterialSuppliers, listMyTasks, listProfiles, listProjects, reportStageBlocker, requestApproval, resolveStageBlocker, selectSupplierQuote, setColorwayStatus, setTaskDependency, unlinkMaterialSupplier, updateMasterMaterial, updateMasterSupplier, updateMaterialSupplierLink, updateProject, updateResearchSummary, updateStage, updateVariantMatrixRow } from '../data/launchRepository';
+import type { BlockerDraft, ColorwayDraft, HppLineDraft, MasterMaterialDraft, MasterSupplierDraft, MaterialSupplierDraft, MaterialSupplierLinkDraft, ProjectEditInput, SampleDraft } from '../domain/types';
 
 export const launchKeys = {
   projects: (status = 'ALL') => ['launch-projects', status] as const,
@@ -20,14 +20,59 @@ export function useCreateProject() {
   return useMutation({ mutationFn: createProject, onSuccess: () => client.invalidateQueries({ queryKey: ['launch-projects'] }) });
 }
 
+export function useDeleteProject() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deleteProject(id), onSuccess: () => client.invalidateQueries({ queryKey: ['launch-projects'] }) });
+}
+
 export function useCompleteTask(projectId: string) {
   const client = useQueryClient();
   return useMutation({ mutationFn: completeTask, onSuccess: async () => { await client.invalidateQueries({ queryKey: launchKeys.project(projectId) }); await client.invalidateQueries({ queryKey: ['launch-tasks'] }); } });
 }
 
+export function useSetTaskDependency(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ taskId, dependsOnId, type }: { taskId: string; dependsOnId: string | null; type: string }) => setTaskDependency(taskId, dependsOnId, type), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
+}
+
 export function useUpdateStage(projectId: string) {
   const client = useQueryClient();
   return useMutation({ mutationFn: ({ stageId, status }: { stageId: string; status: string }) => updateStage(stageId, status), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
+}
+
+export function useReportStageBlocker(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ stageId, input }: { stageId: string; input: BlockerDraft }) => reportStageBlocker(stageId, input), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
+}
+
+export function useResolveStageBlocker(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ blockerId, resolutionNote }: { blockerId: string; resolutionNote: string }) => resolveStageBlocker(blockerId, resolutionNote), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
+}
+
+export function useRequestApproval(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (approvalType: string) => requestApproval(projectId, approvalType), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
+}
+
+export function useDecideApproval(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ approvalId, status, note }: { approvalId: string; status: 'APPROVED' | 'REJECTED' | 'REVISION'; note: string }) => decideApproval(approvalId, status, note), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
+}
+
+export function useAddComment(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ body, isDecisionRequest, decisionDeadline }: { body: string; isDecisionRequest: boolean; decisionDeadline?: string }) => addComment(projectId, body, isDecisionRequest, decisionDeadline), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
+}
+
+export function useDeleteComment(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deleteComment(id), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
+}
+
+export function useDecideCommentRequest(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ commentId, note }: { commentId: string; note: string }) => decideCommentRequest(commentId, note), onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }) });
 }
 
 export function useUpdateProject(projectId: string) {
@@ -94,6 +139,18 @@ export function useSetColorwayStatus(projectId: string) {
   return useProjectMutation(projectId, ({ colorwayId, status }: { colorwayId: string; status: 'CANDIDATE' | 'APPROVED' | 'REJECTED' }) => setColorwayStatus(colorwayId, status));
 }
 
+export function useGenerateVariantMatrix(projectId: string) {
+  return useProjectMutation(projectId, ({ colorwayIds, sizes, defaultUnitCost }: { colorwayIds: string[]; sizes: string[]; defaultUnitCost: number | null }) => generateVariantMatrix(projectId, colorwayIds, sizes, defaultUnitCost));
+}
+
+export function useUpdateVariantMatrixRow(projectId: string) {
+  return useProjectMutation(projectId, ({ id, patch }: { id: string; patch: Parameters<typeof updateVariantMatrixRow>[1] }) => updateVariantMatrixRow(id, patch));
+}
+
+export function useDeleteVariantMatrixRow(projectId: string) {
+  return useProjectMutation(projectId, (id: string) => deleteVariantMatrixRow(id));
+}
+
 export function useFinalizeSizeChart(projectId: string) {
   return useProjectMutation(projectId, (sizeChartId: string) => finalizeSizeChart(projectId, sizeChartId));
 }
@@ -115,4 +172,61 @@ export function useUpdateResearchSummary(projectId: string) {
     mutationFn: (summary: string) => updateResearchSummary(projectId, summary),
     onSuccess: () => client.invalidateQueries({ queryKey: launchKeys.project(projectId) }),
   });
+}
+
+export const masterKeys = {
+  materials: ['master-materials'] as const,
+  suppliers: ['master-suppliers'] as const,
+};
+
+export function useMasterMaterials() { return useQuery({ queryKey: masterKeys.materials, queryFn: listMasterMaterials }); }
+export function useMasterSuppliers() { return useQuery({ queryKey: masterKeys.suppliers, queryFn: listMasterSuppliers }); }
+
+export function useCreateMasterMaterial() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (input: MasterMaterialDraft) => createMasterMaterial(input), onSuccess: () => client.invalidateQueries({ queryKey: masterKeys.materials }) });
+}
+
+export function useUpdateMasterMaterial() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ id, input }: { id: string; input: MasterMaterialDraft }) => updateMasterMaterial(id, input), onSuccess: () => client.invalidateQueries({ queryKey: masterKeys.materials }) });
+}
+
+export function useDeactivateMasterMaterial() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deactivateMasterMaterial(id), onSuccess: () => client.invalidateQueries({ queryKey: masterKeys.materials }) });
+}
+
+export function useCreateMasterSupplier() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (input: MasterSupplierDraft) => createMasterSupplier(input), onSuccess: () => client.invalidateQueries({ queryKey: masterKeys.suppliers }) });
+}
+
+export function useUpdateMasterSupplier() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ id, input }: { id: string; input: MasterSupplierDraft }) => updateMasterSupplier(id, input), onSuccess: () => client.invalidateQueries({ queryKey: masterKeys.suppliers }) });
+}
+
+export function useDeactivateMasterSupplier() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deactivateMasterSupplier(id), onSuccess: () => client.invalidateQueries({ queryKey: masterKeys.suppliers }) });
+}
+
+export function useMaterialSuppliers(materialId: string) {
+  return useQuery({ queryKey: ['material-suppliers', materialId], queryFn: () => listMaterialSuppliers(materialId), enabled: Boolean(materialId) });
+}
+
+export function useLinkMaterialSupplier(materialId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (input: MaterialSupplierLinkDraft) => linkMaterialSupplier(materialId, input), onSuccess: () => client.invalidateQueries({ queryKey: ['material-suppliers', materialId] }) });
+}
+
+export function useUpdateMaterialSupplierLink(materialId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof updateMaterialSupplierLink>[1] }) => updateMaterialSupplierLink(id, patch), onSuccess: () => client.invalidateQueries({ queryKey: ['material-suppliers', materialId] }) });
+}
+
+export function useUnlinkMaterialSupplier(materialId: string) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => unlinkMaterialSupplier(id), onSuccess: () => client.invalidateQueries({ queryKey: ['material-suppliers', materialId] }) });
 }

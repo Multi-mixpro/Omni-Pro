@@ -1,26 +1,15 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Calculator, Check, ChevronRight,
-  CircleDollarSign, ExternalLink, FileImage, ImagePlus, Layers3, Link2,
-  PackagePlus, Palette, Plus, Ruler, Sparkles, Trash2, Truck, UploadCloud,
+  ArrowLeft, ArrowRight, Check, ExternalLink, FileImage, ImagePlus,
+  Layers3, Link2, Palette, Plus, Sparkles, Trash2, UploadCloud, User,
 } from 'lucide-react';
 import { useNavigate } from '@/app/router/simpleRouter';
+import { useAuth } from '@/core/auth/useAuth';
 import { uploadProjectReference } from '../data/launchRepository';
-import type {
-  ColorwayDraft, HppLineDraft, MaterialSupplierDraft, MeasurementDraft,
-  NewProjectInput, Priority, ReferenceDraft,
-} from '../domain/types';
+import type { NewProjectInput, Priority, ReferenceDraft } from '../domain/types';
 import { useBusinessUnits, useCreateProject } from '../hooks/useLaunch';
 
-const SIZE_PRESETS = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
-const MATERIAL_ROLES = [['MAIN', 'Bahan utama'], ['LINING', 'Lining'], ['RIB', 'Rib'], ['ACCESSORY', 'Aksesori'], ['PACKAGING', 'Kemasan'], ['OTHER', 'Lainnya']] as const;
-const HPP_CATEGORIES = [['MATERIAL', 'Material'], ['ACCESSORY', 'Aksesori'], ['LABOR', 'Jahit/tenaga'], ['PRINTING', 'Sablon'], ['EMBROIDERY', 'Bordir'], ['PACKAGING', 'Kemasan'], ['OVERHEAD', 'Overhead'], ['OTHER', 'Lainnya']] as const;
-const MATERIAL_UNITS = ['meter', 'yard', 'kg', 'gram', 'pcs', 'set', 'pasang', 'roll', 'lembar', 'lusin', 'box', 'liter'];
-const PURCHASE_UNITS = [
-  ['meter', 'Per meter'], ['yard', 'Per yard'], ['kg', 'Per kilogram'], ['gram', 'Per gram'],
-  ['pcs', 'Per pcs'], ['set', 'Per set'], ['pasang', 'Per pasang'], ['roll', 'Per roll'],
-  ['lembar', 'Per lembar'], ['lusin', 'Per lusin'], ['box', 'Per box'], ['liter', 'Per liter'],
-] as const;
+const CATEGORY_SUGGESTIONS = ['Jaket', 'Kaos', 'Polo', 'Kemeja', 'Hoodie', 'Crewneck', 'Celana', 'Celana Pendek', 'Rok', 'Dress', 'Vest', 'Topi', 'Tas', 'Aksesori', 'Seragam'];
 
 interface LocalReference {
   id: string;
@@ -31,16 +20,13 @@ interface LocalReference {
 const uid = () => crypto.randomUUID();
 const emptyImageLink = (): ReferenceDraft => ({ title: '', reference_type: 'PRODUCT', image_url: '', insight: '', sort_order: 0 });
 const emptyStudyLink = (): ReferenceDraft => ({ title: '', reference_type: 'MARKET', source_url: '', insight: '', sort_order: 0 });
-const emptyColor = (): ColorwayDraft => ({ name: '', color_code: '', hex_code: '#111b2d', panel_notes: '' });
-const emptyMeasurement = (position: number): MeasurementDraft => ({ point_code: `P${String(position).padStart(2, '0')}`, point_name: '', position, tolerance_plus: 1, tolerance_minus: 1, values: {} });
-const emptyMaterial = (supplierRole: 'PRIMARY' | 'ALTERNATIVE' = 'PRIMARY'): MaterialSupplierDraft => ({
-  proposed_name: '', role: 'MAIN', composition: '', gsm: '', width_cm: '', color_notes: '', estimated_consumption: '', unit: 'meter',
-  suitability_notes: '', risk_notes: '', supplier_name: '', supplier_role: supplierRole, contact_name: '', phone: '', city: '', address: '',
-  unit_price: '', price_unit: 'meter', moq: '', moq_notes: '', lead_time_days: '', supplier_notes: '',
-});
-const emptyHpp = (): HppLineDraft => ({ category: 'MATERIAL', item_name: '', quantity: 1, unit: 'pcs', unit_price: '', waste_percent: 0, notes: '' });
 
-function numberValue(value: string): number | '' { return value === '' ? '' : Number(value); }
+function offsetDate(value: string, days: number) {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 // Halaman produk (mis. marketplace) sering tertempel di kolom URL gambar dan
 // menghasilkan gambar rusak tanpa peringatan. Terima hanya URL berkas gambar.
 function imageUrlIssue(value: string) {
@@ -50,35 +36,22 @@ function imageUrlIssue(value: string) {
   try { parsed = new URL(url); } catch { return 'URL tidak valid. Awali dengan https://'; }
   if (!/^https?:$/.test(parsed.protocol)) return 'Gunakan alamat http:// atau https://';
   if (!/\.(jpe?g|png|webp|gif|avif)$/i.test(parsed.pathname)) {
-    return 'Ini sepertinya link halaman, bukan berkas gambar. Pakai URL yang berakhiran .jpg/.png/.webp, atau pindahkan ke "Link yang perlu dipelajari".';
+    return 'Ini sepertinya link halaman, bukan berkas gambar. Pakai URL yang berakhiran .jpg/.png/.webp, atau pindahkan ke "Link referensi".';
   }
   return null;
-}
-function offsetDate(value: string, days: number) {
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
 }
 
 export function NewProjectBriefPage() {
   const navigate = useNavigate();
+  const auth = useAuth();
   const units = useBusinessUnits();
   const create = useCreateProject();
-  const [form, setForm] = useState<NewProjectInput>({ article_name: '', business_unit_id: '', category: '', concept: '', source_notes: '', priority: 'HIGH', target_date: '' });
+  const [form, setForm] = useState<NewProjectInput>({ article_name: '', business_unit_id: '', category: '', concept: '', priority: 'HIGH' });
+  const [targetQuantity, setTargetQuantity] = useState<number | ''>(500);
+  const [sampleDays, setSampleDays] = useState<number | ''>(14);
   const [localImages, setLocalImages] = useState<LocalReference[]>([]);
   const [imageLinks, setImageLinks] = useState<ReferenceDraft[]>([emptyImageLink()]);
   const [studyLinks, setStudyLinks] = useState<ReferenceDraft[]>([emptyStudyLink()]);
-  const [colors, setColors] = useState<ColorwayDraft[]>([emptyColor()]);
-  const [sizes, setSizes] = useState<string[]>(['S', 'M', 'L', 'XL']);
-  const [customSize, setCustomSize] = useState('');
-  const [measurements, setMeasurements] = useState<MeasurementDraft[]>([
-    { ...emptyMeasurement(1), point_name: 'Lebar dada', point_code: 'LD' },
-    { ...emptyMeasurement(2), point_name: 'Panjang badan', point_code: 'PB' },
-  ]);
-  const [materials, setMaterials] = useState<MaterialSupplierDraft[]>([emptyMaterial()]);
-  const [hppLines, setHppLines] = useState<HppLineDraft[]>([emptyHpp()]);
-  const [targetMargin, setTargetMargin] = useState<number | ''>(30);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -87,21 +60,10 @@ export function NewProjectBriefPage() {
   const imageLinkIssues = imageLinks.map(item => imageUrlIssue(item.image_url ?? ''));
   const validImageLinks = imageLinks.filter((item, index) => item.image_url?.trim() && !imageLinkIssues[index]);
   const referenceCount = localImages.length + validImageLinks.length + studyLinks.filter(item => item.source_url?.trim()).length;
-  const validColors = colors.filter(item => item.name.trim());
-  const validMaterials = materials.filter(item => item.proposed_name.trim());
-  const validHpp = hppLines.filter(item => item.item_name.trim());
-  const hppTotal = useMemo(() => validHpp.reduce((sum, line) => {
-    const quantity = Number(line.quantity) || 0;
-    const price = Number(line.unit_price) || 0;
-    const waste = Number(line.waste_percent) || 0;
-    return sum + quantity * price * (1 + waste / 100);
-  }, 0), [validHpp]);
   const identityReady = Boolean(form.article_name.trim() && form.business_unit_id && form.category.trim());
   const readyToSubmit = identityReady && referenceCount > 0;
-  const completionItems = [identityReady, referenceCount > 0, validMaterials.length > 0, validColors.length > 0 && sizes.length > 0, validHpp.length > 0];
+  const completionItems = [identityReady, referenceCount > 0, Boolean(form.concept?.trim())];
   const completion = Math.round(completionItems.filter(Boolean).length / completionItems.length * 100);
-  const orderedMilestones = [form.target_research_date, form.target_sourcing_date, form.target_fix_date, form.target_costing_date, form.target_date, form.target_launch_date].filter((value): value is string => Boolean(value));
-  const hasMilestoneConflict = orderedMilestones.some((value, index) => index > 0 && value < orderedMilestones[index - 1]);
 
   function addFiles(files: FileList | null) {
     if (!files) return;
@@ -118,22 +80,6 @@ export function NewProjectBriefPage() {
     });
   }
 
-  function toggleSize(size: string) { setSizes(current => current.includes(size) ? current.filter(item => item !== size) : [...current, size]); }
-  function addCustomSize() { const value = customSize.trim().toUpperCase(); if (value && !sizes.includes(value)) setSizes(current => [...current, value]); setCustomSize(''); }
-  function buildSchedule() {
-    const today = new Date().toISOString().slice(0, 10);
-    const readyDate = form.target_date || (form.target_launch_date ? offsetDate(form.target_launch_date, -14) : offsetDate(today, 35));
-    setForm(current => ({
-      ...current,
-      target_research_date: current.target_research_date || offsetDate(readyDate, -21),
-      target_sourcing_date: current.target_sourcing_date || offsetDate(readyDate, -17),
-      target_fix_date: current.target_fix_date || offsetDate(readyDate, -10),
-      target_costing_date: current.target_costing_date || offsetDate(readyDate, -7),
-      target_date: readyDate,
-      target_launch_date: current.target_launch_date || offsetDate(readyDate, 14),
-    }));
-  }
-
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!readyToSubmit || submitting || createdProject) return;
@@ -141,21 +87,24 @@ export function NewProjectBriefPage() {
     setSubmitError(null);
     setUploadProgress('Menyimpan brief dan menyiapkan ruang kerja…');
     try {
+      const today = new Date().toISOString().slice(0, 10);
+      const sampleDate = sampleDays === '' ? undefined : offsetDate(today, Number(sampleDays));
       const externalImages = validImageLinks.map((item, index) => ({ ...item, sort_order: localImages.length + index, is_primary: localImages.length === 0 && index === 0 }));
       const learningLinks = studyLinks.filter(item => item.source_url?.trim()).map((item, index) => ({ ...item, sort_order: localImages.length + externalImages.length + index, is_primary: false }));
       const payload: NewProjectInput = {
         ...form,
+        target_quantity: targetQuantity,
+        target_sample_date: sampleDate,
+        target_fix_date: sampleDate,
+        target_research_date: sampleDays === '' ? undefined : offsetDate(today, Math.max(2, Number(sampleDays) - 10)),
+        target_sourcing_date: sampleDays === '' ? undefined : offsetDate(today, Math.max(4, Number(sampleDays) - 5)),
+        target_costing_date: sampleDate ? offsetDate(sampleDate, 3) : undefined,
+        target_date: sampleDate ? offsetDate(sampleDate, 10) : undefined,
+        target_launch_date: sampleDate ? offsetDate(sampleDate, 24) : undefined,
         references: [...externalImages, ...learningLinks],
-        colorways: validColors,
-        sizes,
-        size_chart_name: 'Chart size awal',
-        size_unit: 'cm',
-        measurements: measurements.filter(item => item.point_name.trim()),
-        materials: validMaterials,
-        hpp_lines: validHpp,
-        target_margin_percent: targetMargin,
       };
       const projectId = await create.mutateAsync(payload);
+
       let failedUploads = 0;
       let primaryAssigned = localImages.length === 0;
       for (let index = 0; index < localImages.length; index += 1) {
@@ -186,91 +135,49 @@ export function NewProjectBriefPage() {
     <div className="brief-builder-page">
       <header className="brief-builder-header">
         <button className="back-link" onClick={() => navigate(-1)}><ArrowLeft size={18} /> Kembali</button>
-        <div><span className="eyebrow">Perintah kerja owner · Brief terstruktur</span><h2>Mulai artikel dari referensi yang kuat.</h2><p>Kumpulkan konteks awal sekali, lalu biarkan tim memvalidasi dan menyempurnakannya di setiap tahap.</p></div>
+        <div><span className="eyebrow">Pendaftaran artikel baru</span><h2>Input identitas awal, lampirkan foto &amp; referensi.</h2><p>Varian warna, ukuran, BOM, dan HPP diisi tim di ruang kerja tahap masing-masing.</p></div>
       </header>
-
-      <nav className="brief-step-nav" aria-label="Bagian brief artikel">
-        <a href="#brief-reference"><span>01</span> Referensi</a><ChevronRight size={15} />
-        <a href="#brief-variant"><span>02</span> Varian & ukuran</a><ChevronRight size={15} />
-        <a href="#brief-sourcing"><span>03</span> Material & supplier</a><ChevronRight size={15} />
-        <a href="#brief-costing"><span>04</span> Draft HPP</a>
-      </nav>
 
       <form className="brief-builder-layout" onSubmit={submit}>
         <div className="brief-builder-main">
+          <section className="brief-section" id="brief-identity">
+            <div className="brief-section-heading"><span className="section-number">01</span><div><span className="eyebrow">Identitas &amp; unit bisnis</span><h3>Data dasar artikel</h3><p>Nama kerja, unit bisnis, dan kategori produk.</p></div></div>
+            <div className="field-grid brief-identity-grid">
+              <label className="field field-wide"><span>Nama artikel *</span><input required placeholder="Contoh: Windbreaker Urban Shell" value={form.article_name} onChange={e => setForm({ ...form, article_name: e.target.value })} /></label>
+              <label className="field"><span>Unit bisnis *</span><select required value={form.business_unit_id} onChange={e => setForm({ ...form, business_unit_id: e.target.value })}><option value="">Pilih unit</option>{units.data?.map(unit => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label>
+              <label className="field"><span>Kategori *</span><input required list="category-suggestions" placeholder="Jaket, kaos, hoodie…" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} /><datalist id="category-suggestions">{CATEGORY_SUGGESTIONS.map(c => <option value={c} key={c} />)}</datalist></label>
+              <label className="field"><span>Prioritas</span><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as Priority })}><option value="NORMAL">Normal</option><option value="HIGH">Tinggi</option><option value="URGENT">Mendesak</option></select></label>
+              <label className="field"><span>Target kuantitas (pcs)</span><input type="number" min={0} placeholder="500" value={targetQuantity} onChange={e => setTargetQuantity(e.target.value === '' ? '' : Number(e.target.value))} /></label>
+              <label className="field"><span>Target sample pertama (hari dari sekarang)</span><input type="number" min={1} placeholder="14" value={sampleDays} onChange={e => setSampleDays(e.target.value === '' ? '' : Number(e.target.value))} /></label>
+              <div className="field pimpro-display"><span>Pimpinan proyek (Pimpro)</span><div className="pimpro-chip"><User size={15} /> {auth.data?.profile?.full_name ?? 'Memuat…'}</div></div>
+              <label className="field field-wide"><span>Konsep &amp; tujuan artikel</span><textarea rows={3} placeholder="Target pengguna, fungsi, fit, karakter, dan level kualitas…" value={form.concept} onChange={e => setForm({ ...form, concept: e.target.value })} /></label>
+            </div>
+          </section>
+
           <section className="brief-section" id="brief-reference">
-            <div className="brief-section-heading"><span className="section-number">01</span><div><span className="eyebrow">Fondasi keputusan</span><h3>Referensi & identitas artikel</h3><p>Gunakan beberapa sudut gambar, URL gambar, dan link yang dapat dipelajari tim.</p></div><span className={`section-state ${referenceCount ? 'ready' : ''}`}>{referenceCount ? <><Check size={14} /> {referenceCount} referensi</> : 'Minimal 1'}</span></div>
+            <div className="brief-section-heading"><span className="section-number">02</span><div><span className="eyebrow">Fondasi keputusan</span><h3>Foto &amp; referensi</h3><p>Gunakan beberapa sudut gambar, URL gambar, dan link yang dapat dipelajari tim.</p></div><span className={`section-state ${referenceCount ? 'ready' : ''}`}>{referenceCount ? <><Check size={14} /> {referenceCount} referensi</> : 'Minimal 1'}</span></div>
 
             <div className="reference-source-grid">
               <label className="multi-upload-zone"><UploadCloud size={30} /><b>Upload beberapa gambar</b><span>Pilih foto, screenshot, atau sketsa dari perangkat</span><small>JPG, PNG, WebP · maksimal 8 file · 10 MB/file</small><input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={event => addFiles(event.target.files)} /></label>
               <div className="reference-guidance"><Sparkles size={21} /><div><b>Referensi yang baik</b><p>Gabungkan tampak depan/belakang, detail konstruksi, material, warna, dan pembanding pasar.</p></div></div>
             </div>
 
-            {localImages.length > 0 && <div className="local-reference-grid">{localImages.map((item, index) => <article key={item.id}><img src={item.preview} alt={`Referensi lokal ${index + 1}`} /><span>{index === 0 ? 'Cover utama' : `Gambar ${index + 1}`}</span><button type="button" aria-label={`Hapus ${item.file.name}`} onClick={() => removeLocalImage(item.id)}><Trash2 size={16} /></button><small>{item.file.name}</small></article>)}</div>}
+            {localImages.length > 0 && <div className="local-reference-grid">{localImages.map((item, index) => <article key={item.id}><img src={item.preview} alt={`Referensi lokal ${index + 1}`} /><span>{index === 0 ? 'Sampul utama' : `Gambar ${index + 1}`}</span><button type="button" aria-label={`Hapus ${item.file.name}`} onClick={() => removeLocalImage(item.id)}><Trash2 size={16} /></button><small>{item.file.name}</small></article>)}</div>}
 
-            <div className="subsection-title"><div><FileImage size={18} /><span><b>Gambar dari URL</b><small>Untuk gambar yang sudah tersedia online</small></span></div><button type="button" className="text-button" onClick={() => setImageLinks(current => [...current, emptyImageLink()])}><Plus size={16} /> Tambah URL gambar</button></div>
-            <div className="repeat-list">{imageLinks.map((item, index) => <div className="reference-row" key={`image-${index}`}><span className="row-index">{index + 1}</span><label className="field"><span>Judul gambar</span><input placeholder="Contoh: Tampak belakang" value={item.title} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} /></label><label className="field field-grow"><span>URL gambar</span><div className={`input-icon ${imageLinkIssues[index] ? 'input-invalid' : ''}`}><Link2 size={16} /><input type="url" placeholder="https://…/gambar.jpg" value={item.image_url} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, image_url: e.target.value } : row))} /></div>{imageLinkIssues[index] && <small className="field-hint-error">{imageLinkIssues[index]}</small>}</label><label className="field field-grow"><span>Hal penting</span><input placeholder="Detail yang perlu dipelajari" value={item.insight} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, insight: e.target.value } : row))} /></label>{imageLinks.length > 1 && <button type="button" className="remove-row" onClick={() => setImageLinks(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div>)}</div>
+            <div className="subsection-title"><div><FileImage size={18} /><span><b>Atau tempel link URL foto</b><small>Untuk gambar yang sudah tersedia online</small></span></div><button type="button" className="text-button" onClick={() => setImageLinks(current => [...current, emptyImageLink()])}><Plus size={16} /> Tambah URL</button></div>
+            <div className="repeat-list">{imageLinks.map((item, index) => <div className="reference-row" key={`image-${index}`}><span className="row-index">{index + 1}</span><label className="field"><span>Judul gambar</span><input placeholder="Contoh: Tampak belakang" value={item.title} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} /></label><label className="field field-grow"><span>URL gambar</span><div className={`input-icon ${imageLinkIssues[index] ? 'input-invalid' : ''}`}><Link2 size={16} /><input type="url" placeholder="https://…/gambar.jpg" value={item.image_url} onChange={e => setImageLinks(current => current.map((row, i) => i === index ? { ...row, image_url: e.target.value } : row))} /></div>{imageLinkIssues[index] && <small className="field-hint-error">{imageLinkIssues[index]}</small>}</label>{imageLinks.length > 1 && <button type="button" className="remove-row" onClick={() => setImageLinks(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div>)}</div>
 
-            <div className="subsection-title"><div><ExternalLink size={18} /><span><b>Link referensi untuk dipelajari</b><small>Produk pembanding, supplier, material, harga, atau tren</small></span></div><button type="button" className="text-button" onClick={() => setStudyLinks(current => [...current, emptyStudyLink()])}><Plus size={16} /> Tambah link</button></div>
-            <div className="repeat-list">{studyLinks.map((item, index) => <div className="reference-row reference-link-row" key={`link-${index}`}><span className="row-index">{index + 1}</span><label className="field"><span>Jenis</span><select value={item.reference_type} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, reference_type: e.target.value as ReferenceDraft['reference_type'] } : row))}><option value="PRODUCT">Produk</option><option value="MATERIAL">Material</option><option value="PRICE">Harga</option><option value="CONSTRUCTION">Konstruksi</option><option value="MARKET">Pasar/tren</option><option value="OTHER">Lainnya</option></select></label><label className="field"><span>Judul</span><input placeholder="Nama sumber" value={item.title} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} /></label><label className="field field-grow"><span>Link aktif</span><input type="url" placeholder="https://…" value={item.source_url} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, source_url: e.target.value } : row))} /></label><label className="field field-grow"><span>Alasan dipakai</span><input placeholder="Apa yang harus dipelajari?" value={item.insight} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, insight: e.target.value } : row))} /></label>{studyLinks.length > 1 && <button type="button" className="remove-row" onClick={() => setStudyLinks(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div>)}</div>
-
-            <div className="field-grid brief-identity-grid"><label className="field field-wide"><span>Nama artikel *</span><input required placeholder="Contoh: Windbreaker Urban Shell" value={form.article_name} onChange={e => setForm({ ...form, article_name: e.target.value })} /></label><label className="field"><span>Unit bisnis *</span><select required value={form.business_unit_id} onChange={e => setForm({ ...form, business_unit_id: e.target.value })}><option value="">Pilih unit</option>{units.data?.map(unit => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label><label className="field"><span>Kategori *</span><input required placeholder="Jaket, kaos, hoodie…" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} /></label><label className="field field-wide"><span>Konsep & tujuan artikel</span><textarea rows={3} placeholder="Target pengguna, fungsi, fit, karakter, dan level kualitas…" value={form.concept} onChange={e => setForm({ ...form, concept: e.target.value })} /></label><label className="field field-wide"><span>Arahan owner dari seluruh referensi</span><textarea rows={3} placeholder="Bagian yang dipertahankan, diubah, dihindari, dan pertanyaan yang harus dijawab tim…" value={form.source_notes} onChange={e => setForm({ ...form, source_notes: e.target.value })} /></label></div>
-          </section>
-
-          <section className="brief-section" id="brief-variant">
-            <div className="brief-section-heading"><span className="section-number">02</span><div><span className="eyebrow">Arah spesifikasi</span><h3>Varian warna, ukuran & chart size</h3><p>Masukkan hipotesis awal. Tim sampling tetap bertanggung jawab memvalidasi ukuran final.</p></div></div>
-            <div className="subsection-title"><div><Palette size={18} /><span><b>Kandidat warna</b><small>Nama, kode, dan catatan panel/kombinasi</small></span></div><button type="button" className="text-button" onClick={() => setColors(current => [...current, emptyColor()])}><Plus size={16} /> Tambah warna</button></div>
-            <div className="color-draft-grid">{colors.map((color, index) => <div className="color-draft" key={`color-${index}`}><input className="color-picker" type="color" value={color.hex_code || '#111b2d'} aria-label={`Pilih warna ${index + 1}`} onChange={e => setColors(current => current.map((row, i) => i === index ? { ...row, hex_code: e.target.value } : row))} /><label className="field"><span>Nama warna</span><input placeholder="Black Onyx" value={color.name} onChange={e => setColors(current => current.map((row, i) => i === index ? { ...row, name: e.target.value } : row))} /></label><label className="field"><span>Kode</span><input placeholder="BLK-01" value={color.color_code} onChange={e => setColors(current => current.map((row, i) => i === index ? { ...row, color_code: e.target.value } : row))} /></label><label className="field field-grow"><span>Panel/kombinasi</span><input placeholder="Body hitam, zipper abu" value={color.panel_notes} onChange={e => setColors(current => current.map((row, i) => i === index ? { ...row, panel_notes: e.target.value } : row))} /></label>{colors.length > 1 && <button type="button" className="remove-row" onClick={() => setColors(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div>)}</div>
-
-            <div className="subsection-title"><div><Ruler size={18} /><span><b>Rentang ukuran</b><small>Pilih preset dan tambahkan ukuran custom bila perlu</small></span></div></div>
-            <div className="size-selector"><div>{SIZE_PRESETS.map(size => <button type="button" className={sizes.includes(size) ? 'selected' : ''} key={size} onClick={() => toggleSize(size)}>{sizes.includes(size) && <Check size={14} />}{size}</button>)}</div><label><input value={customSize} placeholder="Custom" onChange={e => setCustomSize(e.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addCustomSize(); } }} /><button type="button" onClick={addCustomSize}><Plus size={16} /></button></label></div>
-
-            <div className="measurement-wrap"><div className="measurement-head"><b>Draft chart size <span>cm</span></b><button type="button" className="text-button" onClick={() => setMeasurements(current => [...current, emptyMeasurement(current.length + 1)])}><Plus size={16} /> Titik ukur</button></div><div className="measurement-scroll"><table><thead><tr><th>Titik ukur</th>{sizes.map(size => <th key={size}>{size}</th>)}<th>Toleransi +/−</th><th /></tr></thead><tbody>{measurements.map((row, index) => <tr key={`${row.point_code}-${index}`}><td><input placeholder="Lebar dada" value={row.point_name} onChange={e => setMeasurements(current => current.map((item, i) => i === index ? { ...item, point_name: e.target.value } : item))} /></td>{sizes.map(size => <td key={size}><input inputMode="decimal" placeholder="0" value={row.values[size] ?? ''} onChange={e => setMeasurements(current => current.map((item, i) => i === index ? { ...item, values: { ...item.values, [size]: numberValue(e.target.value) } } : item))} /></td>)}<td><div className="tolerance-input"><input inputMode="decimal" value={row.tolerance_plus} onChange={e => setMeasurements(current => current.map((item, i) => i === index ? { ...item, tolerance_plus: numberValue(e.target.value) } : item))} /><span>/</span><input inputMode="decimal" value={row.tolerance_minus} onChange={e => setMeasurements(current => current.map((item, i) => i === index ? { ...item, tolerance_minus: numberValue(e.target.value) } : item))} /></div></td><td>{measurements.length > 1 && <button type="button" onClick={() => setMeasurements(current => current.filter((_, i) => i !== index))}><Trash2 size={16} /></button>}</td></tr>)}</tbody></table></div></div>
-          </section>
-
-          <section className="brief-section" id="brief-sourcing">
-            <div className="brief-section-heading"><span className="section-number">03</span><div><span className="eyebrow">Kesiapan sourcing</span><h3>Material & supplier</h3><p>Catat bahan baku, konsumsi, supplier utama atau alternatif, kontak, harga, MOQ, dan lead time.</p></div><button type="button" className="button button-secondary" onClick={() => setMaterials(current => [...current, emptyMaterial('ALTERNATIVE')])}><PackagePlus size={17} /> Tambah kandidat</button></div>
-            <div className="material-card-list">{materials.map((item, index) => <article className="material-draft-card" key={`material-${index}`}><div className="material-card-head"><span className="material-card-icon"><Layers3 size={20} /></span><div><b>Kandidat {index + 1}</b><small>{item.supplier_role === 'PRIMARY' ? 'Supplier utama' : 'Supplier alternatif'}</small></div><select value={item.supplier_role} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, supplier_role: e.target.value as MaterialSupplierDraft['supplier_role'] } : row))}><option value="PRIMARY">Utama</option><option value="ALTERNATIVE">Alternatif</option></select>{materials.length > 1 && <button type="button" className="remove-row" onClick={() => setMaterials(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div><div className="material-form-grid"><label className="field field-span-2"><span>Nama bahan/komponen</span><input placeholder="Contoh: Taslan balon coating" value={item.proposed_name} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, proposed_name: e.target.value } : row))} /></label><label className="field"><span>Peran bahan</span><select value={item.role} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, role: e.target.value as MaterialSupplierDraft['role'] } : row))}>{MATERIAL_ROLES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label className="field"><span>Komposisi</span><input placeholder="100% nylon" value={item.composition} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, composition: e.target.value } : row))} /></label><label className="field"><span>GSM</span><input type="number" min="0" placeholder="120" value={item.gsm} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, gsm: numberValue(e.target.value) } : row))} /></label><label className="field"><span>Lebar bahan (cm)</span><input type="number" min="0" placeholder="150" value={item.width_cm} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, width_cm: numberValue(e.target.value) } : row))} /></label><label className="field"><span>Konsumsi</span><div className="joined-input"><input type="number" min="0" step="0.01" placeholder="1.5" value={item.estimated_consumption} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, estimated_consumption: numberValue(e.target.value) } : row))} /><select value={item.unit} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, unit: e.target.value } : row))}><option>meter</option><option>kg</option><option>pcs</option><option>set</option><option>roll</option></select></div></label><label className="field field-span-3"><span>Warna & karakter bahan</span><input placeholder="Pilihan warna, handfeel, stretch, coating, ketebalan…" value={item.color_notes} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, color_notes: e.target.value } : row))} /></label></div><div className="supplier-divider"><Truck size={17} /><span>Data supplier</span></div><div className="material-form-grid"><label className="field field-span-2"><span>Nama supplier</span><input placeholder="Nama toko, pabrik, atau distributor" value={item.supplier_name} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, supplier_name: e.target.value } : row))} /></label><label className="field"><span>Kontak person</span><input placeholder="Nama PIC" value={item.contact_name} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, contact_name: e.target.value } : row))} /></label><label className="field"><span>WhatsApp/telepon</span><input inputMode="tel" placeholder="08…" value={item.phone} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, phone: e.target.value } : row))} /></label><label className="field"><span>Kota</span><input placeholder="Bandung" value={item.city} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, city: e.target.value } : row))} /></label><label className="field"><span>Harga per {item.unit}</span><input type="number" min="0" placeholder="0" value={item.unit_price} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, unit_price: numberValue(e.target.value) } : row))} /></label><label className="field"><span>MOQ</span><input type="number" min="0" placeholder="0" value={item.moq} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, moq: numberValue(e.target.value) } : row))} /></label><label className="field"><span>Lead time (hari)</span><input type="number" min="0" placeholder="7" value={item.lead_time_days} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, lead_time_days: numberValue(e.target.value) } : row))} /></label><label className="field field-span-3"><span>Catatan supplier</span><input placeholder="Kualitas, cara pemesanan, risiko, masa berlaku harga…" value={item.supplier_notes} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, supplier_notes: e.target.value } : row))} /></label></div></article>)}</div>
-            <div className="supplier-unit-planner">
-              <div className="supplier-unit-head">
-                <div><span className="eyebrow">Standar perhitungan</span><h4>Konsumsi produksi & harga beli supplier</h4><p>Satuan pemakaian produksi boleh berbeda dengan satuan penawaran supplier. Sistem menyimpannya terpisah agar HPP tidak salah hitung.</p></div>
-              </div>
-              <div className="supplier-unit-list">
-                {materials.map((item, index) => <div className="supplier-unit-row" key={`unit-${index}`}>
-                  <div className="supplier-unit-name"><span>{index + 1}</span><p><b>{item.proposed_name || `Kandidat material ${index + 1}`}</b><small>{item.supplier_name || (item.supplier_role === 'PRIMARY' ? 'Supplier utama' : 'Supplier alternatif')}</small></p></div>
-                  <label className="field"><span>Konsumsi produksi</span><div className="joined-input"><input type="number" min="0" step="0.01" placeholder="1.5" value={item.estimated_consumption} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, estimated_consumption: numberValue(e.target.value) } : row))} /><select value={item.unit} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, unit: e.target.value } : row))}>{MATERIAL_UNITS.map(unit => <option value={unit} key={unit}>{unit}</option>)}</select></div></label>
-                  <label className="field"><span>Harga beli supplier</span><div className="joined-input purchase-unit-input"><input type="number" min="0" placeholder="0" value={item.unit_price} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, unit_price: numberValue(e.target.value) } : row))} /><select value={item.price_unit} onChange={e => setMaterials(current => current.map((row, i) => i === index ? { ...row, price_unit: e.target.value } : row))}>{PURCHASE_UNITS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div></label>
-                </div>)}
-              </div>
-            </div>
-          </section>
-
-          <section className="brief-section" id="brief-costing">
-            <div className="brief-section-heading"><span className="section-number">04</span><div><span className="eyebrow">Estimasi awal</span><h3>Draft HPP & target</h3><p>Owner boleh memberi angka awal; tim costing wajib memvalidasi sebelum status final.</p></div><button type="button" className="button button-secondary" onClick={() => setHppLines(current => [...current, emptyHpp()])}><Plus size={17} /> Komponen biaya</button></div>
-            <div className="hpp-table-wrap"><div className="hpp-table-head"><span>Komponen</span><span>Jumlah</span><span>Satuan</span><span>Harga satuan</span><span>Waste</span><span>Total</span><span /></div>{hppLines.map((line, index) => { const total = (Number(line.quantity) || 0) * (Number(line.unit_price) || 0) * (1 + (Number(line.waste_percent) || 0) / 100); return <div className="hpp-table-row" key={`hpp-${index}`}><div><select value={line.category} aria-label="Kategori biaya" onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, category: e.target.value as HppLineDraft['category'] } : row))}>{HPP_CATEGORIES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><input placeholder="Nama bahan/jasa" value={line.item_name} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, item_name: e.target.value } : row))} /></div><input type="number" min="0" step="0.01" value={line.quantity} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, quantity: numberValue(e.target.value) } : row))} /><input value={line.unit} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, unit: e.target.value } : row))} /><input type="number" min="0" placeholder="0" value={line.unit_price} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, unit_price: numberValue(e.target.value) } : row))} /><div className="percent-input"><input type="number" min="0" value={line.waste_percent} onChange={e => setHppLines(current => current.map((row, i) => i === index ? { ...row, waste_percent: numberValue(e.target.value) } : row))} /><span>%</span></div><b>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(total)}</b>{hppLines.length > 1 && <button type="button" onClick={() => setHppLines(current => current.filter((_, i) => i !== index))}><Trash2 size={16} /></button>}</div>; })}</div>
-            <div className="cost-summary-strip"><div><Calculator size={21} /><span><small>Estimasi HPP awal</small><b>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(hppTotal)}</b></span></div><label><span>Target margin</span><div><input type="number" min="0" max="100" value={targetMargin} onChange={e => setTargetMargin(numberValue(e.target.value))} /><b>%</b></div></label><div><small>Harga rekomendasi awal</small><b>{targetMargin !== '' && Number(targetMargin) < 100 ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(hppTotal / (1 - Number(targetMargin) / 100)) : '—'}</b></div></div>
-            <div className="target-planner">
-              <div className="target-planner-head"><div><span className="eyebrow">Rencana waktu</span><h4>Target artikel dari riset sampai rilis</h4><p>Artikel dinyatakan <b>fix</b> setelah fit, konstruksi, material, warna, dan chart size master sample disetujui.</p></div><button type="button" className="button button-secondary" onClick={buildSchedule}><Sparkles size={16} /> Susun otomatis</button></div>
-              <div className="milestone-grid">
-                <label className="field milestone-card"><span>Prioritas</span><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as Priority })}><option value="NORMAL">Normal</option><option value="HIGH">Tinggi</option><option value="URGENT">Mendesak</option></select><small>Menentukan urgensi seluruh tugas.</small></label>
-                <label className="field milestone-card"><span>01 · Riset selesai</span><input type="date" value={form.target_research_date ?? ''} onChange={e => setForm({ ...form, target_research_date: e.target.value })} /><small>Referensi dan arah produk lengkap.</small></label>
-                <label className="field milestone-card"><span>02 · Supplier terkunci</span><input type="date" value={form.target_sourcing_date ?? ''} onChange={e => setForm({ ...form, target_sourcing_date: e.target.value })} /><small>Bahan, harga, MOQ, dan lead time valid.</small></label>
-                <label className="field milestone-card milestone-fix"><span>03 · Artikel / master sample fix</span><input type="date" value={form.target_fix_date ?? ''} onChange={e => setForm({ ...form, target_fix_date: e.target.value })} /><small>Spesifikasi final siap dikunci.</small></label>
-                <label className="field milestone-card"><span>04 · HPP final</span><input type="date" value={form.target_costing_date ?? ''} onChange={e => setForm({ ...form, target_costing_date: e.target.value })} /><small>Biaya dan harga jual disetujui.</small></label>
-                <label className="field milestone-card milestone-ready"><span>05 · Siap produksi massal</span><input type="date" value={form.target_date} onChange={e => setForm({ ...form, target_date: e.target.value })} /><small>PO dan kapasitas produksi siap.</small></label>
-                <label className="field milestone-card milestone-launch"><span>06 · Target rilis produk</span><input type="date" value={form.target_launch_date ?? ''} onChange={e => setForm({ ...form, target_launch_date: e.target.value })} /><small>Stok, foto, katalog, dan kanal jual siap.</small></label>
-              </div>
-              {hasMilestoneConflict && <div className="milestone-warning"><AlertTriangle size={16} /><span>Urutan tanggal belum logis. Pastikan target riset, sourcing, artikel fix, HPP, produksi, lalu rilis bergerak maju.</span></div>}
-            </div>
+            <div className="subsection-title"><div><ExternalLink size={18} /><span><b>Link referensi tambahan</b><small>Pinterest, media, atau kompetitor</small></span></div><button type="button" className="text-button" onClick={() => setStudyLinks(current => [...current, emptyStudyLink()])}><Plus size={16} /> Tambah link</button></div>
+            <div className="repeat-list">{studyLinks.map((item, index) => <div className="reference-row reference-link-row" key={`link-${index}`}><span className="row-index">{index + 1}</span><label className="field"><span>Jenis</span><select value={item.reference_type} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, reference_type: e.target.value as ReferenceDraft['reference_type'] } : row))}><option value="PRODUCT">Siluet</option><option value="MATERIAL">Material</option><option value="PRICE">Harga</option><option value="CONSTRUCTION">Konstruksi</option><option value="MARKET">Pasar/tren</option><option value="OTHER">Lainnya</option></select></label><label className="field"><span>Judul</span><input placeholder="Nama sumber" value={item.title} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} /></label><label className="field field-grow"><span>Link URL referensi</span><input type="url" placeholder="https://…" value={item.source_url} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, source_url: e.target.value } : row))} /></label><label className="field field-grow"><span>Catatan/alasan (opsional)</span><input placeholder="Apa yang harus dipelajari?" value={item.insight} onChange={e => setStudyLinks(current => current.map((row, i) => i === index ? { ...row, insight: e.target.value } : row))} /></label>{studyLinks.length > 1 && <button type="button" className="remove-row" onClick={() => setStudyLinks(current => current.filter((_, i) => i !== index))}><Trash2 size={17} /></button>}</div>)}</div>
           </section>
         </div>
 
         <aside className="brief-command-panel">
-          <div className="brief-score"><div className="brief-score-ring" style={{ '--score': `${completion * 3.6}deg` } as React.CSSProperties}><span>{completion}%</span></div><div><span className="eyebrow">Kesiapan brief</span><h3>{completion >= 80 ? 'Siap dibagikan ke tim' : 'Lengkapi konteks utama'}</h3></div></div>
-          <div className="brief-checklist"><div className={identityReady ? 'done' : ''}><span>{identityReady ? <Check size={14} /> : '1'}</span><p><b>Identitas artikel</b><small>Nama, unit, dan kategori</small></p></div><div className={referenceCount ? 'done' : ''}><span>{referenceCount ? <Check size={14} /> : '2'}</span><p><b>Minimal satu referensi</b><small>File, URL gambar, atau link</small></p></div><div className={validMaterials.length ? 'done' : ''}><span>{validMaterials.length ? <Check size={14} /> : '3'}</span><p><b>Material & supplier</b><small>{validMaterials.length} kandidat disiapkan</small></p></div><div className={validColors.length && sizes.length ? 'done' : ''}><span>{validColors.length && sizes.length ? <Check size={14} /> : '4'}</span><p><b>Varian & ukuran</b><small>{validColors.length} warna · {sizes.length} ukuran</small></p></div><div className={validHpp.length ? 'done' : ''}><span>{validHpp.length ? <Check size={14} /> : '5'}</span><p><b>Draft HPP</b><small>{validHpp.length} komponen biaya</small></p></div></div>
-          <div className="brief-output"><span className="eyebrow">Output otomatis</span><p><ImagePlus size={16} /> Galeri referensi Cloudinary</p><p><Layers3 size={16} /> 9 tahap dan tugas tim</p><p><Palette size={16} /> Draft spesifikasi</p><p><CircleDollarSign size={16} /> Worksheet HPP versi 1</p></div>
-          {submitError && <div className={`form-error ${createdProject ? 'form-warning' : ''}`}>{createdProject && <AlertTriangle size={17} />}{submitError}</div>}
-          {createdProject ? <button type="button" className="button button-primary button-large" onClick={() => navigate(`/launch/app/projects/${createdProject.id}`)}>Buka workspace artikel <ArrowRight size={18} /></button> : <button className="button button-primary button-large" disabled={!readyToSubmit || submitting}>{submitting ? uploadProgress : 'Buat workspace artikel'} <ArrowRight size={18} /></button>}
+          <div className="brief-score"><div className="brief-score-ring" style={{ '--score': `${completion * 3.6}deg` } as React.CSSProperties}><span>{completion}%</span></div><div><span className="eyebrow">Kesiapan brief</span><h3>{completion >= 66 ? 'Siap didaftarkan' : 'Lengkapi identitas & referensi'}</h3></div></div>
+          <div className="brief-checklist"><div className={identityReady ? 'done' : ''}><span>{identityReady ? <Check size={14} /> : '1'}</span><p><b>Identitas artikel</b><small>Nama, unit, dan kategori</small></p></div><div className={referenceCount ? 'done' : ''}><span>{referenceCount ? <Check size={14} /> : '2'}</span><p><b>Minimal satu referensi</b><small>File, URL gambar, atau link</small></p></div></div>
+          <div className="brief-output"><span className="eyebrow">Diisi tim setelah ini</span><p><Palette size={16} /> Varian warna &amp; size chart</p><p><Layers3 size={16} /> BOM, material &amp; supplier</p><p><ImagePlus size={16} /> HPP &amp; harga produksi</p></div>
+          {submitError && <div className={`form-error ${createdProject ? 'form-warning' : ''}`}>{submitError}</div>}
+          {createdProject ? <button type="button" className="button button-primary button-large" onClick={() => navigate(`/launch/app/projects/${createdProject.id}`)}>Buka workspace artikel <ArrowRight size={18} /></button> : <button className="button button-primary button-large" disabled={!readyToSubmit || submitting}>{submitting ? uploadProgress : 'Daftarkan artikel sekarang'} <ArrowRight size={18} /></button>}
           {!readyToSubmit && <small className="submit-hint">Lengkapi identitas dan minimal satu referensi untuk melanjutkan.</small>}
           <small className="data-note">Data terstruktur tersimpan di Supabase. File gambar tersimpan di Cloudinary.</small>
         </aside>

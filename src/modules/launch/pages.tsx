@@ -1,23 +1,27 @@
-import { FormEvent, ReactNode, useState } from 'react';
-import { Activity, AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, Factory, FileSearch, Filter, ImagePlus, Layers3, MoreHorizontal, PackageCheck, Palette, Pencil, Plus, Search, Shirt, Sparkles, Target, Users } from 'lucide-react';
-import { Link, useNavigate, useParams } from '@/app/router/simpleRouter';
+import { ReactNode, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, Factory, FileSearch, Filter, LayoutGrid, Layers3, Link2, List, PackageCheck, Palette, Pencil, Plus, Search, ShieldCheck, Shirt, Sparkles, Target, Users } from 'lucide-react';
+import { Link, useNavigate, useParams } from '@/app/router/simpleRouter';
 import { useAuth } from '@/core/auth/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { uploadProjectReference } from './data/launchRepository';
+import { listTeamMembers } from './data/teamRepository';
 import { BriefSnapshot } from './components/BriefSnapshot';
 import { ResearchPanel } from './components/ResearchPanel';
 import { SafeImage } from './components/SafeImage';
 import { EditProjectPanel } from './components/EditProjectPanel';
+import { DeleteButton } from './components/DeleteButton';
 import { SourcingPanel } from './components/SourcingPanel';
 import { SamplingPanel } from './components/SamplingPanel';
 import { CostingPanel } from './components/CostingPanel';
 import { SpecificationPanel } from './components/SpecificationPanel';
 import { QcPanel } from './components/QcPanel';
-import type { LaunchProject, LaunchStage, LaunchTask, NewProjectInput, Priority, ProjectStatus, StageCode } from './domain/types';
+import { MaterialFormPanel, SupplierFormPanel } from './components/MasterDataPanel';
+import { BlockerReportForm, OpenBlockerCard } from './components/BlockerPanel';
+import { ApprovalPanel } from './components/ApprovalPanel';
+import { DiscussionPanel } from './components/DiscussionPanel';
+import type { DependencyType, LaunchProject, LaunchStage, LaunchTask, MasterMaterial, MasterSupplier, ProjectStatus, StageCode } from './domain/types';
 import { STAGE_ORDER } from './domain/types';
 import { COST_CONFIDENCE_LABEL, SCHEDULE_HEALTH_LABEL, costConfidence, dataReadiness, dataReadinessItems, scheduleHealth } from './domain/indicators';
-import { useBusinessUnits, useCompleteTask, useCreateProject, useMyTasks, useProfiles, useProject, useProjects, useUpdateStage } from './hooks/useLaunch';
+import { useCompleteTask, useDeactivateMasterMaterial, useDeactivateMasterSupplier, useDeleteProject, useMasterMaterials, useMasterSuppliers, useMyTasks, useProject, useProjects, useSetTaskDependency, useUpdateStage } from './hooks/useLaunch';
 import type { ProjectWorkspace as ProjectWorkspaceData } from './domain/types';
 
 const stageMeta: Record<StageCode, { short: string; label: string }> = {
@@ -31,6 +35,17 @@ const stageMeta: Record<StageCode, { short: string; label: string }> = {
   OWNER_APPROVAL: { short: 'Approval', label: 'Approval owner' },
   PRODUCTION_READY: { short: 'Produksi', label: 'Siap produksi' },
 };
+
+const WORKSTREAM_TABS: Array<{ code: StageCode | null; label: string; icon: ReactNode }> = [
+  { code: null, label: 'Brief', icon: <Layers3 size={15} /> },
+  { code: 'RESEARCH', label: 'Riset', icon: <BookOpen size={15} /> },
+  { code: 'SOURCING', label: 'Bahan & supplier', icon: <Factory size={15} /> },
+  { code: 'SAMPLING', label: 'Sampling', icon: <Shirt size={15} /> },
+  { code: 'COSTING', label: 'HPP', icon: <CircleDollarSign size={15} /> },
+  { code: 'SPECIFICATION', label: 'Warna & size', icon: <Palette size={15} /> },
+  { code: 'QC', label: 'QC', icon: <PackageCheck size={15} /> },
+  { code: 'OWNER_APPROVAL', label: 'Approval', icon: <ShieldCheck size={15} /> },
+];
 
 const statusLabels: Record<ProjectStatus, string> = {
   DRAFT: 'Draft', ACTIVE: 'Berjalan', BLOCKED: 'Terhambat', IN_REVIEW: 'Menunggu review', READY_FOR_PRODUCTION: 'Siap produksi', ARCHIVED: 'Arsip',
@@ -63,7 +78,7 @@ function ProjectCard({ project }: { project: LaunchProject }) {
         <span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name ?? 'GG'}</span>
       </div>
       <div className="project-card-body">
-        <div className="project-card-top"><span>{project.code}</span><MoreHorizontal size={18} /></div>
+        <div className="project-card-top"><span>{project.code}</span></div>
         <h3>{project.article_name}</h3>
         <p>{project.category} · {stageMeta[project.current_stage]?.label ?? project.current_stage}</p>
         <Progress value={project.progress} />
@@ -73,8 +88,40 @@ function ProjectCard({ project }: { project: LaunchProject }) {
   );
 }
 
-function TaskRow({ task, onComplete }: { task: LaunchTask; onComplete?: () => void }) {
-  return <div className="task-row"><button className={`task-check ${task.status === 'DONE' ? 'done' : ''}`} onClick={onComplete} disabled={!onComplete} aria-label="Tandai selesai">{task.status === 'DONE' && <Check size={14} />}</button><div className="task-main"><b>{task.title}</b><span>{task.project?.article_name ?? stageMeta[task.stage_code]?.label}</span></div><span className={`task-due ${task.due_date && new Date(task.due_date) < new Date() ? 'late' : ''}`}>{dueText(task.due_date)}</span></div>;
+const DEPENDENCY_LABEL: Record<DependencyType, string> = { NONE: 'Tanpa dependency', FS: 'Finish-to-Start', SS: 'Start-to-Start', FF: 'Finish-to-Finish' };
+
+function TaskRow({ task, onComplete, allTasks, onSetDependency }: { task: LaunchTask; onComplete?: () => Promise<unknown>; allTasks?: LaunchTask[]; onSetDependency?: (dependsOnId: string | null, type: DependencyType) => Promise<unknown> }) {
+  const [error, setError] = useState<string | null>(null);
+  const [editingDep, setEditingDep] = useState(false);
+  const predecessor = allTasks?.find(item => item.id === task.depends_on_task_id);
+  const locked = Boolean(predecessor && predecessor.status !== 'DONE' && (task.dependency_type === 'FS' || task.dependency_type === 'FF'));
+
+  async function handleComplete() {
+    if (!onComplete) return;
+    setError(null);
+    try { await onComplete(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Tugas belum dapat ditandai selesai.'); }
+  }
+
+  return <div className="task-row-wrap">
+    <div className="task-row">
+      <button className={`task-check ${task.status === 'DONE' ? 'done' : ''}`} onClick={handleComplete} disabled={!onComplete || locked} aria-label="Tandai selesai">{task.status === 'DONE' && <Check size={14} />}</button>
+      <div className="task-main">
+        <b>{task.title}</b>
+        <span>{task.project?.article_name ?? stageMeta[task.stage_code]?.label}</span>
+        {predecessor && <small className={`task-dependency ${locked ? 'task-dependency-locked' : ''}`}>{locked ? 'Menunggu' : 'Setelah'}: {predecessor.title}</small>}
+        {error && <small className="task-error">{error}</small>}
+      </div>
+      <span className={`task-due ${task.due_date && new Date(task.due_date) < new Date() ? 'late' : ''}`}>{dueText(task.due_date)}</span>
+      {allTasks && onSetDependency && <button type="button" className="icon-button task-dep-toggle" onClick={() => setEditingDep(value => !value)} aria-label="Atur dependency"><Link2 size={14} /></button>}
+    </div>
+    {editingDep && allTasks && onSetDependency && <div className="task-dependency-editor">
+      <select value={task.depends_on_task_id ?? ''} onChange={e => onSetDependency(e.target.value || null, task.dependency_type === 'NONE' ? 'FS' : task.dependency_type)}>
+        <option value="">Tanpa predecessor</option>
+        {allTasks.filter(item => item.id !== task.id).map(item => <option value={item.id} key={item.id}>{item.title}</option>)}
+      </select>
+      {task.depends_on_task_id && <select value={task.dependency_type} onChange={e => onSetDependency(task.depends_on_task_id, e.target.value as DependencyType)}>{(['FS', 'SS', 'FF'] as const).map(type => <option value={type} key={type}>{DEPENDENCY_LABEL[type]}</option>)}</select>}
+    </div>}
+  </div>;
 }
 
 export function TodayPage() {
@@ -87,6 +134,15 @@ export function TodayPage() {
   const review = data.filter(item => item.status === 'IN_REVIEW');
   const blocked = data.filter(item => item.status === 'BLOCKED');
   const ready = data.filter(item => item.status === 'READY_FOR_PRODUCTION');
+  const health = data.map(item => ({ item, status: scheduleHealth(item, []) }));
+  const atRisk = health.filter(entry => entry.status === 'AT_RISK');
+  const overdue = health.filter(entry => entry.status === 'OVERDUE');
+  const now = new Date();
+  const releaseThisMonth = data.filter(item => {
+    if (!item.target_launch_date) return false;
+    const target = new Date(item.target_launch_date);
+    return target.getUTCFullYear() === now.getUTCFullYear() && target.getUTCMonth() === now.getUTCMonth();
+  });
   const stageCounts = STAGE_ORDER.map(code => ({ code, count: data.filter(item => item.current_stage === code).length }));
 
   if (projects.isLoading) return <LoadingBlocks />;
@@ -110,6 +166,10 @@ export function TodayPage() {
         <div className="metric-card"><span className="metric-icon yellow"><Clock3 size={19} /></span><div><small>Tugas saya</small><b>{tasks.data?.length ?? 0}</b><span>butuh perhatian</span></div></div>
         <div className="metric-card"><span className="metric-icon red"><AlertCircle size={19} /></span><div><small>Terhambat</small><b>{blocked.length}</b><span>perlu dibuka</span></div></div>
         <div className="metric-card"><span className="metric-icon green"><PackageCheck size={19} /></span><div><small>Siap produksi</small><b>{ready.length}</b><span>artikel tervalidasi</span></div></div>
+        <div className="metric-card"><span className="metric-icon yellow"><AlertCircle size={19} /></span><div><small>Berisiko</small><b>{atRisk.length}</b><span>mendekati tenggat</span></div></div>
+        <div className="metric-card"><span className="metric-icon red"><Clock3 size={19} /></span><div><small>Terlambat</small><b>{overdue.length}</b><span>lewat target</span></div></div>
+        <div className="metric-card"><span className="metric-icon orange"><Sparkles size={19} /></span><div><small>Menunggu approval</small><b>{review.length}</b><span>butuh keputusan owner</span></div></div>
+        <div className="metric-card"><span className="metric-icon green"><CalendarDays size={19} /></span><div><small>Rilis bulan ini</small><b>{releaseThisMonth.length}</b><span>target launch</span></div></div>
       </section>
 
       <section className="content-card launch-lane-card">
@@ -133,54 +193,27 @@ export function TodayPage() {
   );
 }
 
+function ProjectListView({ projects }: { projects: LaunchProject[] }) {
+  return <section className="content-card"><div className="project-list-table"><table><thead><tr><th>Artikel</th><th>Unit</th><th>Kategori</th><th>Priority</th><th>Status</th><th>Tahap</th><th>Progress</th><th>Kondisi jadwal</th><th>Owner</th><th>Target produksi</th><th>Target rilis</th><th>Update terakhir</th></tr></thead><tbody>{projects.map(project => {
+    const health = scheduleHealth(project, []);
+    return <tr key={project.id}><td><Link to={`/launch/app/projects/${project.id}`}><b>{project.article_name}</b><small>{project.code}</small></Link></td><td>{project.business_unit?.short_name ?? '—'}</td><td>{project.category}</td><td><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></td><td><StatusPill status={project.status} /></td><td>{stageMeta[project.current_stage]?.short}</td><td><Progress value={project.progress} compact /></td><td><span className={`health-chip health-${health.toLowerCase()}`}>{SCHEDULE_HEALTH_LABEL[health]}</span></td><td>{project.owner?.full_name ?? '—'}</td><td>{project.target_date ? date.format(new Date(project.target_date)) : '—'}</td><td>{project.target_launch_date ? date.format(new Date(project.target_launch_date)) : '—'}</td><td>{date.format(new Date(project.updated_at))}</td></tr>;
+  })}</tbody></table></div></section>;
+}
+
 export function ProjectsPage() {
   const [status, setStatus] = useState('ALL');
   const [query, setQuery] = useState('');
+  const [view, setView] = useState<'grid' | 'list'>('grid');
   const projects = useProjects(status);
   const filtered = (projects.data ?? []).filter(item => `${item.article_name} ${item.code} ${item.category}`.toLowerCase().includes(query.toLowerCase()));
   const filters = [['ALL', 'Semua'], ['ACTIVE', 'Berjalan'], ['IN_REVIEW', 'Review'], ['BLOCKED', 'Terhambat'], ['READY_FOR_PRODUCTION', 'Siap produksi']];
 
   return <div className="page-stack"><section className="page-intro"><div><span className="eyebrow">Portfolio artikel</span><h2>Kelola seluruh peluncuran.</h2><p>Urutkan pekerjaan berdasarkan status, brand, atau kebutuhan keputusan.</p></div><Link className="button button-primary" to="/launch/app/projects/new"><Plus size={18} /> Artikel baru</Link></section>
-    <section className="toolbar-card"><div className="search-field"><Search size={18} /><input placeholder="Cari nama artikel, kode, atau kategori…" value={query} onChange={event => setQuery(event.target.value)} /></div><div className="filter-scroll">{filters.map(([value, label]) => <button className={status === value ? 'active' : ''} key={value} onClick={() => setStatus(value)}>{label}</button>)}</div><button className="icon-button filter-button"><Filter size={19} /></button></section>
-    {projects.isLoading ? <LoadingBlocks /> : projects.error ? <ErrorPanel /> : filtered.length ? <section className="project-grid">{filtered.map(project => <ProjectCard project={project} key={project.id} />)}</section> : <EmptyPanel icon={<FileSearch size={30} />} title="Tidak ada artikel yang cocok" detail="Ubah kata pencarian atau filter status untuk melihat artikel lainnya." />}
+    <section className="toolbar-card"><div className="search-field"><Search size={18} /><input placeholder="Cari nama artikel, kode, atau kategori…" value={query} onChange={event => setQuery(event.target.value)} /></div><div className="filter-scroll">{filters.map(([value, label]) => <button className={status === value ? 'active' : ''} key={value} onClick={() => setStatus(value)}>{label}</button>)}</div><div className="view-toggle"><button type="button" className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')} aria-label="Tampilan grid"><LayoutGrid size={17} /></button><button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')} aria-label="Tampilan list"><List size={17} /></button></div><button className="icon-button filter-button"><Filter size={19} /></button></section>
+    {projects.isLoading ? <LoadingBlocks /> : projects.error ? <ErrorPanel /> : filtered.length ? (view === 'grid' ? <section className="project-grid">{filtered.map(project => <ProjectCard project={project} key={project.id} />)}</section> : <ProjectListView projects={filtered} />) : <EmptyPanel icon={<FileSearch size={30} />} title="Tidak ada artikel yang cocok" detail="Ubah kata pencarian atau filter status untuk melihat artikel lainnya." />}
   </div>;
 }
 
-export function NewProjectPage() {
-  const navigate = useNavigate();
-  const units = useBusinessUnits();
-  const create = useCreateProject();
-  const [image, setImage] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [form, setForm] = useState<NewProjectInput>({ article_name: '', business_unit_id: '', category: '', concept: '', source_notes: '', priority: 'HIGH', target_date: '' });
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setSubmitError(null);
-    try {
-      const projectId = await create.mutateAsync(form);
-      if (image) await uploadProjectReference(projectId, image);
-      navigate(`/launch/app/projects/${projectId}`);
-    } catch (reason) { setSubmitError(reason instanceof Error ? reason.message : 'Perintah artikel belum dapat dibuat.'); }
-  }
-
-  function chooseImage(file?: File) { if (!file) return; setImage(file); setPreview(URL.createObjectURL(file)); }
-
-  return <div className="form-page"><div className="form-top"><button className="back-link" onClick={() => navigate(-1)}><ArrowLeft size={18} /> Kembali</button><div><span className="eyebrow">Perintah kerja owner</span><h2>Mulai artikel dari satu referensi.</h2><p>Sistem otomatis menyiapkan sembilan tahap kerja dan ruang kolaborasi tim.</p></div></div>
-    <form className="project-form" onSubmit={submit}>
-      <div className="form-main">
-        <section className="form-section"><div className="form-section-title"><span>01</span><div><h3>Gambar & identitas artikel</h3><p>Titik awal yang menyatukan pemahaman seluruh tim.</p></div></div>
-          <label className={`upload-zone ${preview ? 'has-preview' : ''}`}>{preview ? <img src={preview} alt="Preview referensi" /> : <><span><ImagePlus size={27} /></span><b>Tambahkan gambar referensi</b><small>Foto, screenshot, atau sketsa · JPG/PNG/WebP · maks. 10 MB</small></>}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => chooseImage(event.target.files?.[0])} />{preview && <div className="upload-overlay">Ganti gambar</div>}</label>
-          <div className="field-grid"><label className="field field-wide"><span>Nama artikel *</span><input required placeholder="Contoh: Windbreaker Urban Shell" value={form.article_name} onChange={e => setForm({ ...form, article_name: e.target.value })} /></label><label className="field"><span>Unit bisnis *</span><select required value={form.business_unit_id} onChange={e => setForm({ ...form, business_unit_id: e.target.value })}><option value="">Pilih unit</option>{units.data?.map(unit => <option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></label><label className="field"><span>Kategori *</span><input required placeholder="Jaket, kaos, hoodie…" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} /></label></div>
-        </section>
-        <section className="form-section"><div className="form-section-title"><span>02</span><div><h3>Arah produk</h3><p>Jelaskan apa yang perlu dicapai, bukan cara mengerjakannya.</p></div></div><label className="field"><span>Konsep & tujuan artikel</span><textarea rows={4} placeholder="Target pengguna, karakter produk, fungsi utama, kisaran kualitas…" value={form.concept} onChange={e => setForm({ ...form, concept: e.target.value })} /></label><label className="field"><span>Catatan dari referensi</span><textarea rows={3} placeholder="Bagian yang harus dipertahankan, diubah, atau diteliti…" value={form.source_notes} onChange={e => setForm({ ...form, source_notes: e.target.value })} /></label></section>
-        <section className="form-section"><div className="form-section-title"><span>03</span><div><h3>Prioritas & target</h3><p>Membantu sistem menempatkan pekerjaan pada urutan yang tepat.</p></div></div><div className="field-grid"><label className="field"><span>Prioritas</span><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as Priority })}><option value="NORMAL">Normal</option><option value="HIGH">Tinggi</option><option value="URGENT">Mendesak</option></select></label><label className="field"><span>Target siap produksi</span><input type="date" value={form.target_date} onChange={e => setForm({ ...form, target_date: e.target.value })} /></label></div></section>
-      </div>
-      <aside className="form-summary"><span className="eyebrow">Setelah dibuat</span><h3>Workspace otomatis</h3><ol>{STAGE_ORDER.map((code, index) => <li key={code}><span>{index + 1}</span>{stageMeta[code].label}</li>)}</ol>{submitError && <div className="form-error">{submitError}</div>}<button className="button button-primary button-large" disabled={create.isPending || !form.article_name || !form.business_unit_id || !form.category}>{create.isPending ? 'Menyiapkan workspace…' : 'Mulai perintah artikel'} <ArrowRight size={18} /></button><small>Gambar akan disimpan ke Cloudinary setelah workspace dibuat.</small></aside>
-    </form>
-  </div>;
-}
 
 function IndicatorPanel({ workspace }: { workspace: ProjectWorkspaceData }) {
   const { project, stages } = workspace;
@@ -224,34 +257,46 @@ function StageRail({ stages, active }: { stages: LaunchStage[]; active: StageCod
 
 export function ProjectDetailPage() {
   const { projectId = '' } = useParams();
+  const navigate = useNavigate();
+  const auth = useAuth();
   const workspace = useProject(projectId);
   const completeTaskMutation = useCompleteTask(projectId);
   const stageMutation = useUpdateStage(projectId);
-  const [tab, setTab] = useState<'overview' | 'work' | 'tasks' | 'activity'>('overview');
+  const dependencyMutation = useSetTaskDependency(projectId);
+  const deleteProjectMutation = useDeleteProject();
+  const [tab, setTab] = useState<'overview' | 'work' | 'tasks' | 'discussion' | 'activity'>('overview');
   const [activeWorkstream, setActiveWorkstream] = useState<StageCode | null>(null);
   const [editing, setEditing] = useState(false);
+  const [reportingBlocker, setReportingBlocker] = useState(false);
+  const canDelete = auth.data?.permissions.includes('launch.admin') ?? false;
   if (workspace.isLoading) return <LoadingBlocks />;
   if (workspace.error || !workspace.data) return <ErrorPanel title="Artikel tidak dapat dibuka" />;
-  const { project, stages, tasks, activity, references, materials, colorways, hpp, sizeCharts, qc, samples } = workspace.data;
+  const { project, stages, tasks, activity, references, materials, colorways, hpp, sizeCharts, qc, samples, blockers } = workspace.data;
   const currentStage = stages.find(stage => stage.code === project.current_stage) ?? stages.find(stage => stage.status !== 'COMPLETED');
   const stageOf = (code: StageCode) => stages.find(stage => stage.code === code);
   const openTasks = tasks.filter(task => task.status !== 'DONE');
   const latestHpp = hpp[0];
+  const openBlocker = currentStage ? blockers.find(b => b.status === 'OPEN' && b.stage_run_id === currentStage.id) : undefined;
 
   return <div className="project-page"><Link className="back-link" to="/launch/app/projects"><ArrowLeft size={18} /> Semua artikel</Link>
-    <section className="project-hero"><div className="project-hero-image"><SafeImage src={project.reference_image_url} alt={project.article_name} fallback={<Shirt size={44} />} /><span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name}</span></div><div className="project-hero-copy"><div className="project-meta"><span>{project.code}</span><StatusPill status={project.status} /><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div><h2>{project.article_name}</h2><p>{project.concept || 'Konsep artikel belum dilengkapi.'}</p><div className="hero-facts"><span><Target size={16} /> {project.category}</span><span><CalendarDays size={16} /> {project.target_date ? date.format(new Date(project.target_date)) : 'Target belum ada'}</span><span><Users size={16} /> Owner: {project.owner?.full_name ?? 'Belum ditetapkan'}</span></div><button type="button" className="button button-secondary hero-edit" onClick={() => setEditing(true)}><Pencil size={16} /> Ubah artikel</button></div><div className="hero-progress"><div className="progress-ring" style={{ '--progress': `${project.progress * 3.6}deg` } as React.CSSProperties}><span><b>{project.progress}%</b><small>kesiapan</small></span></div></div></section>
+    <section className="project-hero"><div className="project-hero-image"><SafeImage src={project.reference_image_url} alt={project.article_name} fallback={<Shirt size={44} />} /><span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name}</span></div><div className="project-hero-copy"><div className="project-meta"><span>{project.code}</span><StatusPill status={project.status} /><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div><h2>{project.article_name}</h2><p>{project.concept || 'Konsep artikel belum dilengkapi.'}</p><div className="hero-facts"><span><Target size={16} /> {project.category}</span><span><CalendarDays size={16} /> {project.target_date ? date.format(new Date(project.target_date)) : 'Target belum ada'}</span><span><Users size={16} /> Owner: {project.owner?.full_name ?? 'Belum ditetapkan'}</span></div><div className="hero-actions"><button type="button" className="button button-secondary hero-edit" onClick={() => setEditing(true)}><Pencil size={16} /> Ubah artikel</button>{canDelete && <DeleteButton label={`artikel ${project.article_name}`} pending={deleteProjectMutation.isPending} onConfirm={() => deleteProjectMutation.mutate(project.id, { onSuccess: () => navigate('/launch/app/projects') })} />}</div></div><div className="hero-progress"><div className="progress-ring" style={{ '--progress': `${project.progress * 3.6}deg` } as React.CSSProperties}><span><b>{project.progress}%</b><small>kesiapan</small></span></div></div></section>
 
     {editing && <EditProjectPanel project={project} onClose={() => setEditing(false)} />}
 
-    <section className="stage-card"><div className="section-head"><div><span className="eyebrow">Alur utama</span><h3>{currentStage ? `Sekarang: ${stageMeta[currentStage.code].label}` : 'Seluruh tahap selesai'}</h3></div>{currentStage && currentStage.status === 'NOT_STARTED' && <button className="button button-secondary" onClick={() => stageMutation.mutate({ stageId: currentStage.id, status: 'IN_PROGRESS' })}>Mulai tahap <ArrowRight size={16} /></button>}</div><StageRail stages={stages} active={project.current_stage} /></section>
+    <section className="stage-card"><div className="section-head"><div><span className="eyebrow">Alur utama</span><h3>{currentStage ? `Sekarang: ${stageMeta[currentStage.code].label}` : 'Seluruh tahap selesai'}</h3></div><div className="stage-card-actions">{currentStage && currentStage.status === 'NOT_STARTED' && <button className="button button-secondary" onClick={() => stageMutation.mutate({ stageId: currentStage.id, status: 'IN_PROGRESS' })}>Mulai tahap <ArrowRight size={16} /></button>}{currentStage && currentStage.status !== 'BLOCKED' && currentStage.status !== 'COMPLETED' && <button type="button" className="button button-danger-ghost" onClick={() => setReportingBlocker(true)}><AlertTriangle size={15} /> Tandai terhambat</button>}</div></div><StageRail stages={stages} active={project.current_stage} /></section>
 
-    <div className="project-tabs">{([['overview', 'Ringkasan'], ['work', 'Ruang kerja'], ['tasks', `Tugas (${openTasks.length})`], ['activity', 'Aktivitas']] as const).map(item => <button key={item[0]} className={tab === item[0] ? 'active' : ''} onClick={() => setTab(item[0])}>{item[1]}</button>)}</div>
+    {reportingBlocker && currentStage && <BlockerReportForm projectId={project.id} stageId={currentStage.id} onDone={() => setReportingBlocker(false)} />}
+    {openBlocker && <OpenBlockerCard projectId={project.id} blocker={openBlocker} />}
+
+    <div className="project-tabs">{([['overview', 'Ringkasan'], ['work', 'Ruang kerja'], ['tasks', `Tugas (${openTasks.length})`], ['discussion', `Diskusi (${workspace.data.comments.length})`], ['activity', 'Aktivitas']] as const).map(item => <button key={item[0]} className={tab === item[0] ? 'active' : ''} onClick={() => setTab(item[0])}>{item[1]}</button>)}</div>
 
     {tab === 'overview' && <><IndicatorPanel workspace={workspace.data} /><div className="workspace-grid"><section className="content-card next-action"><div className="next-icon"><ArrowUpRight size={23} /></div><div><span className="eyebrow">Tindakan terbaik berikutnya</span><h3>{currentStage?.status === 'BLOCKED' ? 'Buka hambatan tahap ini' : `Lanjutkan ${currentStage ? stageMeta[currentStage.code].label.toLowerCase() : 'persiapan produksi'}`}</h3><p>{currentStage?.blocking_note || 'Lengkapi data wajib dan selesaikan tugas terbuka sebelum mengajukan review.'}</p></div><button className="button button-primary" onClick={() => setTab('work')}>Buka ruang kerja</button></section>
       <section className="content-card"><div className="section-head"><div><span className="eyebrow">Kelengkapan artikel</span><h3>Gate produksi</h3></div></div><div className="gate-list"><div className={colorways.length ? 'done' : ''}><span>{colorways.length ? <Check size={15} /> : <Palette size={16} />}</span><b>Varian warna</b><small>{colorways.length} final/kandidat</small></div><div className={latestHpp?.status === 'FINAL' ? 'done' : ''}><span>{latestHpp?.status === 'FINAL' ? <Check size={15} /> : <CircleDollarSign size={16} />}</span><b>HPP final</b><small>{latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'}</small></div><div className={sizeCharts.some(item => item.status === 'FINAL') ? 'done' : ''}><span>{sizeCharts.some(item => item.status === 'FINAL') ? <Check size={15} /> : <Layers3 size={16} />}</span><b>Size chart</b><small>{sizeCharts.length ? sizeCharts[0].status : 'Belum tersedia'}</small></div><div className={qc.some(item => item.result === 'PASS') ? 'done' : ''}><span>{qc.some(item => item.result === 'PASS') ? <Check size={15} /> : <PackageCheck size={16} />}</span><b>QC sample</b><small>{qc.length ? qc[0].result : 'Belum diperiksa'}</small></div></div></section>
-      <section className="content-card"><div className="section-head"><div><span className="eyebrow">Tugas terbuka</span><h3>Yang perlu diselesaikan</h3></div><button className="text-button" onClick={() => setTab('tasks')}>Lihat semua</button></div>{openTasks.length ? <div className="task-list">{openTasks.slice(0, 5).map(task => <TaskRow task={task} key={task.id} onComplete={() => completeTaskMutation.mutate(task.id)} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={27} />} title="Semua tugas selesai" detail="Tidak ada tugas terbuka pada artikel ini." />}</section></div></>}
+      <section className="content-card"><div className="section-head"><div><span className="eyebrow">Tugas terbuka</span><h3>Yang perlu diselesaikan</h3></div><button className="text-button" onClick={() => setTab('tasks')}>Lihat semua</button></div>{openTasks.length ? <div className="task-list">{openTasks.slice(0, 5).map(task => <TaskRow task={task} key={task.id} allTasks={tasks} onComplete={() => completeTaskMutation.mutateAsync(task.id)} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={27} />} title="Semua tugas selesai" detail="Tidak ada tugas terbuka pada artikel ini." />}</section></div></>}
 
-    {tab === 'work' && (activeWorkstream === 'RESEARCH'
+    {tab === 'work' && <>
+      <div className="workstream-tabs">{WORKSTREAM_TABS.map(item => <button type="button" key={item.label} className={activeWorkstream === item.code ? 'active' : ''} onClick={() => setActiveWorkstream(item.code)}>{item.icon}{item.label}</button>)}</div>
+      {activeWorkstream === 'RESEARCH'
       ? <ResearchPanel projectId={project.id} stage={stageOf('RESEARCH')} references={references} researchSummary={project.research_summary} onBack={() => setActiveWorkstream(null)} />
       : activeWorkstream === 'SOURCING'
       ? <SourcingPanel projectId={project.id} stage={stageOf('SOURCING')} materials={materials} onBack={() => setActiveWorkstream(null)} />
@@ -260,12 +305,16 @@ export function ProjectDetailPage() {
       : activeWorkstream === 'COSTING'
       ? <CostingPanel projectId={project.id} stage={stageOf('COSTING')} hpp={hpp} onBack={() => setActiveWorkstream(null)} />
       : activeWorkstream === 'SPECIFICATION'
-      ? <SpecificationPanel projectId={project.id} stage={stageOf('SPECIFICATION')} colorways={colorways} sizeCharts={sizeCharts} onBack={() => setActiveWorkstream(null)} />
+      ? <SpecificationPanel projectId={project.id} stage={stageOf('SPECIFICATION')} colorways={colorways} sizeCharts={sizeCharts} variantMatrix={workspace.data.variantMatrix} hpp={hpp} onBack={() => setActiveWorkstream(null)} />
       : activeWorkstream === 'QC'
       ? <QcPanel projectId={project.id} stage={stageOf('QC')} qc={qc} samples={samples} onBack={() => setActiveWorkstream(null)} />
-      : <><BriefSnapshot references={references} materials={materials} colorways={colorways} sizeCharts={sizeCharts} hpp={hpp} /><section className="workstream-grid"><Workstream icon={<BookOpen />} tone="blue" title="Riset & referensi" metric={`${references.length} referensi`} detail="Benchmark, fungsi, target pengguna, dan insight artikel." onClick={() => setActiveWorkstream('RESEARCH')} /><Workstream icon={<Factory />} tone="purple" title="Bahan & supplier" metric={`${materials.length} kandidat`} detail="Kandidat bahan, quotation, MOQ, lead time, dan supplier terpilih." onClick={() => setActiveWorkstream('SOURCING')} /><Workstream icon={<Shirt />} tone="orange" title="Sampling" metric={samples.length ? `${samples.length} versi sample` : 'Belum ada sample'} detail="Konstruksi, pola, revisi, foto, dan master sample." onClick={() => setActiveWorkstream('SAMPLING')} /><Workstream icon={<CircleDollarSign />} tone="green" title="HPP & harga" metric={latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'} detail="Bahan, aksesori, jasa, overhead, margin, dan harga rekomendasi." onClick={() => setActiveWorkstream('COSTING')} /><Workstream icon={<Palette />} tone="pink" title="Warna & size chart" metric={`${colorways.length} warna · ${sizeCharts.length} chart`} detail="Varian final, titik ukur, toleransi, dan standar produksi." onClick={() => setActiveWorkstream('SPECIFICATION')} /><Workstream icon={<PackageCheck />} tone="yellow" title="QC & approval" metric={qc[0]?.result ?? 'Belum diperiksa'} detail="Checklist kualitas, bukti pemeriksaan, revisi, dan persetujuan owner." onClick={() => setActiveWorkstream('QC')} /></section></>)}
+      : activeWorkstream === 'OWNER_APPROVAL'
+      ? <ApprovalPanel projectId={project.id} ownerApprovalStage={stageOf('OWNER_APPROVAL')} productionReadyStage={stageOf('PRODUCTION_READY')} approvals={workspace.data.approvals} onBack={() => setActiveWorkstream(null)} />
+      : <><BriefSnapshot references={references} materials={materials} colorways={colorways} sizeCharts={sizeCharts} hpp={hpp} /><section className="workstream-grid"><Workstream icon={<BookOpen />} tone="blue" title="Riset & referensi" metric={`${references.length} referensi`} detail="Benchmark, fungsi, target pengguna, dan insight artikel." onClick={() => setActiveWorkstream('RESEARCH')} /><Workstream icon={<Factory />} tone="purple" title="Bahan & supplier" metric={`${materials.length} kandidat`} detail="Kandidat bahan, quotation, MOQ, lead time, dan supplier terpilih." onClick={() => setActiveWorkstream('SOURCING')} /><Workstream icon={<Shirt />} tone="orange" title="Sampling" metric={samples.length ? `${samples.length} versi sample` : 'Belum ada sample'} detail="Konstruksi, pola, revisi, foto, dan master sample." onClick={() => setActiveWorkstream('SAMPLING')} /><Workstream icon={<CircleDollarSign />} tone="green" title="HPP & harga" metric={latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'} detail="Bahan, aksesori, jasa, overhead, margin, dan harga rekomendasi." onClick={() => setActiveWorkstream('COSTING')} /><Workstream icon={<Palette />} tone="pink" title="Warna & size chart" metric={`${colorways.length} warna · ${sizeCharts.length} chart`} detail="Varian final, titik ukur, toleransi, dan standar produksi." onClick={() => setActiveWorkstream('SPECIFICATION')} /><Workstream icon={<PackageCheck />} tone="yellow" title="QC" metric={qc[0]?.result ?? 'Belum diperiksa'} detail="Checklist kualitas dan bukti pemeriksaan sebelum approval." onClick={() => setActiveWorkstream('QC')} /><Workstream icon={<ShieldCheck />} tone="blue" title="Approval & produksi" metric={workspace.data.approvals[0]?.status ?? 'Belum diajukan'} detail="Persetujuan owner sebelum artikel ditandai siap produksi." onClick={() => setActiveWorkstream('OWNER_APPROVAL')} /></section></>}
+    </>}
 
-    {tab === 'tasks' && <section className="content-card tasks-full"><div className="section-head"><div><span className="eyebrow">Eksekusi tim</span><h3>Daftar tugas artikel</h3></div></div>{tasks.length ? <div className="task-list">{tasks.map(task => <TaskRow key={task.id} task={task} onComplete={task.status === 'DONE' ? undefined : () => completeTaskMutation.mutate(task.id)} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={28} />} title="Belum ada tugas" detail="Tugas otomatis akan muncul ketika tahapan mulai dikerjakan." />}</section>}
+    {tab === 'tasks' && <section className="content-card tasks-full"><div className="section-head"><div><span className="eyebrow">Eksekusi tim</span><h3>Daftar tugas artikel</h3></div></div>{tasks.length ? <div className="task-list">{tasks.map(task => <TaskRow key={task.id} task={task} allTasks={tasks} onComplete={task.status === 'DONE' ? undefined : () => completeTaskMutation.mutateAsync(task.id)} onSetDependency={(dependsOnId, type) => dependencyMutation.mutateAsync({ taskId: task.id, dependsOnId, type })} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={28} />} title="Belum ada tugas" detail="Tugas otomatis akan muncul ketika tahapan mulai dikerjakan." />}</section>}
+    {tab === 'discussion' && <DiscussionPanel projectId={project.id} comments={workspace.data.comments} />}
     {tab === 'activity' && <section className="content-card activity-card"><div className="section-head"><div><span className="eyebrow">Jejak keputusan</span><h3>Aktivitas artikel</h3></div></div>{activity.length ? <div className="activity-list">{activity.map(item => <div key={item.id}><span className="avatar avatar-small">{initials(item.actor?.full_name)}</span><div><p><b>{item.actor?.full_name ?? 'Sistem'}</b> {item.message}</p><small>{date.format(new Date(item.created_at))}</small></div></div>)}</div> : <EmptyPanel icon={<Activity size={28} />} title="Belum ada aktivitas" detail="Perubahan dan keputusan penting akan tercatat di sini." />}</section>}
   </div>;
 }
@@ -277,12 +326,42 @@ function Workstream({ icon, tone, title, metric, detail, onClick }: { icon: Reac
 }
 
 export function LibraryPage() {
-  const library = useQuery({ queryKey: ['launch-library'], queryFn: async () => { const [suppliers, materials] = await Promise.all([supabase.from('suppliers').select('*').eq('is_active', true).order('name'), supabase.from('materials').select('*').eq('is_active', true).order('name')]); if (suppliers.error) throw suppliers.error; if (materials.error) throw materials.error; return { suppliers: suppliers.data ?? [], materials: materials.data ?? [] }; } });
-  return <div className="page-stack"><section className="page-intro"><div><span className="eyebrow">Sumber daya bersama</span><h2>Jangan riset hal yang sama dua kali.</h2><p>Supplier dan bahan tervalidasi menjadi pengetahuan bersama untuk artikel berikutnya.</p></div><button className="button button-primary"><Plus size={18} /> Tambah data</button></section>{library.isLoading ? <LoadingBlocks /> : library.error ? <ErrorPanel /> : <div className="library-grid"><section className="content-card"><div className="section-head"><div><span className="eyebrow">Mitra produksi</span><h3>Supplier</h3></div><span className="count-badge">{library.data?.suppliers.length}</span></div>{library.data?.suppliers.length ? <div className="resource-list">{library.data.suppliers.map(item => <div key={item.id}><span className="resource-icon"><Factory size={18} /></span><div><b>{item.name}</b><small>{item.city || 'Lokasi belum diisi'} · {item.lead_time_days ? `${item.lead_time_days} hari` : 'Lead time belum ada'}</small></div><ChevronRight size={18} /></div>)}</div> : <EmptyPanel icon={<Factory size={28} />} title="Supplier belum tercatat" detail="Tambahkan supplier saat proses sourcing artikel pertama." />}</section><section className="content-card"><div className="section-head"><div><span className="eyebrow">Standar bahan</span><h3>Material</h3></div><span className="count-badge">{library.data?.materials.length}</span></div>{library.data?.materials.length ? <div className="resource-list">{library.data.materials.map(item => <div key={item.id}><span className="resource-icon"><Layers3 size={18} /></span><div><b>{item.name}</b><small>{item.category} · {item.composition || 'Komposisi belum diisi'}</small></div><ChevronRight size={18} /></div>)}</div> : <EmptyPanel icon={<Layers3 size={28} />} title="Material belum tercatat" detail="Material yang disetujui akan menjadi pustaka yang dapat dipakai ulang." />}</section></div>}</div>;
+  const materials = useMasterMaterials();
+  const suppliers = useMasterSuppliers();
+  const deactivateMaterial = useDeactivateMasterMaterial();
+  const deactivateSupplier = useDeactivateMasterSupplier();
+  const [materialForm, setMaterialForm] = useState<'new' | MasterMaterial | null>(null);
+  const [supplierForm, setSupplierForm] = useState<'new' | MasterSupplier | null>(null);
+  const isLoading = materials.isLoading || suppliers.isLoading;
+  const error = materials.error || suppliers.error;
+
+  return <div className="page-stack">
+    <section className="page-intro"><div><span className="eyebrow">Sumber daya bersama</span><h2>Jangan riset hal yang sama dua kali.</h2><p>Supplier dan bahan tervalidasi menjadi pengetahuan bersama untuk artikel berikutnya.</p></div></section>
+    {materialForm && <MaterialFormPanel material={materialForm === 'new' ? undefined : materialForm} onClose={() => setMaterialForm(null)} />}
+    {supplierForm && <SupplierFormPanel supplier={supplierForm === 'new' ? undefined : supplierForm} onClose={() => setSupplierForm(null)} />}
+    {isLoading ? <LoadingBlocks /> : error ? <ErrorPanel /> : <div className="library-grid">
+      <section className="content-card">
+        <div className="section-head"><div><span className="eyebrow">Mitra produksi</span><h3>Supplier</h3></div><span className="count-badge">{suppliers.data?.length}</span><button type="button" className="button button-secondary" onClick={() => setSupplierForm('new')}><Plus size={16} /> Tambah</button></div>
+        {suppliers.data?.length ? <div className="resource-list">{suppliers.data.map(item => <div key={item.id}><span className="resource-icon"><Factory size={18} /></span><div><b>{item.name}</b><small>{item.city || 'Lokasi belum diisi'} · {item.lead_time_days ? `${item.lead_time_days} hari` : 'Lead time belum ada'}</small></div><button type="button" className="icon-button" onClick={() => setSupplierForm(item)} aria-label="Ubah supplier"><Pencil size={16} /></button><DeleteButton label={`supplier ${item.name}`} pending={deactivateSupplier.isPending} onConfirm={() => deactivateSupplier.mutate(item.id)} /></div>)}</div> : <EmptyPanel icon={<Factory size={28} />} title="Supplier belum tercatat" detail="Tambahkan supplier saat proses sourcing artikel pertama." />}
+      </section>
+      <section className="content-card">
+        <div className="section-head"><div><span className="eyebrow">Standar bahan</span><h3>Material</h3></div><span className="count-badge">{materials.data?.length}</span><button type="button" className="button button-secondary" onClick={() => setMaterialForm('new')}><Plus size={16} /> Tambah</button></div>
+        {materials.data?.length ? <div className="resource-list">{materials.data.map(item => <div key={item.id}><span className="resource-icon"><Layers3 size={18} /></span><div><b>{item.name}</b><small>{item.category} · {item.composition || 'Komposisi belum diisi'}</small></div><button type="button" className="icon-button" onClick={() => setMaterialForm(item)} aria-label="Ubah material"><Pencil size={16} /></button><DeleteButton label={`material ${item.name}`} pending={deactivateMaterial.isPending} onConfirm={() => deactivateMaterial.mutate(item.id)} /></div>)}</div> : <EmptyPanel icon={<Layers3 size={28} />} title="Material belum tercatat" detail="Material yang disetujui akan menjadi pustaka yang dapat dipakai ulang." />}
+      </section>
+    </div>}
+  </div>;
 }
 
+const ROLE_RESPONSIBILITY: Record<string, string> = {
+  owner: 'Arah produk, prioritas, keputusan, dan approval akhir.',
+  product_lead: 'Riset produk, kelayakan artikel, HPP, dan koordinasi peluncuran.',
+  sourcing_lead: 'Sourcing bahan, supplier, quotation, dan dokumentasi.',
+  production_qc: 'Sampling, konstruksi, standar ukuran, produksi, dan QC.',
+  product_team: 'Berkolaborasi dalam riset, validasi, dan peluncuran artikel.',
+};
+
 export function TeamPage() {
-  const profiles = useProfiles();
-  const responsibility: Record<string, string> = { gugun: 'Arah produk, prioritas, keputusan, dan approval akhir.', dodi: 'Riset produk, kelayakan artikel, HPP, dan koordinasi peluncuran.', syaikhu: 'Sourcing bahan, supplier, quotation, dan dokumentasi.', yadi: 'Sampling, konstruksi, standar ukuran, produksi, dan QC.' };
-  return <div className="page-stack"><section className="page-intro"><div><span className="eyebrow">4 orang · 1 sistem</span><h2>Tim kecil dengan visibilitas penuh.</h2><p>Tanggung jawab utama jelas, tetapi informasi dan keputusan tetap dapat dilihat bersama.</p></div></section>{profiles.isLoading ? <LoadingBlocks /> : profiles.error ? <ErrorPanel /> : <section className="team-grid">{profiles.data?.map((profile, index) => <article className="team-card" key={profile.id}><div className={`avatar avatar-large avatar-tone-${index % 4}`}>{initials(profile.full_name)}</div><div><span className="online-dot">Aktif</span><h3>{profile.full_name}</h3><b>{profile.job_title ?? 'Tim Product Launch'}</b><p>{responsibility[profile.username.toLowerCase()] ?? 'Berkolaborasi dalam riset, validasi, dan peluncuran artikel.'}</p></div><button className="icon-button"><MoreHorizontal size={19} /></button></article>)}</section>}</div>;
+  const team = useQuery({ queryKey: ['launch-team-directory'], queryFn: listTeamMembers });
+  const members = (team.data ?? []).filter(person => person.is_active);
+  return <div className="page-stack"><section className="page-intro"><div><span className="eyebrow">{members.length} orang · 1 sistem</span><h2>Tim kecil dengan visibilitas penuh.</h2><p>Tanggung jawab utama jelas, tetapi informasi dan keputusan tetap dapat dilihat bersama.</p></div></section>{team.isLoading ? <LoadingBlocks /> : team.error ? <ErrorPanel /> : <section className="team-grid">{members.map((person, index) => <article className="team-card" key={person.id}><div className={`avatar avatar-large avatar-tone-${index % 4}`}>{initials(person.full_name)}</div><div><span className="online-dot">Aktif</span><h3>{person.full_name}</h3><b>{person.job_title || person.role_name || 'Tim Product Launch'}</b><p>{(person.role_code && ROLE_RESPONSIBILITY[person.role_code]) ?? 'Berkolaborasi dalam riset, validasi, dan peluncuran artikel.'}</p></div></article>)}</section>}</div>;
 }

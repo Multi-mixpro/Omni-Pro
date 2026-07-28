@@ -1,29 +1,43 @@
 import { FormEvent, useState } from 'react';
-import { AlertCircle, ArrowLeft, Check, Palette, Plus, Ruler } from 'lucide-react';
-import { useAddColorway, useDeleteColorway, useFinalizeSizeChart, useSetColorwayStatus, useUpdateStage } from '../hooks/useLaunch';
+import { AlertCircle, ArrowLeft, Check, Grid3x3, Palette, Plus, Ruler, Wallet } from 'lucide-react';
+import { useAddColorway, useDeleteColorway, useDeleteVariantMatrixRow, useFinalizeSizeChart, useGenerateVariantMatrix, useSetColorwayStatus, useUpdateStage, useUpdateVariantMatrixRow } from '../hooks/useLaunch';
 import { DeleteButton } from './DeleteButton';
-import type { ColorwayDraft, LaunchStage, ProjectWorkspace } from '../domain/types';
+import type { ColorwayDraft, LaunchStage, ProjectWorkspace, VariantMatrixStatus } from '../domain/types';
 
 const emptyColor = (): ColorwayDraft => ({ name: '', color_code: '', hex_code: '#111b2d', panel_notes: '' });
+const VARIANT_STATUS_LABEL: Record<VariantMatrixStatus, string> = {
+  DRAFT: 'Draft', SAMPLE_ONLY: 'Sample only', APPROVED: 'Disetujui', PRODUCTION_READY: 'Siap produksi', DISABLED: 'Nonaktif',
+};
+const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 
 interface SpecificationPanelProps {
   projectId: string;
   stage?: LaunchStage;
   colorways: ProjectWorkspace['colorways'];
   sizeCharts: ProjectWorkspace['sizeCharts'];
+  variantMatrix: ProjectWorkspace['variantMatrix'];
+  hpp: ProjectWorkspace['hpp'];
   onBack: () => void;
 }
 
-export function SpecificationPanel({ projectId, stage, colorways, sizeCharts, onBack }: SpecificationPanelProps) {
+export function SpecificationPanel({ projectId, stage, colorways, sizeCharts, variantMatrix, hpp, onBack }: SpecificationPanelProps) {
   const addColor = useAddColorway(projectId);
   const setStatus = useSetColorwayStatus(projectId);
   const deleteColor = useDeleteColorway(projectId);
   const finalizeChart = useFinalizeSizeChart(projectId);
   const updateStageMutation = useUpdateStage(projectId);
+  const generateMatrix = useGenerateVariantMatrix(projectId);
+  const updateMatrixRow = useUpdateVariantMatrixRow(projectId);
+  const deleteMatrixRow = useDeleteVariantMatrixRow(projectId);
   const [draft, setDraft] = useState<ColorwayDraft>(emptyColor());
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stageError, setStageError] = useState<string | null>(null);
+  const availableSizes = sizeCharts[0]?.sizes ?? [];
+  const referenceHpp = hpp.find(item => item.status === 'FINAL') ?? hpp[0];
+  const totalQuantity = variantMatrix.reduce((sum, row) => sum + (row.min_quantity ?? 0), 0);
+  const totalBudget = variantMatrix.reduce((sum, row) => sum + (row.min_quantity ?? 0) * (row.unit_cost ?? referenceHpp?.total_hpp ?? 0), 0);
+  const missingCostCount = variantMatrix.filter(row => (row.min_quantity ?? 0) > 0 && row.unit_cost == null && !referenceHpp).length;
 
   const approvedColor = colorways.find(item => item.status === 'APPROVED');
   const finalChart = sizeCharts.find(item => item.status === 'FINAL');
@@ -69,6 +83,34 @@ export function SpecificationPanel({ projectId, stage, colorways, sizeCharts, on
           <div className="edit-project-actions"><button type="button" className="button button-secondary" onClick={() => setShowForm(false)}>Batal</button><button type="submit" className="button button-primary" disabled={addColor.isPending}>{addColor.isPending ? 'Menyimpan…' : 'Simpan warna'}</button></div>
         </form>
       </section>}
+
+      <section className="content-card">
+        <div className="section-head"><div><span className="eyebrow">Variant planning</span><h3>Matriks warna × ukuran</h3><p>{variantMatrix.length} kombinasi SKU{referenceHpp ? ` · HPP acuan ${money.format(referenceHpp.total_hpp)}/unit` : ' · Belum ada HPP acuan'}</p></div><button type="button" className="button button-secondary" disabled={!colorways.length || !availableSizes.length || generateMatrix.isPending} onClick={() => generateMatrix.mutate({ colorwayIds: colorways.map(c => c.id), sizes: availableSizes, defaultUnitCost: referenceHpp?.total_hpp ?? null })}><Grid3x3 size={17} /> {generateMatrix.isPending ? 'Membuat…' : 'Buat/perbarui matriks'}</button></div>
+        {!colorways.length || !availableSizes.length ? <div className="state-panel state-empty"><Grid3x3 size={28} /><h3>Belum siap dibuat</h3><p>Tambahkan minimal satu warna dan pastikan size chart sudah memiliki daftar ukuran.</p></div>
+        : variantMatrix.length ? <>
+        <div className="budget-summary">
+          <div><small>Total kuantitas minimum</small><b>{totalQuantity.toLocaleString('id-ID')} pcs</b></div>
+          <div><small>Estimasi anggaran produksi massal</small><b>{money.format(totalBudget)}</b></div>
+          <div className="budget-hint"><Wallet size={15} /><span>Dihitung dari kuantitas minimum × biaya per unit (per ukuran jika diisi, jika kosong memakai HPP acuan artikel).</span></div>
+        </div>
+        {missingCostCount > 0 && <div className="form-error"><AlertCircle size={16} /> {missingCostCount} kombinasi belum punya biaya per unit maupun HPP acuan — estimasi anggaran belum lengkap.</div>}
+        <div className="variant-matrix-table"><table><thead><tr><th>Warna</th><th>Ukuran</th><th>SKU</th><th>Status</th><th>Min. qty</th><th>Biaya/unit</th><th>Subtotal</th><th /></tr></thead><tbody>{variantMatrix.map(row => {
+          const colorway = colorways.find(c => c.id === row.colorway_id);
+          const effectiveCost = row.unit_cost ?? referenceHpp?.total_hpp ?? 0;
+          const subtotal = (row.min_quantity ?? 0) * effectiveCost;
+          return <tr key={row.id}>
+            <td><span className="colorway-swatch" style={{ background: colorway?.hex_code || '#d6dae1' }} /> {colorway?.name ?? 'Warna dihapus'}</td>
+            <td>{row.size}</td>
+            <td><input defaultValue={row.sku ?? ''} onBlur={e => e.target.value !== row.sku && updateMatrixRow.mutate({ id: row.id, patch: { sku: e.target.value } })} /></td>
+            <td><select defaultValue={row.status} onChange={e => updateMatrixRow.mutate({ id: row.id, patch: { status: e.target.value } })}>{Object.entries(VARIANT_STATUS_LABEL).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></td>
+            <td><input type="number" min={0} defaultValue={row.min_quantity ?? ''} onBlur={e => { const value = e.target.value === '' ? null : Number(e.target.value); if (value !== row.min_quantity) updateMatrixRow.mutate({ id: row.id, patch: { min_quantity: value } }); }} /></td>
+            <td><input type="number" min={0} placeholder={referenceHpp ? String(referenceHpp.total_hpp) : '0'} defaultValue={row.unit_cost ?? ''} onBlur={e => { const value = e.target.value === '' ? null : Number(e.target.value); if (value !== row.unit_cost) updateMatrixRow.mutate({ id: row.id, patch: { unit_cost: value } }); }} /></td>
+            <td>{money.format(subtotal)}</td>
+            <td><DeleteButton label={`SKU ${row.sku ?? `${colorway?.name}-${row.size}`}`} pending={deleteMatrixRow.isPending} onConfirm={() => deleteMatrixRow.mutate(row.id)} /></td>
+          </tr>;
+        })}</tbody></table></div>
+        </> : <div className="state-panel state-empty"><Grid3x3 size={28} /><h3>Matriks belum dibuat</h3><p>Klik "Buat/perbarui matriks" untuk membuat kombinasi warna dan ukuran secara otomatis.</p></div>}
+      </section>
 
       <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Standar ukuran</span><h3>{sizeCharts.length} size chart</h3></div></div>

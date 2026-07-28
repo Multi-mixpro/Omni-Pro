@@ -49,6 +49,8 @@ export interface LaunchProject {
   target_date: string | null;
   target_fix_date: string | null;
   target_launch_date: string | null;
+  target_sample_date: string | null;
+  target_quantity: number | null;
   research_summary: string | null;
   created_at: string;
   updated_at: string;
@@ -73,6 +75,8 @@ export interface LaunchStage {
   owner?: Profile | null;
 }
 
+export type DependencyType = 'FS' | 'SS' | 'FF' | 'NONE';
+
 export interface LaunchTask {
   id: string;
   project_id: string;
@@ -82,8 +86,69 @@ export interface LaunchTask {
   priority: Priority;
   assignee_id: string | null;
   due_date: string | null;
+  depends_on_task_id: string | null;
+  dependency_type: DependencyType;
   project?: Pick<LaunchProject, 'id' | 'code' | 'article_name'>;
   assignee?: Profile | null;
+}
+
+export interface Comment {
+  id: string;
+  project_id: string;
+  author_id: string;
+  body: string;
+  is_decision_request: boolean;
+  decision_deadline: string | null;
+  decision_status: 'OPEN' | 'DECIDED' | null;
+  decision_note: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
+  author?: Profile | null;
+  decider?: Profile | null;
+}
+
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVISION';
+
+export interface LaunchApproval {
+  id: string;
+  project_id: string;
+  approval_type: string;
+  status: ApprovalStatus;
+  requested_by: string;
+  decided_by: string | null;
+  decision_note: string | null;
+  requested_at: string;
+  decided_at: string | null;
+  requester?: Profile | null;
+  decider?: Profile | null;
+}
+
+export type BlockerType = 'MATERIAL' | 'SUPPLIER' | 'SAMPLE' | 'APPROVAL' | 'INTERNAL' | 'BUDGET' | 'OTHER';
+
+export interface LaunchBlocker {
+  id: string;
+  project_id: string;
+  stage_run_id: string | null;
+  blocker_type: BlockerType;
+  description: string;
+  owner_id: string | null;
+  target_resolution_date: string | null;
+  impact: string | null;
+  affects_target: boolean;
+  status: 'OPEN' | 'RESOLVED';
+  resolution_note: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  owner?: Profile | null;
+}
+
+export interface BlockerDraft {
+  blocker_type: BlockerType;
+  description: string;
+  target_resolution_date?: string;
+  impact?: string;
+  affects_target: boolean;
 }
 
 export interface ActivityItem {
@@ -123,10 +188,14 @@ export interface ProjectWorkspace {
     }>;
   }>;
   colorways: Array<{ id: string; name: string; hex_code: string | null; status: string }>;
+  variantMatrix: VariantMatrixRow[];
   hpp: Array<{ id: string; version: number; total_hpp: number; recommended_price: number | null; target_margin_percent: number | null; status: string }>;
   sizeCharts: Array<{ id: string; name: string; status: string; sizes: string[] }>;
   qc: Array<{ id: string; result: string; summary: string | null; checked_at: string | null }>;
   samples: Array<{ id: string; version: number; sample_type: string; status: string; is_master: boolean; material_notes: string | null; pattern_notes: string | null; construction_notes: string | null; revision_notes: string | null }>;
+  blockers: LaunchBlocker[];
+  approvals: LaunchApproval[];
+  comments: Comment[];
 }
 
 export interface NewProjectInput {
@@ -142,6 +211,8 @@ export interface NewProjectInput {
   target_fix_date?: string;
   target_costing_date?: string;
   target_launch_date?: string;
+  target_sample_date?: string;
+  target_quantity?: number | '';
   references?: ReferenceDraft[];
   colorways?: ColorwayDraft[];
   sizes?: string[];
@@ -201,9 +272,29 @@ export interface MeasurementDraft {
   values: Record<string, number | ''>;
 }
 
+export type BomComponentRole =
+  | 'MAIN_FABRIC' | 'SECONDARY_FABRIC' | 'LINING' | 'INTERLINING' | 'PADDING' | 'RIB'
+  | 'WEBBING' | 'ELASTIC' | 'ZIPPER' | 'BUTTON' | 'SNAP' | 'VELCRO' | 'THREAD'
+  | 'DRAWCORD' | 'EYELET' | 'LABEL' | 'PATCH' | 'PRINTING' | 'EMBROIDERY'
+  | 'POLYBAG' | 'HANGTAG' | 'CARTON' | 'PACKAGING' | 'OTHER';
+
+export const BOM_COMPONENT_ROLES: Array<[BomComponentRole, string]> = [
+  ['MAIN_FABRIC', 'Kain utama'], ['SECONDARY_FABRIC', 'Kain sekunder'], ['LINING', 'Lining'],
+  ['INTERLINING', 'Interlining'], ['PADDING', 'Padding'], ['RIB', 'Rib'], ['WEBBING', 'Webbing'],
+  ['ELASTIC', 'Elastic'], ['ZIPPER', 'Zipper'], ['BUTTON', 'Kancing'], ['SNAP', 'Snap'],
+  ['VELCRO', 'Velcro'], ['THREAD', 'Benang'], ['DRAWCORD', 'Drawcord'], ['EYELET', 'Eyelet'],
+  ['LABEL', 'Label'], ['PATCH', 'Patch'], ['PRINTING', 'Sablon'], ['EMBROIDERY', 'Bordir'],
+  ['POLYBAG', 'Polybag'], ['HANGTAG', 'Hangtag'], ['CARTON', 'Karton'], ['PACKAGING', 'Kemasan'],
+  ['OTHER', 'Komponen custom'],
+];
+
+export function bomRoleLabel(role: string): string {
+  return BOM_COMPONENT_ROLES.find(([value]) => value === role)?.[1] ?? role;
+}
+
 export interface MaterialSupplierDraft {
   proposed_name: string;
-  role: 'MAIN' | 'LINING' | 'RIB' | 'ACCESSORY' | 'PACKAGING' | 'OTHER';
+  role: BomComponentRole;
   composition?: string;
   gsm?: number | '';
   width_cm?: number | '';
@@ -234,4 +325,95 @@ export interface HppLineDraft {
   unit_price: number | '';
   waste_percent: number | '';
   notes?: string;
+}
+
+export interface MasterMaterial {
+  id: string;
+  code: string | null;
+  name: string;
+  category: string;
+  composition: string | null;
+  gsm: number | null;
+  width_cm: number | null;
+  unit: string;
+  characteristics: string | null;
+  care_notes: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface MasterMaterialDraft {
+  name: string;
+  category: string;
+  composition?: string;
+  gsm?: number | '';
+  width_cm?: number | '';
+  unit: string;
+  characteristics?: string;
+  care_notes?: string;
+}
+
+export interface MasterSupplier {
+  id: string;
+  code: string | null;
+  name: string;
+  category: string | null;
+  contact_name: string | null;
+  phone: string | null;
+  city: string | null;
+  address: string | null;
+  lead_time_days: number | null;
+  minimum_order_notes: string | null;
+  quality_notes: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface MasterSupplierDraft {
+  name: string;
+  category?: string;
+  contact_name?: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  lead_time_days?: number | '';
+  minimum_order_notes?: string;
+  quality_notes?: string;
+}
+
+export interface MaterialSupplierLink {
+  id: string;
+  material_id: string;
+  supplier_id: string;
+  is_primary: boolean;
+  unit_price: number | null;
+  price_unit: string | null;
+  moq: number | null;
+  lead_time_days: number | null;
+  notes: string | null;
+  supplier?: Pick<MasterSupplier, 'id' | 'name' | 'contact_name' | 'phone' | 'city'>;
+}
+
+export interface MaterialSupplierLinkDraft {
+  supplier_id: string;
+  is_primary?: boolean;
+  unit_price?: number | '';
+  price_unit?: string;
+  moq?: number | '';
+  lead_time_days?: number | '';
+  notes?: string;
+}
+
+export type VariantMatrixStatus = 'DRAFT' | 'SAMPLE_ONLY' | 'APPROVED' | 'PRODUCTION_READY' | 'DISABLED';
+
+export interface VariantMatrixRow {
+  id: string;
+  project_id: string;
+  colorway_id: string;
+  size: string;
+  sku: string | null;
+  status: VariantMatrixStatus;
+  min_quantity: number | null;
+  unit_cost: number | null;
+  notes: string | null;
 }

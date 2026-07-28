@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { BusinessUnit, ColorwayDraft, HppLineDraft, LaunchProject, LaunchStage, LaunchTask, MaterialSupplierDraft, NewProjectInput, Profile, ProjectEditInput, ProjectWorkspace, ReferenceType, SampleDraft } from '../domain/types';
+import type { BlockerDraft, BusinessUnit, ColorwayDraft, HppLineDraft, LaunchProject, LaunchStage, LaunchTask, MasterMaterial, MasterMaterialDraft, MasterSupplier, MasterSupplierDraft, MaterialSupplierDraft, MaterialSupplierLink, MaterialSupplierLinkDraft, NewProjectInput, Profile, ProjectEditInput, ProjectWorkspace, ReferenceType, SampleDraft } from '../domain/types';
 
 const PROJECT_FIELDS = '*, business_unit:business_units(*), owner:profiles!launch_projects_owner_id_fkey(*)';
 
@@ -36,7 +36,7 @@ export async function listMyTasks(userId: string) {
 }
 
 export async function getProjectWorkspace(projectId: string): Promise<ProjectWorkspace> {
-  const [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, hppResult, sizeResult, qcResult, sampleResult] = await Promise.all([
+  const [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, variantMatrixResult, hppResult, sizeResult, qcResult, sampleResult, blockerResult, approvalResult, commentResult] = await Promise.all([
     supabase.from('launch_projects').select(PROJECT_FIELDS).eq('id', projectId).single(),
     supabase.from('launch_stage_runs').select('*, owner:profiles!launch_stage_runs_owner_id_fkey(*)').eq('project_id', projectId).order('position'),
     supabase.from('launch_tasks').select('*, assignee:profiles!launch_tasks_assignee_id_fkey(*)').eq('project_id', projectId).order('created_at'),
@@ -44,13 +44,17 @@ export async function getProjectWorkspace(projectId: string): Promise<ProjectWor
     supabase.from('launch_references').select('id, title, reference_type, source_url, image_url, insight, is_primary').eq('project_id', projectId).order('sort_order'),
     supabase.from('launch_material_candidates').select('id, proposed_name, role, composition, gsm, width_cm, color_notes, status, quotes:launch_supplier_quotes(id, supplier_role, price, unit, moq, lead_time_days, status, supplier:suppliers(id, name, contact_name, phone, city))').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_colorways').select('id, name, hex_code, status').eq('project_id', projectId).order('created_at'),
+    supabase.from('launch_variant_matrix').select('id, project_id, colorway_id, size, sku, status, min_quantity, unit_cost, notes').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_hpp_versions').select('id, version, total_hpp, recommended_price, target_margin_percent, status').eq('project_id', projectId).order('version', { ascending: false }),
     supabase.from('launch_size_charts').select('id, name, status, sizes').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('launch_qc_checks').select('id, result, summary, checked_at').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('launch_samples').select('id, version, sample_type, status, is_master, material_notes, pattern_notes, construction_notes, revision_notes').eq('project_id', projectId).order('version', { ascending: false }),
+    supabase.from('launch_blockers').select('*, owner:profiles!launch_blockers_owner_id_fkey(*)').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('launch_approvals').select('*, requester:profiles!launch_approvals_requested_by_fkey(*), decider:profiles!launch_approvals_decided_by_fkey(*)').eq('project_id', projectId).order('requested_at', { ascending: false }),
+    supabase.from('launch_comments').select('*, author:profiles!launch_comments_author_id_fkey(*), decider:profiles!launch_comments_decided_by_fkey(*)').eq('project_id', projectId).order('created_at', { ascending: false }),
   ]);
 
-  const failure = [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, hppResult, sizeResult, qcResult, sampleResult].find(result => result.error);
+  const failure = [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, variantMatrixResult, hppResult, sizeResult, qcResult, sampleResult, blockerResult, approvalResult, commentResult].find(result => result.error);
   if (failure?.error) throw failure.error;
 
   return {
@@ -61,10 +65,14 @@ export async function getProjectWorkspace(projectId: string): Promise<ProjectWor
     references: (referenceResult.data ?? []) as ProjectWorkspace['references'],
     materials: (materialResult.data ?? []) as unknown as ProjectWorkspace['materials'],
     colorways: (colorResult.data ?? []) as ProjectWorkspace['colorways'],
+    variantMatrix: (variantMatrixResult.data ?? []) as ProjectWorkspace['variantMatrix'],
     hpp: (hppResult.data ?? []) as ProjectWorkspace['hpp'],
     sizeCharts: (sizeResult.data ?? []) as ProjectWorkspace['sizeCharts'],
     qc: (qcResult.data ?? []) as ProjectWorkspace['qc'],
+    approvals: (approvalResult.data ?? []) as unknown as ProjectWorkspace['approvals'],
+    comments: (commentResult.data ?? []) as unknown as ProjectWorkspace['comments'],
     samples: (sampleResult.data ?? []) as ProjectWorkspace['samples'],
+    blockers: (blockerResult.data ?? []) as unknown as ProjectWorkspace['blockers'],
   };
 }
 
@@ -81,6 +89,11 @@ export async function createProject(input: NewProjectInput) {
   }
 
   throw planned.error;
+}
+
+export async function deleteProject(id: string) {
+  const { error } = await supabase.from('launch_projects').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function addProjectReference(
@@ -331,12 +344,67 @@ export const deleteColorway = (id: string) => removeRow('launch_colorways', id);
 export const deleteQcCheck = (id: string) => removeRow('launch_qc_checks', id);
 
 export async function completeTask(taskId: string) {
-  const { error } = await supabase.from('launch_tasks').update({ status: 'DONE', completed_at: new Date().toISOString() }).eq('id', taskId);
+  const { error } = await supabase.rpc('complete_launch_task', { p_task_id: taskId });
+  if (error) throw error;
+}
+
+export async function setTaskDependency(taskId: string, dependsOnTaskId: string | null, dependencyType: string) {
+  const { error } = await supabase.rpc('set_task_dependency', { p_task_id: taskId, p_depends_on_task_id: dependsOnTaskId, p_dependency_type: dependencyType });
   if (error) throw error;
 }
 
 export async function updateStage(stageId: string, status: string) {
   const { error } = await supabase.rpc('transition_launch_stage', { p_stage_id: stageId, p_status: status });
+  if (error) throw error;
+}
+
+export async function addComment(projectId: string, body: string, isDecisionRequest: boolean, decisionDeadline?: string) {
+  const userId = await currentUserId();
+  const { error } = await supabase.from('launch_comments').insert({
+    project_id: projectId, author_id: userId, body: body.trim(),
+    is_decision_request: isDecisionRequest, decision_deadline: decisionDeadline || null,
+  });
+  if (error) throw error;
+}
+
+export const deleteComment = (id: string) => removeRow('launch_comments', id);
+
+export async function decideCommentRequest(commentId: string, note: string) {
+  const { error } = await supabase.rpc('decide_comment_request', { p_comment_id: commentId, p_note: note.trim() });
+  if (error) throw error;
+}
+
+export async function requestApproval(projectId: string, approvalType: string) {
+  const userId = await currentUserId();
+  const { error } = await supabase.from('launch_approvals').insert({
+    project_id: projectId, approval_type: approvalType, status: 'PENDING', requested_by: userId,
+  });
+  if (error) throw error;
+}
+
+export async function decideApproval(approvalId: string, status: 'APPROVED' | 'REJECTED' | 'REVISION', note: string) {
+  const userId = await currentUserId();
+  const { error } = await supabase.from('launch_approvals').update({
+    status, decision_note: note.trim() || null, decided_by: userId, decided_at: new Date().toISOString(),
+  }).eq('id', approvalId);
+  if (error) throw error;
+}
+
+export async function reportStageBlocker(stageId: string, input: BlockerDraft) {
+  const { data, error } = await supabase.rpc('report_stage_blocker', {
+    p_stage_id: stageId,
+    p_blocker_type: input.blocker_type,
+    p_description: input.description.trim(),
+    p_target_resolution_date: input.target_resolution_date || null,
+    p_impact: input.impact?.trim() || null,
+    p_affects_target: input.affects_target,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function resolveStageBlocker(blockerId: string, resolutionNote: string) {
+  const { error } = await supabase.rpc('resolve_stage_blocker', { p_blocker_id: blockerId, p_resolution_note: resolutionNote.trim() });
   if (error) throw error;
 }
 
@@ -402,3 +470,157 @@ export async function uploadProjectReference(
   }
   return uploaded.secure_url;
 }
+
+export async function listMasterMaterials() {
+  const { data, error } = await supabase.from('materials').select('*').eq('is_active', true).order('name');
+  if (error) throw error;
+  return (data ?? []) as MasterMaterial[];
+}
+
+export async function createMasterMaterial(input: MasterMaterialDraft) {
+  const { data, error } = await supabase.from('materials').insert({
+    name: input.name.trim(),
+    category: input.category.trim(),
+    composition: input.composition?.trim() || null,
+    gsm: input.gsm === '' || input.gsm === undefined ? null : input.gsm,
+    width_cm: input.width_cm === '' || input.width_cm === undefined ? null : input.width_cm,
+    unit: input.unit,
+    characteristics: input.characteristics?.trim() || null,
+    care_notes: input.care_notes?.trim() || null,
+    created_by: await currentUserId(),
+  }).select('*').single();
+  if (error) throw error;
+  return data as MasterMaterial;
+}
+
+export async function updateMasterMaterial(id: string, input: MasterMaterialDraft) {
+  const { error } = await supabase.from('materials').update({
+    name: input.name.trim(),
+    category: input.category.trim(),
+    composition: input.composition?.trim() || null,
+    gsm: input.gsm === '' || input.gsm === undefined ? null : input.gsm,
+    width_cm: input.width_cm === '' || input.width_cm === undefined ? null : input.width_cm,
+    unit: input.unit,
+    characteristics: input.characteristics?.trim() || null,
+    care_notes: input.care_notes?.trim() || null,
+  }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deactivateMasterMaterial(id: string) {
+  const { error } = await supabase.from('materials').update({ is_active: false }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function findOrCreateMasterMaterial(input: MasterMaterialDraft) {
+  const { data: existing, error: findError } = await supabase.from('materials')
+    .select('id').eq('is_active', true).ilike('name', input.name.trim()).limit(1).maybeSingle();
+  if (findError) throw findError;
+  if (existing) return existing.id as string;
+  const created = await createMasterMaterial(input);
+  return created.id;
+}
+
+export async function listMasterSuppliers() {
+  const { data, error } = await supabase.from('suppliers').select('*').eq('is_active', true).order('name');
+  if (error) throw error;
+  return (data ?? []) as MasterSupplier[];
+}
+
+export async function createMasterSupplier(input: MasterSupplierDraft) {
+  const { data, error } = await supabase.from('suppliers').insert({
+    name: input.name.trim(),
+    category: input.category?.trim() || null,
+    contact_name: input.contact_name?.trim() || null,
+    phone: input.phone?.trim() || null,
+    city: input.city?.trim() || null,
+    address: input.address?.trim() || null,
+    lead_time_days: input.lead_time_days === '' || input.lead_time_days === undefined ? null : input.lead_time_days,
+    minimum_order_notes: input.minimum_order_notes?.trim() || null,
+    quality_notes: input.quality_notes?.trim() || null,
+    created_by: await currentUserId(),
+  }).select('*').single();
+  if (error) throw error;
+  return data as MasterSupplier;
+}
+
+export async function updateMasterSupplier(id: string, input: MasterSupplierDraft) {
+  const { error } = await supabase.from('suppliers').update({
+    name: input.name.trim(),
+    category: input.category?.trim() || null,
+    contact_name: input.contact_name?.trim() || null,
+    phone: input.phone?.trim() || null,
+    city: input.city?.trim() || null,
+    address: input.address?.trim() || null,
+    lead_time_days: input.lead_time_days === '' || input.lead_time_days === undefined ? null : input.lead_time_days,
+    minimum_order_notes: input.minimum_order_notes?.trim() || null,
+    quality_notes: input.quality_notes?.trim() || null,
+  }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deactivateMasterSupplier(id: string) {
+  const { error } = await supabase.from('suppliers').update({ is_active: false }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function findOrCreateMasterSupplier(input: MasterSupplierDraft) {
+  const { data: existing, error: findError } = await supabase.from('suppliers')
+    .select('id').eq('is_active', true).ilike('name', input.name.trim()).limit(1).maybeSingle();
+  if (findError) throw findError;
+  if (existing) return existing.id as string;
+  const created = await createMasterSupplier(input);
+  return created.id;
+}
+
+export async function listMaterialSuppliers(materialId: string) {
+  const { data, error } = await supabase.from('material_suppliers')
+    .select('id, material_id, supplier_id, is_primary, unit_price, price_unit, moq, lead_time_days, notes, supplier:suppliers(id, name, contact_name, phone, city)')
+    .eq('material_id', materialId).order('is_primary', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as MaterialSupplierLink[];
+}
+
+export async function linkMaterialSupplier(materialId: string, input: MaterialSupplierLinkDraft) {
+  const { error } = await supabase.from('material_suppliers').insert({
+    material_id: materialId,
+    supplier_id: input.supplier_id,
+    is_primary: input.is_primary ?? false,
+    unit_price: input.unit_price === '' || input.unit_price === undefined ? null : input.unit_price,
+    price_unit: input.price_unit || null,
+    moq: input.moq === '' || input.moq === undefined ? null : input.moq,
+    lead_time_days: input.lead_time_days === '' || input.lead_time_days === undefined ? null : input.lead_time_days,
+    notes: input.notes?.trim() || null,
+    created_by: await currentUserId(),
+  });
+  if (error) throw error;
+}
+
+export async function updateMaterialSupplierLink(id: string, patch: { is_primary?: boolean; unit_price?: number | null; price_unit?: string | null; moq?: number | null; lead_time_days?: number | null; notes?: string | null }) {
+  const { error } = await supabase.from('material_suppliers').update(patch).eq('id', id);
+  if (error) throw error;
+}
+
+export const unlinkMaterialSupplier = (id: string) => removeRow('material_suppliers', id);
+
+export async function generateVariantMatrix(projectId: string, colorwayIds: string[], sizes: string[], defaultUnitCost: number | null) {
+  const userId = await currentUserId();
+  const rows: { project_id: string; colorway_id: string; size: string; sku: string; unit_cost: number | null; created_by: string | undefined }[] = [];
+  for (const colorwayId of colorwayIds) {
+    for (const size of sizes) {
+      const { data: sku, error: skuError } = await supabase.rpc('generate_variant_sku', { p_project_id: projectId, p_colorway_id: colorwayId, p_size: size });
+      if (skuError) throw skuError;
+      rows.push({ project_id: projectId, colorway_id: colorwayId, size, sku: sku as string, unit_cost: defaultUnitCost, created_by: userId });
+    }
+  }
+  if (!rows.length) return;
+  const { error } = await supabase.from('launch_variant_matrix').upsert(rows, { onConflict: 'colorway_id,size', ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+export async function updateVariantMatrixRow(id: string, patch: { sku?: string; status?: string; min_quantity?: number | null; unit_cost?: number | null; notes?: string | null }) {
+  const { error } = await supabase.from('launch_variant_matrix').update(patch).eq('id', id);
+  if (error) throw error;
+}
+
+export const deleteVariantMatrixRow = (id: string) => removeRow('launch_variant_matrix', id);
