@@ -20,9 +20,10 @@ interface SpecificationPanelProps {
   variantMatrix: ProjectWorkspace['variantMatrix'];
   hpp: ProjectWorkspace['hpp'];
   onBack: () => void;
+  mode?: 'all' | 'colors' | 'sizes' | 'budget';
 }
 
-export function SpecificationPanel({ projectId, category, stage, colorways, sizeCharts, variantMatrix, hpp, onBack }: SpecificationPanelProps) {
+export function SpecificationPanel({ projectId, category, stage, colorways, sizeCharts, variantMatrix, hpp, onBack, mode = 'all' }: SpecificationPanelProps) {
   const addColor = useAddColorway(projectId);
   const setStatus = useSetColorwayStatus(projectId);
   const deleteColor = useDeleteColorway(projectId);
@@ -45,6 +46,9 @@ export function SpecificationPanel({ projectId, category, stage, colorways, size
   const approvedColor = colorways.find(item => item.status === 'APPROVED');
   const finalChart = sizeCharts.find(item => item.status === 'FINAL');
   const gateReady = Boolean(approvedColor && finalChart);
+  const showColors = mode === 'all' || mode === 'colors';
+  const showSizes = mode === 'all' || mode === 'sizes';
+  const showBudget = mode === 'all' || mode === 'budget';
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -63,17 +67,17 @@ export function SpecificationPanel({ projectId, category, stage, colorways, size
 
   return (
     <div className="workstream-panel">
-      <button className="back-link" onClick={onBack}><ArrowLeft size={18} /> Kembali ke ruang kerja</button>
-      <div className="section-head"><div><span className="eyebrow">Tahap 06 · Warna & size chart</span><h3>Kunci varian warna dan standar ukuran</h3><p>Setujui minimal satu warna dan finalkan satu size chart sebagai standar produksi.</p></div></div>
+      {mode === 'all' && <button className="back-link" onClick={onBack}><ArrowLeft size={18} /> Kembali ke ruang kerja</button>}
+      {mode === 'all' && <div className="section-head"><div><span className="eyebrow">Tahap 06 · Warna & size chart</span><h3>Kunci varian warna dan standar ukuran</h3><p>Setujui minimal satu warna dan finalkan satu size chart sebagai standar produksi.</p></div></div>}
 
-      <section className="content-card">
+      {showColors && <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Varian warna</span><h3>{colorways.length} warna</h3></div><button type="button" className="button button-secondary" onClick={() => setShowForm(value => !value)}><Plus size={17} /> {showForm ? 'Tutup form' : 'Tambah warna'}</button></div>
         {colorways.length ? <div className="sourcing-list">{colorways.map(item => <article key={item.id} className={`sourcing-card ${item.status === 'APPROVED' ? 'sourcing-locked' : ''}`}>
           <div className="sourcing-card-head"><span className="colorway-swatch" style={{ background: item.hex_code || '#d6dae1' }} /><div><b>{item.name}</b><small>Status: {item.status}</small></div>{item.status === 'APPROVED' ? <span className="sourcing-badge"><Check size={13} /> Disetujui</span> : <button type="button" className="button button-primary" disabled={setStatus.isPending} onClick={() => setStatus.mutate({ colorwayId: item.id, status: 'APPROVED' })}>Setujui warna</button>}<DeleteButton label={`warna ${item.name}`} pending={deleteColor.isPending} onConfirm={() => deleteColor.mutate(item.id)} /></div>
         </article>)}</div> : <div className="state-panel state-empty"><Palette size={28} /><h3>Belum ada varian warna</h3><p>Tambahkan kandidat warna lalu setujui yang akan diproduksi.</p></div>}
-      </section>
+      </section>}
 
-      {showForm && <section className="content-card">
+      {showColors && showForm && <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Warna baru</span><h3>Kandidat varian</h3></div></div>
         <form onSubmit={submit}>
           <div className="field-grid">
@@ -87,7 +91,7 @@ export function SpecificationPanel({ projectId, category, stage, colorways, size
         </form>
       </section>}
 
-      <section className="content-card">
+      {showBudget && <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Variant planning</span><h3>Matriks warna × ukuran</h3><p>{variantMatrix.length} kombinasi SKU{referenceHpp ? ` · HPP acuan ${money.format(referenceHpp.total_hpp)}/unit` : ' · Belum ada HPP acuan'}</p></div><button type="button" className="button button-secondary" disabled={!colorways.length || !availableSizes.length || generateMatrix.isPending} onClick={() => generateMatrix.mutate({ colorwayIds: colorways.map(c => c.id), sizes: availableSizes, defaultUnitCost: referenceHpp?.total_hpp ?? null })}><Grid3x3 size={17} /> {generateMatrix.isPending ? 'Membuat…' : 'Buat/perbarui matriks'}</button></div>
         {!colorways.length || !availableSizes.length ? <div className="state-panel state-empty"><Grid3x3 size={28} /><h3>Belum siap dibuat</h3><p>Tambahkan minimal satu warna dan pastikan size chart sudah memiliki daftar ukuran.</p></div>
         : variantMatrix.length ? <>
@@ -113,17 +117,17 @@ export function SpecificationPanel({ projectId, category, stage, colorways, size
           </tr>;
         })}</tbody></table></div>
         </> : <div className="state-panel state-empty"><Grid3x3 size={28} /><h3>Matriks belum dibuat</h3><p>Klik "Buat/perbarui matriks" untuk membuat kombinasi warna dan ukuran secara otomatis.</p></div>}
-      </section>
+      </section>}
 
-      <section className="content-card">
+      {showSizes && <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Standar ukuran</span><h3>{sizeCharts.length} size chart</h3></div></div>
         <SizeChartBuilder projectId={projectId} category={category} charts={sizeCharts} />
         {sizeCharts.length ? <div className="sourcing-list">{sizeCharts.map(item => <article key={item.id} className={`sourcing-card ${item.status === 'FINAL' ? 'sourcing-locked' : ''}`}>
           <div className="sourcing-card-head"><span className="material-role"><Ruler size={14} /></span><div><b>{item.name}</b><small>Status: {item.status} · {item.sizes.join(', ') || 'Belum ada ukuran'} · {item.measurements?.length ?? 0} titik ukur</small></div>{item.status === 'FINAL' ? <span className="sourcing-badge"><Check size={13} /> Final</span> : <button type="button" className="button button-primary" disabled={finalizeChart.isPending} onClick={() => finalizeChart.mutate(item.id)}>Tandai final</button>}<DeleteButton label={`size chart ${item.name}`} pending={deleteChart.isPending} onConfirm={() => deleteChart.mutate(item.id)} /></div>
         </article>)}</div> : <div className="state-panel state-empty"><Ruler size={28} /><h3>Belum ada size chart</h3><p>Size chart awal dibuat dari brief. Tambahkan ukuran melalui brief artikel.</p></div>}
-      </section>
+      </section>}
 
-      {stage && stage.status !== 'COMPLETED' && <section className="content-card">
+      {showSizes && stage && stage.status !== 'COMPLETED' && <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Gate tahap</span><h3>Tandai spesifikasi selesai</h3></div></div>
         <div className="gate-list">
           <div className={approvedColor ? 'done' : ''}><span>{approvedColor ? <Check size={15} /> : <Palette size={16} />}</span><b>Warna disetujui</b><small>{approvedColor ? approvedColor.name : 'Belum ada warna disetujui'}</small></div>

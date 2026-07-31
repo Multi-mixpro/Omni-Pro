@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, CircleDollarSign, Clock3, Factory, FileSearch, Filter, LayoutGrid, Layers3, Link2, List, Megaphone, PackageCheck, Palette, Pencil, Plus, Search, ShieldCheck, Shirt, Sparkles, Target, Users } from 'lucide-react';
+import { Activity, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign, ClipboardList, Clock3, Factory, FileSearch, FileText, Filter, LayoutGrid, Layers3, Link2, List, Megaphone, MessageSquare, PackageCheck, Palette, Pencil, Plus, Ruler, Search, ShieldCheck, Shirt, Sparkles, Tags, Target, Users } from 'lucide-react';
 import { Link, useLocation, useNavigate, useParams } from '@/app/router/simpleRouter';
 import { useAuth } from '@/core/auth/useAuth';
 import { listTeamMembers } from './data/teamRepository';
@@ -22,6 +22,7 @@ import { ProgressSheetPanel } from './components/ProgressSheetPanel';
 import { BlockerReportForm, OpenBlockerCard } from './components/BlockerPanel';
 import { ApprovalPanel } from './components/ApprovalPanel';
 import { DiscussionPanel } from './components/DiscussionPanel';
+import { StudioWorkspacePanel } from './components/StudioWorkspacePanel';
 import type { DependencyType, LaunchProject, LaunchStage, LaunchTask, MasterMaterial, MasterSupplier, ProjectStatus, StageCode } from './domain/types';
 import { STAGE_ORDER } from './domain/types';
 import { COST_CONFIDENCE_LABEL, SCHEDULE_HEALTH_LABEL, costConfidence, dataReadiness, dataReadinessItems, scheduleHealth } from './domain/indicators';
@@ -41,7 +42,7 @@ const stageMeta: Record<StageCode, { short: string; label: string }> = {
 };
 
 type WorkstreamCode = StageCode | 'PRODUCTION' | 'LAUNCH' | null;
-type OperationalWorkstream = Exclude<WorkstreamCode, null>;
+type StudioPanelCode = 'PRODUCT_BRIEF' | 'MATERIALS' | 'COLORS' | 'SIZES' | 'SUPPLIERS' | 'PATTERN' | 'SAMPLING' | 'COSTING' | 'BUDGET' | 'READINESS' | 'PRODUCTION' | 'LAUNCH' | 'TASKS' | 'FILES';
 
 const WORKSTREAM_TABS: Array<{ code: WorkstreamCode; label: string; icon: ReactNode }> = [
   { code: null, label: 'Brief', icon: <Layers3 size={15} /> },
@@ -80,18 +81,21 @@ function ProjectCard({ project }: { project: LaunchProject }) {
   // The list query stays light, so health is derived from the article fields
   // alone; the workspace adds stage-level detail once the article is opened.
   const health = scheduleHealth(project, []);
+  const signals = [project.reference_image_url, project.concept, project.target_sample_date, project.target_date, project.target_launch_date, project.owner_id];
+  const completeness = Math.round(signals.filter(Boolean).length / signals.length * 100);
   return (
-    <article className="project-card">
-      <Link to={`/launch/app/projects/${project.id}?tab=overview`} className="project-thumb">
+    <article className="project-card studio-article-card">
+      <Link to={`/launch/app/projects/${project.id}?tab=overview`} className="project-thumb studio-article-image">
         <SafeImage src={project.reference_image_url} alt={`Referensi ${project.article_name}`} fallback={<Shirt size={34} />} />
         <span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name ?? 'GG'}</span>
         <span className={`project-health-overlay health-${health.toLowerCase()}`}><i />{SCHEDULE_HEALTH_LABEL[health]}</span>
       </Link>
-      <div className="project-card-body">
+      <div className="project-card-body studio-article-body">
         <div className="project-card-top"><span>{project.code}</span><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div>
         <h3>{project.article_name}</h3>
         <p>{project.category} · {stageMeta[project.current_stage]?.label ?? project.current_stage}</p>
         <div className="project-stage-line"><span><i style={{ width: `${project.progress}%` }} /></span><b>{project.progress}%</b></div>
+        <div className="studio-card-progress"><div><span>Kelengkapan data</span><b>{completeness}%</b><i><em style={{ width: `${completeness}%` }} /></i></div></div>
         <div className="project-card-insight">
           <div><small>Tahap aktif</small><b>{stageMeta[project.current_stage]?.short ?? project.current_stage}</b></div>
           <div><small>Target selesai</small><b>{dueText(project.target_date)}</b></div>
@@ -314,7 +318,9 @@ export function ProjectDetailPage() {
   const initialTab = requestedTab === 'brief' || requestedTab === 'work' || requestedTab === 'progress' ? requestedTab : 'overview';
   const [tab, setTab] = useState<'brief' | 'overview' | 'work' | 'progress' | 'tasks' | 'discussion' | 'activity'>(initialTab);
   const [activeWorkstream, setActiveWorkstream] = useState<WorkstreamCode>(null);
-  const [expandedWorkstreams, setExpandedWorkstreams] = useState<OperationalWorkstream[]>(['RESEARCH']);
+  const [expandedWorkstreams, setExpandedWorkstreams] = useState<StudioPanelCode[]>(['PRODUCT_BRIEF', 'MATERIALS']);
+  const [activeStudioPanel, setActiveStudioPanel] = useState<StudioPanelCode>('PRODUCT_BRIEF');
+  const [pinnedPanels, setPinnedPanels] = useState<StudioPanelCode[]>([]);
   const [editing, setEditing] = useState(false);
   const [reportingBlocker, setReportingBlocker] = useState(false);
   const canDelete = auth.data?.permissions.includes('launch.admin') ?? false;
@@ -326,43 +332,53 @@ export function ProjectDetailPage() {
   const openTasks = tasks.filter(task => task.status !== 'DONE');
   const latestHpp = hpp[0];
   const openBlocker = currentStage ? blockers.find(b => b.status === 'OPEN' && b.stage_run_id === currentStage.id) : undefined;
-  const workspaceSections: Array<{ code: OperationalWorkstream; label: string; eyebrow: string; icon: ReactNode; metric: string; detail: string }> = [
-    { code: 'RESEARCH', label: 'Riset & referensi', eyebrow: 'Konteks produk', icon: <BookOpen size={19} />, metric: `${references.length} referensi`, detail: 'Gambar, sumber belajar, benchmark, fungsi, target pengguna, dan kesimpulan riset.' },
-    { code: 'SOURCING', label: 'Material & supplier', eyebrow: 'Bill of materials', icon: <Factory size={19} />, metric: `${materials.length} material`, detail: 'Bahan utama, aksesori, konsumsi, supplier, satuan harga, MOQ, dan lead time.' },
-    { code: 'SAMPLING', label: 'Pola & sampling', eyebrow: 'Validasi bentuk', icon: <Shirt size={19} />, metric: samples.length ? `${samples.length} versi` : 'Belum ada sample', detail: 'Pola, konstruksi, iterasi sample, hasil fitting, revisi, dan master sample.' },
-    { code: 'COSTING', label: 'HPP & harga', eyebrow: 'Kalkulasi biaya', icon: <CircleDollarSign size={19} />, metric: latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung', detail: 'Pemakaian bahan, CMT, cutting, jahit, finishing, packing, overhead, dan margin.' },
-    { code: 'SPECIFICATION', label: 'Warna, ukuran & size chart', eyebrow: 'Spesifikasi produk', icon: <Palette size={19} />, metric: `${colorways.length} warna · ${sizeCharts.length} chart`, detail: 'Varian warna, rentang size, titik ukur rekomendasi, toleransi, SKU, stok, dan budget.' },
-    { code: 'QC', label: 'Quality control', eyebrow: 'Standar kualitas', icon: <PackageCheck size={19} />, metric: qc[0]?.result ?? 'Belum diperiksa', detail: 'Checklist visual, konstruksi, ukuran, material, temuan, bukti, dan keputusan QC.' },
-    { code: 'OWNER_APPROVAL', label: 'Approval owner', eyebrow: 'Gerbang keputusan', icon: <ShieldCheck size={19} />, metric: workspace.data.approvals[0]?.status ?? 'Belum diajukan', detail: 'Periksa seluruh output, catat keputusan, dan berikan izin menuju produksi massal.' },
-    { code: 'PRODUCTION', label: 'Produksi massal', eyebrow: 'Eksekusi produksi', icon: <Factory size={19} />, metric: productionBatches.length ? `${productionBatches.length} batch` : 'Belum ada batch', detail: 'Budget kuantitas, cutting, jahit, finishing, QC, output lolos, reject, dan rework.' },
-    { code: 'LAUNCH', label: 'Persiapan rilis', eyebrow: 'Go to market', icon: <Megaphone size={19} />, metric: releasePlan?.status ? releasePlan.status.replace(/_/g, ' ') : 'Belum dimulai', detail: 'Nama final, harga, konten, aset, kanal penjualan, stok awal, dan checklist publikasi.' },
+  const workspaceSections: Array<{ code: StudioPanelCode; label: string; eyebrow: string; icon: ReactNode; metric: string; detail: string; completeness: number; missing: number }> = [
+    { code: 'PRODUCT_BRIEF', label: 'Product Brief', eyebrow: 'Arah & referensi', icon: <BookOpen size={19} />, metric: `${references.length} referensi`, detail: 'Konteks produk, target, referensi visual, link pembelajaran, dan keputusan arah artikel.', completeness: Math.min(100, references.length * 25 + (project.concept ? 25 : 0) + (project.target_date ? 25 : 0)), missing: Math.max(0, 4 - references.length) },
+    { code: 'MATERIALS', label: 'Materials & Accessories', eyebrow: 'Bill of materials', icon: <Layers3 size={19} />, metric: `${materials.length} komponen`, detail: 'Kain, lining, rib, label, zipper, aksesori, konsumsi, waste, dan unit pembelian.', completeness: Math.min(100, materials.length * 25), missing: materials.length ? 0 : 3 },
+    { code: 'COLORS', label: 'Colors & Variants', eyebrow: 'Variant planning', icon: <Palette size={19} />, metric: `${colorways.length} warna`, detail: 'Colorway, kode warna, swatch, status sample, dan keputusan varian produksi.', completeness: Math.min(100, colorways.length * 34), missing: colorways.length ? 0 : 2 },
+    { code: 'SIZES', label: 'Sizes & Size Chart', eyebrow: 'Standar ukuran', icon: <Ruler size={19} />, metric: `${sizeCharts.length} chart`, detail: 'Template kategori, titik ukur, grading, toleransi, hasil sample, dan final lock.', completeness: sizeCharts.some(item => item.status === 'FINAL') ? 100 : sizeCharts.length ? 55 : 0, missing: sizeCharts.length ? 1 : 3 },
+    { code: 'SUPPLIERS', label: 'Source & Suppliers', eyebrow: 'Sourcing decision', icon: <Factory size={19} />, metric: `${materials.filter(item => item.quotes?.some(quote => quote.status === 'SELECTED')).length} pilihan`, detail: 'Perbandingan supplier utama dan alternatif berdasarkan harga, MOQ, lead time, dan risiko.', completeness: materials.length ? Math.round(materials.filter(item => item.quotes?.some(quote => quote.status === 'SELECTED')).length / materials.length * 100) : 0, missing: materials.filter(item => !item.quotes?.some(quote => quote.status === 'SELECTED')).length },
+    { code: 'PATTERN', label: 'Pattern', eyebrow: 'Konstruksi produk', icon: <Tags size={19} />, metric: samples.length ? 'Terhubung ke sample' : 'Belum dimulai', detail: 'Versi pola, file pola, pembuat, status review, dan catatan konstruksi.', completeness: samples.length ? 45 : 0, missing: samples.length ? 2 : 4 },
+    { code: 'SAMPLING', label: 'Sampling & Fitting', eyebrow: 'Validasi fisik', icon: <Shirt size={19} />, metric: samples.length ? `${samples.length} iterasi` : 'Belum ada sample', detail: 'Permintaan sample, fitting, temuan, revisi, foto, keputusan, dan golden sample.', completeness: Math.min(100, samples.length * 35), missing: samples.length ? 1 : 4 },
+    { code: 'COSTING', label: 'HPP & Pricing', eyebrow: 'Kalkulasi biaya', icon: <CircleDollarSign size={19} />, metric: latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung', detail: 'Biaya bahan, CMT, cutting, jahit, finishing, packing, overhead, margin, dan harga jual.', completeness: latestHpp?.status === 'FINAL' ? 100 : latestHpp ? 65 : 0, missing: latestHpp ? 1 : 4 },
+    { code: 'BUDGET', label: 'Stock & Production Budget', eyebrow: 'Matriks produksi', icon: <ClipboardList size={19} />, metric: `${workspace.data.variantMatrix.length} kombinasi`, detail: 'Warna × size × kuantitas × HPP untuk budgeting produksi dan kebutuhan modal.', completeness: workspace.data.variantMatrix.length ? 70 : 0, missing: workspace.data.variantMatrix.length ? 1 : 3 },
+    { code: 'READINESS', label: 'QC & Readiness', eyebrow: 'Production gate', icon: <ShieldCheck size={19} />, metric: qc[0]?.result ?? 'Belum diperiksa', detail: 'Checklist mutu, bukti QC, approval owner, override, dan kesiapan produksi.', completeness: qc.some(item => item.result === 'PASS') ? 100 : qc.length ? 55 : 0, missing: qc.length ? 1 : 4 },
+    { code: 'PRODUCTION', label: 'Production', eyebrow: 'Eksekusi massal', icon: <Factory size={19} />, metric: productionBatches.length ? `${productionBatches.length} batch` : 'Belum ada batch', detail: 'Cutting, jahit, finishing, QC, output lolos, reject, rework, dan forecast.', completeness: productionBatches.length ? 55 : 0, missing: productionBatches.length ? 2 : 4 },
+    { code: 'LAUNCH', label: 'Launch', eyebrow: 'Go to market', icon: <Megaphone size={19} />, metric: releasePlan?.status ? releasePlan.status.replace(/_/g, ' ') : 'Belum dimulai', detail: 'Nama final, konten, aset, harga, kanal, stok awal, dan checklist publikasi.', completeness: releasePlan ? 60 : 0, missing: releasePlan ? 2 : 5 },
+    { code: 'TASKS', label: 'Tasks & Progress', eyebrow: 'Kolaborasi tim', icon: <CheckCircle2 size={19} />, metric: `${openTasks.length} tugas terbuka`, detail: 'Rencana, aktual, dependency, update dua sisi, blocker, keputusan, dan langkah berikutnya.', completeness: tasks.length ? Math.round(tasks.filter(item => item.status === 'DONE').length / tasks.length * 100) : 0, missing: openTasks.length },
+    { code: 'FILES', label: 'Files, Discussion & History', eyebrow: 'Dokumentasi artikel', icon: <MessageSquare size={19} />, metric: `${workspace.data.comments.length} diskusi`, detail: 'File, komentar, mention, keputusan, versi, dan jejak perubahan artikel.', completeness: workspace.data.comments.length || activity.length ? 70 : 0, missing: workspace.data.comments.length ? 0 : 1 },
   ];
 
-  function toggleWorkstream(code: OperationalWorkstream) {
+  function toggleWorkstream(code: StudioPanelCode) {
     setExpandedWorkstreams(current => current.includes(code) ? current.filter(item => item !== code) : [...current, code]);
-    setActiveWorkstream(current => current === code ? null : code);
+    setActiveStudioPanel(code);
   }
 
-  function focusWorkstream(code: OperationalWorkstream) {
+  function focusWorkstream(code: StudioPanelCode) {
     setExpandedWorkstreams(current => current.includes(code) ? current : [...current, code]);
-    setActiveWorkstream(code);
+    setActiveStudioPanel(code);
     window.setTimeout(() => document.getElementById(`workspace-${code.toLowerCase()}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
-  function renderWorkstreamPanel(code: OperationalWorkstream) {
-    if (code === 'RESEARCH') return <ResearchPanel projectId={project.id} stage={stageOf('RESEARCH')} references={references} researchSummary={project.research_summary} onBack={() => toggleWorkstream(code)} />;
-    if (code === 'SOURCING') return <SourcingPanel projectId={project.id} stage={stageOf('SOURCING')} materials={materials} onBack={() => toggleWorkstream(code)} />;
+  function renderWorkstreamPanel(code: StudioPanelCode) {
+    if (code === 'PRODUCT_BRIEF') return <ResearchPanel projectId={project.id} stage={stageOf('RESEARCH')} references={references} researchSummary={project.research_summary} onBack={() => toggleWorkstream(code)} />;
+    if (code === 'MATERIALS') return <SourcingPanel projectId={project.id} stage={stageOf('SOURCING')} materials={materials} onBack={() => toggleWorkstream(code)} />;
+    if (code === 'COLORS') return <SpecificationPanel mode="colors" projectId={project.id} category={project.category} stage={stageOf('SPECIFICATION')} colorways={colorways} sizeCharts={sizeCharts} variantMatrix={workspace.data!.variantMatrix} hpp={hpp} onBack={() => toggleWorkstream(code)} />;
+    if (code === 'SIZES') return <SpecificationPanel mode="sizes" projectId={project.id} category={project.category} stage={stageOf('SPECIFICATION')} colorways={colorways} sizeCharts={sizeCharts} variantMatrix={workspace.data!.variantMatrix} hpp={hpp} onBack={() => toggleWorkstream(code)} />;
+    if (code === 'SUPPLIERS') return <section className="studio-embedded-summary"><div className="studio-summary-head"><Factory size={20} /><div><b>Keputusan sourcing</b><p>Ringkasan supplier yang terhubung ke setiap material.</p></div></div>{materials.length ? <div className="studio-summary-list">{materials.map(item => <div key={item.id}><span>{item.role}</span><b>{item.proposed_name}</b><small>{item.quotes?.some(quote => quote.status === 'SELECTED') ? 'Supplier utama sudah dipilih' : 'Perlu pilih quotation utama'}</small></div>)}</div> : <EmptyPanel icon={<Factory size={26} />} title="Belum ada sumber material" detail="Tambahkan material terlebih dahulu, lalu bandingkan supplier utama dan alternatif." />}</section>;
+    if (code === 'PATTERN') return <section className="studio-embedded-summary"><div className="studio-summary-head"><Tags size={20} /><div><b>Register pola artikel</b><p>Panel pola terhubung dengan iterasi sample agar revisi konstruksi tetap dapat dilacak.</p></div></div><div className="studio-empty-action"><FileText size={28} /><b>Belum ada file pola</b><p>Tambahkan versi pola, pembuat pola, tanggal, dan catatan konstruksi saat sample pertama dimulai.</p><button className="button button-secondary" onClick={() => focusWorkstream('SAMPLING')}>Lanjut ke Sampling</button></div></section>;
     if (code === 'SAMPLING') return <SamplingPanel projectId={project.id} stage={stageOf('SAMPLING')} samples={samples} onBack={() => toggleWorkstream(code)} />;
     if (code === 'COSTING') return <CostingPanel projectId={project.id} stage={stageOf('COSTING')} hpp={hpp} materials={materials} onBack={() => toggleWorkstream(code)} />;
-    if (code === 'SPECIFICATION') return <SpecificationPanel projectId={project.id} category={project.category} stage={stageOf('SPECIFICATION')} colorways={colorways} sizeCharts={sizeCharts} variantMatrix={workspace.data!.variantMatrix} hpp={hpp} onBack={() => toggleWorkstream(code)} />;
-    if (code === 'QC') return <QcPanel projectId={project.id} stage={stageOf('QC')} qc={qc} samples={samples} onBack={() => toggleWorkstream(code)} />;
-    if (code === 'OWNER_APPROVAL') return <ApprovalPanel projectId={project.id} ownerApprovalStage={stageOf('OWNER_APPROVAL')} productionReadyStage={stageOf('PRODUCTION_READY')} approvals={workspace.data!.approvals} onBack={() => toggleWorkstream(code)} />;
+    if (code === 'BUDGET') return <SpecificationPanel mode="budget" projectId={project.id} category={project.category} stage={stageOf('SPECIFICATION')} colorways={colorways} sizeCharts={sizeCharts} variantMatrix={workspace.data!.variantMatrix} hpp={hpp} onBack={() => toggleWorkstream(code)} />;
+    if (code === 'READINESS') return <><QcPanel projectId={project.id} stage={stageOf('QC')} qc={qc} samples={samples} onBack={() => toggleWorkstream(code)} /><ApprovalPanel projectId={project.id} ownerApprovalStage={stageOf('OWNER_APPROVAL')} productionReadyStage={stageOf('PRODUCTION_READY')} approvals={workspace.data!.approvals} onBack={() => toggleWorkstream(code)} /></>;
     if (code === 'PRODUCTION') return <ProductionPanel projectId={project.id} batches={productionBatches} targetQuantity={project.target_quantity} onBack={() => toggleWorkstream(code)} />;
-    return <LaunchPreparationPanel projectId={project.id} projectName={project.article_name} targetLaunchDate={project.target_launch_date} releasePlan={releasePlan} onBack={() => toggleWorkstream(code)} />;
+    if (code === 'LAUNCH') return <LaunchPreparationPanel projectId={project.id} projectName={project.article_name} targetLaunchDate={project.target_launch_date} releasePlan={releasePlan} onBack={() => toggleWorkstream(code)} />;
+    if (code === 'TASKS') return <><ProgressSheetPanel projectId={project.id} currentStage={project.current_stage} updates={workspace.data!.progressUpdates} /><section className="content-card tasks-full"><div className="section-head"><div><span className="eyebrow">Eksekusi tim</span><h3>Daftar tugas artikel</h3></div></div>{tasks.length ? <div className="task-list">{tasks.map(task => <TaskRow key={task.id} task={task} allTasks={tasks} onComplete={task.status === 'DONE' ? undefined : () => completeTaskMutation.mutateAsync(task.id)} onSetDependency={(dependsOnId, type) => dependencyMutation.mutateAsync({ taskId: task.id, dependsOnId, type })} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={28} />} title="Belum ada tugas" detail="Tugas otomatis akan muncul ketika tahapan mulai dikerjakan." />}</section></>;
+    return <><DiscussionPanel projectId={project.id} comments={workspace.data!.comments} /><section className="content-card"><div className="section-head"><div><span className="eyebrow">Jejak perubahan</span><h3>Aktivitas artikel</h3></div></div>{activity.length ? <div className="activity-list">{activity.slice(0, 12).map(item => <div key={item.id}><span className="avatar avatar-small">{initials(item.actor?.full_name)}</span><div><p><b>{item.actor?.full_name ?? 'Sistem'}</b> {item.message}</p><small>{date.format(new Date(item.created_at))}</small></div></div>)}</div> : <EmptyPanel icon={<Activity size={28} />} title="Belum ada aktivitas" detail="Perubahan dan keputusan penting akan tercatat di sini." />}</section></>;
   }
 
   return <div className="project-page"><Link className="back-link" to="/launch/app/projects"><ArrowLeft size={18} /> Semua artikel</Link>
-    <section className="project-hero"><div className="project-hero-image"><SafeImage src={project.reference_image_url} alt={project.article_name} fallback={<Shirt size={44} />} /><span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name}</span></div><div className="project-hero-copy"><div className="project-meta"><span>{project.code}</span><StatusPill status={project.status} /><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div><h2>{project.article_name}</h2><p>{project.concept || 'Konsep artikel belum dilengkapi.'}</p><div className="hero-facts"><span><Target size={16} /> {project.category}</span><span><CalendarDays size={16} /> {project.target_date ? date.format(new Date(project.target_date)) : 'Target belum ada'}</span><span><Users size={16} /> Owner: {project.owner?.full_name ?? 'Belum ditetapkan'}</span></div><div className="hero-actions"><button type="button" className="button button-secondary hero-edit" onClick={() => setEditing(true)}><Pencil size={16} /> Ubah artikel</button>{canDelete && <DeleteButton label={`artikel ${project.article_name}`} pending={deleteProjectMutation.isPending} onConfirm={() => deleteProjectMutation.mutate(project.id, { onSuccess: () => navigate('/launch/app/projects') })} />}</div></div><div className="hero-progress"><div className="progress-ring" style={{ '--progress': `${project.progress * 3.6}deg` } as React.CSSProperties}><span><b>{project.progress}%</b><small>kesiapan</small></span></div></div></section>
+    <section className="project-hero studio-article-header"><div className="project-hero-image"><SafeImage src={project.reference_image_url} alt={project.article_name} fallback={<Shirt size={44} />} /><span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#087e79' } as React.CSSProperties}>{project.business_unit?.short_name}</span></div><div className="project-hero-copy"><div className="project-meta"><span>{project.code}</span><StatusPill status={project.status} /><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div><h2>{project.article_name}</h2><p>{project.category} · {stageMeta[project.current_stage]?.label}</p><div className="hero-facts"><span><Target size={16} /> {project.target_fix_date ? `Fix ${date.format(new Date(project.target_fix_date))}` : 'Target fix belum ada'}</span><span><CalendarDays size={16} /> {project.target_launch_date ? `Rilis ${date.format(new Date(project.target_launch_date))}` : 'Target rilis belum ada'}</span><span><Users size={16} /> {project.owner?.full_name ?? 'PIC belum ditetapkan'}</span></div></div><div className="hero-progress"><div className="progress-ring" style={{ '--progress': `${project.progress * 3.6}deg` } as React.CSSProperties}><span><b>{project.progress}%</b><small>workflow</small></span></div><div className="hero-actions"><button type="button" className="button button-secondary hero-edit" onClick={() => setEditing(true)}><Pencil size={16} /> Ubah</button>{canDelete && <DeleteButton label={`artikel ${project.article_name}`} pending={deleteProjectMutation.isPending} onConfirm={() => deleteProjectMutation.mutate(project.id, { onSuccess: () => navigate('/launch/app/projects') })} />}</div></div></section>
 
     {editing && <EditProjectPanel project={project} onClose={() => setEditing(false)} />}
 
@@ -371,7 +387,7 @@ export function ProjectDetailPage() {
     {reportingBlocker && currentStage && <BlockerReportForm projectId={project.id} stageId={currentStage.id} onDone={() => setReportingBlocker(false)} />}
     {openBlocker && <OpenBlockerCard projectId={project.id} blocker={openBlocker} />}
 
-    <div className="project-tabs">{([['brief', 'Brief'], ['overview', 'Detail'], ['work', 'Workspace'], ['progress', `Progres (${workspace.data.progressUpdates.length})`], ['tasks', `Tugas (${openTasks.length})`], ['discussion', `Diskusi (${workspace.data.comments.length})`], ['activity', 'Aktivitas']] as const).map(item => <button key={item[0]} className={tab === item[0] ? 'active' : ''} onClick={() => setTab(item[0])}>{item[1]}</button>)}</div>
+    <div className="project-tabs studio-mode-switch">{([['brief', 'Brief'], ['overview', 'Detail'], ['work', 'Workspace']] as const).map(item => <button key={item[0]} className={tab === item[0] ? 'active' : ''} onClick={() => setTab(item[0])}>{item[1]}</button>)}</div>
 
     {tab === 'brief' && <BriefSnapshot references={references} materials={materials} colorways={colorways} sizeCharts={sizeCharts} hpp={hpp} />}
     {tab === 'overview' && <><IndicatorPanel workspace={workspace.data} /><ArticleResultPanel workspace={workspace.data} /><div className="workspace-grid"><section className="content-card next-action"><div className="next-icon"><ArrowUpRight size={23} /></div><div><span className="eyebrow">Tindakan terbaik berikutnya</span><h3>{currentStage?.status === 'BLOCKED' ? 'Buka hambatan tahap ini' : `Lanjutkan ${currentStage ? stageMeta[currentStage.code].label.toLowerCase() : 'persiapan produksi'}`}</h3><p>{currentStage?.blocking_note || 'Lengkapi data wajib dan selesaikan tugas terbuka sebelum mengajukan review.'}</p></div><button className="button button-primary" onClick={() => setTab('work')}>Buka ruang kerja</button></section>
@@ -381,7 +397,7 @@ export function ProjectDetailPage() {
     {tab === 'work' && <div className="blueprint-workspace unified-workspace">
       <aside className="blueprint-stage-nav">
         <div className="stage-nav-head"><span>LEMBAR KERJA</span><b>{expandedWorkstreams.length}/{workspaceSections.length} panel terbuka</b></div>
-        {workspaceSections.map((item, index) => <button type="button" key={item.code} className={activeWorkstream === item.code ? 'active' : ''} onClick={() => focusWorkstream(item.code)}><span className="stage-nav-number">{String(index + 1).padStart(2, '0')}</span><span><b>{item.label}</b><small>{item.metric}</small></span></button>)}
+        {workspaceSections.map((item, index) => <button type="button" key={item.code} className={activeStudioPanel === item.code ? 'active' : ''} onClick={() => focusWorkstream(item.code)}><span className="stage-nav-number">{String(index + 1).padStart(2, '0')}</span><span><b>{item.label}</b><small>{item.metric}</small></span><em>{item.completeness}%</em></button>)}
       </aside>
       <main className="blueprint-workspace-main unified-workspace-form">
         <section className="workspace-form-intro">
@@ -391,16 +407,26 @@ export function ProjectDetailPage() {
         <div className="workspace-accordion">
           {workspaceSections.map((item, index) => {
             const expanded = expandedWorkstreams.includes(item.code);
-            return <section className={`workspace-accordion-panel ${expanded ? 'expanded' : ''}`} id={`workspace-${item.code.toLowerCase()}`} key={item.code}>
-              <button type="button" className="workspace-accordion-trigger" onClick={() => toggleWorkstream(item.code)} aria-expanded={expanded}>
-                <span className="accordion-order">{String(index + 1).padStart(2, '0')}</span>
-                <span className="accordion-icon">{item.icon}</span>
-                <span className="accordion-copy"><small>{item.eyebrow}</small><b>{item.label}</b><em>{item.detail}</em></span>
-                <span className="accordion-metric">{item.metric}</span>
-                <ChevronDown size={19} />
-              </button>
-              {expanded && <div className="workspace-accordion-body">{renderWorkstreamPanel(item.code)}</div>}
-            </section>;
+            const complete = item.completeness >= 100;
+            return <StudioWorkspacePanel
+              key={item.code}
+              id={`workspace-${item.code.toLowerCase()}`}
+              index={index + 1}
+              icon={item.icon}
+              title={item.label}
+              subtitle={item.eyebrow}
+              metric={item.metric}
+              completeness={item.completeness}
+              missingCount={item.missing}
+              owner={project.owner?.full_name}
+              state={complete ? 'complete' : item.completeness >= 70 ? 'review' : 'incomplete'}
+              expanded={expanded}
+              active={activeStudioPanel === item.code}
+              pinned={pinnedPanels.includes(item.code)}
+              onToggle={() => toggleWorkstream(item.code)}
+              onPin={() => setPinnedPanels(current => current.includes(item.code) ? current.filter(code => code !== item.code) : [...current, item.code])}
+              onResult={() => setTab('overview')}
+            >{renderWorkstreamPanel(item.code)}</StudioWorkspacePanel>;
           })}
         </div>
       </main>
@@ -409,7 +435,7 @@ export function ProjectDetailPage() {
         <div className="context-section"><span>TARGET FIX ARTIKEL</span><b>{project.target_fix_date ? date.format(new Date(project.target_fix_date)) : 'Belum ditentukan'}</b><small>Seluruh spesifikasi harus terkunci</small></div>
         <div className="context-section"><span>PANEL TERBUKA</span><b>{expandedWorkstreams.length} dari {workspaceSections.length}</b><small>Input tersimpan per panel kerja</small></div>
         <div className="context-checks"><span>KELENGKAPAN UTAMA</span><div className={materials.length ? 'done' : ''}><i>{materials.length ? <Check size={12} /> : null}</i><b>Material & supplier</b></div><div className={colorways.length ? 'done' : ''}><i>{colorways.length ? <Check size={12} /> : null}</i><b>Varian warna</b></div><div className={sizeCharts.length ? 'done' : ''}><i>{sizeCharts.length ? <Check size={12} /> : null}</i><b>Size chart</b></div><div className={hpp.length ? 'done' : ''}><i>{hpp.length ? <Check size={12} /> : null}</i><b>Draft HPP</b></div></div>
-        <button className="button button-primary context-update" onClick={() => setTab('progress')}><Activity size={16} /> Tambah update tim</button>
+        <button className="button button-primary context-update" onClick={() => focusWorkstream('TASKS')}><Activity size={16} /> Tambah update tim</button>
       </aside>
     </div>}
 
