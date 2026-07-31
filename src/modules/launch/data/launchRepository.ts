@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { BlockerDraft, BusinessUnit, ColorwayDraft, HppLineDraft, LaunchProject, LaunchStage, LaunchTask, MasterMaterial, MasterMaterialDraft, MasterSupplier, MasterSupplierDraft, MaterialSupplierDraft, MaterialSupplierLink, MaterialSupplierLinkDraft, NewProjectInput, Profile, ProjectEditInput, ProjectWorkspace, ReferenceType, SampleDraft } from '../domain/types';
+import type { BlockerDraft, BusinessUnit, ColorwayDraft, CostComponent, CostComponentDraft, HppLineDraft, LaunchProject, LaunchStage, LaunchTask, MasterMaterial, MasterMaterialDraft, MasterSupplier, MasterSupplierDraft, MaterialSupplierDraft, MaterialSupplierLink, MaterialSupplierLinkDraft, NewProjectInput, ProductionBatch, ProductionBatchDraft, Profile, ProgressUpdate, ProgressUpdateDraft, ProjectEditInput, ProjectWorkspace, ReferenceType, ReleasePlan, ReleasePlanDraft, SampleDraft, SizeChartDraft } from '../domain/types';
 
 const PROJECT_FIELDS = '*, business_unit:business_units(*), owner:profiles!launch_projects_owner_id_fkey(*)';
 
@@ -35,23 +35,35 @@ export async function listMyTasks(userId: string) {
   return (data ?? []) as unknown as LaunchTask[];
 }
 
+export async function listRecentProgressUpdates() {
+  const { data, error } = await supabase.from('launch_progress_updates')
+    .select('*, author:profiles!launch_progress_updates_author_id_fkey(*), project:launch_projects(id, code, article_name)')
+    .order('created_at', { ascending: false })
+    .limit(8);
+  if (error) throw error;
+  return (data ?? []) as unknown as ProgressUpdate[];
+}
+
 export async function getProjectWorkspace(projectId: string): Promise<ProjectWorkspace> {
-  const [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, variantMatrixResult, hppResult, sizeResult, qcResult, sampleResult, blockerResult, approvalResult, commentResult] = await Promise.all([
+  const [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, variantMatrixResult, hppResult, sizeResult, qcResult, sampleResult, blockerResult, approvalResult, commentResult, progressResult, productionResult, releaseResult] = await Promise.all([
     supabase.from('launch_projects').select(PROJECT_FIELDS).eq('id', projectId).single(),
     supabase.from('launch_stage_runs').select('*, owner:profiles!launch_stage_runs_owner_id_fkey(*)').eq('project_id', projectId).order('position'),
     supabase.from('launch_tasks').select('*, assignee:profiles!launch_tasks_assignee_id_fkey(*)').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_activity').select('*, actor:profiles!launch_activity_actor_id_fkey(*)').eq('project_id', projectId).order('created_at', { ascending: false }).limit(20),
     supabase.from('launch_references').select('id, title, reference_type, source_url, image_url, insight, is_primary').eq('project_id', projectId).order('sort_order'),
-    supabase.from('launch_material_candidates').select('id, proposed_name, role, composition, gsm, width_cm, color_notes, status, quotes:launch_supplier_quotes(id, supplier_role, price, unit, moq, lead_time_days, status, supplier:suppliers(id, name, contact_name, phone, city))').eq('project_id', projectId).order('created_at'),
+    supabase.from('launch_material_candidates').select('id, proposed_name, role, composition, gsm, width_cm, color_notes, estimated_consumption, unit, status, quotes:launch_supplier_quotes(id, supplier_role, price, unit, moq, lead_time_days, status, supplier:suppliers(id, name, contact_name, phone, city))').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_colorways').select('id, name, hex_code, status').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_variant_matrix').select('id, project_id, colorway_id, size, sku, status, min_quantity, unit_cost, notes').eq('project_id', projectId).order('created_at'),
     supabase.from('launch_hpp_versions').select('id, version, total_hpp, recommended_price, target_margin_percent, status').eq('project_id', projectId).order('version', { ascending: false }),
-    supabase.from('launch_size_charts').select('id, name, status, sizes').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('launch_size_charts').select('id, name, version, unit, status, sizes, measurements:launch_size_chart_measurements(id, point_code, point_name, position, tolerance_plus, tolerance_minus, values)').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('launch_qc_checks').select('id, result, summary, checked_at').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('launch_samples').select('id, version, sample_type, status, is_master, material_notes, pattern_notes, construction_notes, revision_notes').eq('project_id', projectId).order('version', { ascending: false }),
     supabase.from('launch_blockers').select('*, owner:profiles!launch_blockers_owner_id_fkey(*)').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('launch_approvals').select('*, requester:profiles!launch_approvals_requested_by_fkey(*), decider:profiles!launch_approvals_decided_by_fkey(*)').eq('project_id', projectId).order('requested_at', { ascending: false }),
     supabase.from('launch_comments').select('*, author:profiles!launch_comments_author_id_fkey(*), decider:profiles!launch_comments_decided_by_fkey(*)').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('launch_progress_updates').select('*, author:profiles!launch_progress_updates_author_id_fkey(*)').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('launch_production_batches').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('launch_release_plans').select('*').eq('project_id', projectId).maybeSingle(),
   ]);
 
   const failure = [projectResult, stagesResult, tasksResult, activityResult, referenceResult, materialResult, colorResult, variantMatrixResult, hppResult, sizeResult, qcResult, sampleResult, blockerResult, approvalResult, commentResult].find(result => result.error);
@@ -71,8 +83,11 @@ export async function getProjectWorkspace(projectId: string): Promise<ProjectWor
     qc: (qcResult.data ?? []) as ProjectWorkspace['qc'],
     approvals: (approvalResult.data ?? []) as unknown as ProjectWorkspace['approvals'],
     comments: (commentResult.data ?? []) as unknown as ProjectWorkspace['comments'],
+    progressUpdates: progressResult.error ? [] : (progressResult.data ?? []) as unknown as ProgressUpdate[],
     samples: (sampleResult.data ?? []) as ProjectWorkspace['samples'],
     blockers: (blockerResult.data ?? []) as unknown as ProjectWorkspace['blockers'],
+    productionBatches: productionResult.error ? [] : (productionResult.data ?? []) as ProductionBatch[],
+    releasePlan: releaseResult.error ? null : releaseResult.data as ReleasePlan | null,
   };
 }
 
@@ -316,6 +331,36 @@ export async function finalizeSizeChart(projectId: string, sizeChartId: string) 
     .eq('id', sizeChartId);
   if (error) throw error;
 }
+
+export async function createSizeChart(projectId: string, input: SizeChartDraft) {
+  const { data: chart, error: chartError } = await supabase.from('launch_size_charts').insert({
+    project_id: projectId,
+    name: input.name.trim(),
+    version: input.version,
+    unit: input.unit,
+    sizes: input.sizes,
+    status: 'DRAFT',
+    created_by: await currentUserId(),
+  }).select('id').single();
+  if (chartError) throw chartError;
+
+  const rows = input.measurements.filter(item => item.point_name.trim()).map((item, index) => ({
+    size_chart_id: chart.id,
+    point_code: item.point_code.trim() || `P${String(index + 1).padStart(2, '0')}`,
+    point_name: item.point_name.trim(),
+    position: index + 1,
+    tolerance_plus: item.tolerance_plus === '' ? 0 : item.tolerance_plus,
+    tolerance_minus: item.tolerance_minus === '' ? 0 : item.tolerance_minus,
+    values: item.values,
+  }));
+  if (rows.length) {
+    const { error } = await supabase.from('launch_size_chart_measurements').insert(rows);
+    if (error) throw error;
+  }
+  return chart.id as string;
+}
+
+export const deleteSizeChart = (id: string) => removeRow('launch_size_charts', id);
 
 export async function addQcCheck(projectId: string, input: { result: string; summary?: string; sample_id?: string }) {
   const { error } = await supabase.from('launch_qc_checks').insert({
@@ -571,6 +616,89 @@ export async function findOrCreateMasterSupplier(input: MasterSupplierDraft) {
   if (existing) return existing.id as string;
   const created = await createMasterSupplier(input);
   return created.id;
+}
+
+export async function listCostComponents() {
+  const { data, error } = await supabase.from('cost_components').select('*').eq('is_active', true).order('category').order('name');
+  if (error) throw error;
+  return (data ?? []) as CostComponent[];
+}
+
+export async function createCostComponent(input: CostComponentDraft) {
+  const { data, error } = await supabase.from('cost_components').insert({
+    name: input.name.trim(),
+    category: input.category,
+    calculation_method: input.calculation_method,
+    unit: input.unit,
+    default_price: input.default_price === '' || input.default_price === undefined ? null : input.default_price,
+    notes: input.notes?.trim() || null,
+    created_by: await currentUserId(),
+  }).select('*').single();
+  if (error) throw error;
+  return data as CostComponent;
+}
+
+export async function deactivateCostComponent(id: string) {
+  const { error } = await supabase.from('cost_components').update({ is_active: false }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function createProductionBatch(projectId: string, input: ProductionBatchDraft) {
+  const { error } = await supabase.from('launch_production_batches').insert({
+    project_id: projectId,
+    batch_code: input.batch_code.trim(),
+    vendor_name: input.vendor_name?.trim() || null,
+    planned_start: input.planned_start || null,
+    target_finish: input.target_finish || null,
+    total_quantity: input.total_quantity === '' ? 0 : input.total_quantity,
+    notes: input.notes?.trim() || null,
+    created_by: await currentUserId(),
+  });
+  if (error) throw error;
+}
+
+export async function updateProductionBatch(id: string, patch: Partial<Pick<ProductionBatch, 'status' | 'actual_start' | 'actual_finish' | 'cutting_progress' | 'sewing_progress' | 'finishing_progress' | 'qc_progress' | 'quantity_passed' | 'quantity_rejected' | 'quantity_reworked' | 'notes'>>) {
+  const { error } = await supabase.from('launch_production_batches').update(patch).eq('id', id);
+  if (error) throw error;
+}
+
+export async function saveReleasePlan(projectId: string, input: ReleasePlanDraft) {
+  const { error } = await supabase.from('launch_release_plans').upsert({
+    project_id: projectId,
+    final_product_name: input.final_product_name?.trim() || null,
+    product_description: input.product_description?.trim() || null,
+    selling_points: input.selling_points?.trim() || null,
+    retail_price: input.retail_price === '' || input.retail_price === undefined ? null : input.retail_price,
+    marketing_start_date: input.marketing_start_date || null,
+    launch_date: input.launch_date || null,
+    channel_links: input.channel_links,
+    readiness_checks: input.readiness_checks,
+    status: input.status,
+    created_by: await currentUserId(),
+  }, { onConflict: 'project_id' });
+  if (error) throw error;
+}
+
+export async function addProgressUpdate(projectId: string, input: ProgressUpdateDraft) {
+  const { error } = await supabase.from('launch_progress_updates').insert({
+    project_id: projectId,
+    stage_code: input.stage_code || null,
+    author_id: await currentUserId(),
+    update_type: input.update_type,
+    completed_text: input.completed_text?.trim() || null,
+    current_text: input.current_text?.trim() || null,
+    blocker_text: input.blocker_text?.trim() || null,
+    decision_needed: input.decision_needed?.trim() || null,
+    next_step: input.next_step?.trim() || null,
+    forecast_finish: input.forecast_finish || null,
+    progress_percent: input.progress_percent === '' || input.progress_percent === undefined ? null : input.progress_percent,
+  });
+  if (error) throw error;
+}
+
+export async function deleteProgressUpdate(id: string) {
+  const { error } = await supabase.from('launch_progress_updates').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function listMaterialSuppliers(materialId: string) {

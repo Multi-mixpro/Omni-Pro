@@ -1,7 +1,8 @@
 import { FormEvent, useState } from 'react';
 import { AlertCircle, ArrowLeft, Check, Grid3x3, Palette, Plus, Ruler, Wallet } from 'lucide-react';
-import { useAddColorway, useDeleteColorway, useDeleteVariantMatrixRow, useFinalizeSizeChart, useGenerateVariantMatrix, useSetColorwayStatus, useUpdateStage, useUpdateVariantMatrixRow } from '../hooks/useLaunch';
+import { useAddColorway, useDeleteColorway, useDeleteSizeChart, useDeleteVariantMatrixRow, useFinalizeSizeChart, useGenerateVariantMatrix, useSetColorwayStatus, useUpdateStage, useUpdateVariantMatrixRow } from '../hooks/useLaunch';
 import { DeleteButton } from './DeleteButton';
+import { SizeChartBuilder } from './SizeChartBuilder';
 import type { ColorwayDraft, LaunchStage, ProjectWorkspace, VariantMatrixStatus } from '../domain/types';
 
 const emptyColor = (): ColorwayDraft => ({ name: '', color_code: '', hex_code: '#111b2d', panel_notes: '' });
@@ -12,6 +13,7 @@ const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR
 
 interface SpecificationPanelProps {
   projectId: string;
+  category: string;
   stage?: LaunchStage;
   colorways: ProjectWorkspace['colorways'];
   sizeCharts: ProjectWorkspace['sizeCharts'];
@@ -20,7 +22,7 @@ interface SpecificationPanelProps {
   onBack: () => void;
 }
 
-export function SpecificationPanel({ projectId, stage, colorways, sizeCharts, variantMatrix, hpp, onBack }: SpecificationPanelProps) {
+export function SpecificationPanel({ projectId, category, stage, colorways, sizeCharts, variantMatrix, hpp, onBack }: SpecificationPanelProps) {
   const addColor = useAddColorway(projectId);
   const setStatus = useSetColorwayStatus(projectId);
   const deleteColor = useDeleteColorway(projectId);
@@ -29,6 +31,7 @@ export function SpecificationPanel({ projectId, stage, colorways, sizeCharts, va
   const generateMatrix = useGenerateVariantMatrix(projectId);
   const updateMatrixRow = useUpdateVariantMatrixRow(projectId);
   const deleteMatrixRow = useDeleteVariantMatrixRow(projectId);
+  const deleteChart = useDeleteSizeChart(projectId);
   const [draft, setDraft] = useState<ColorwayDraft>(emptyColor());
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,8 +117,9 @@ export function SpecificationPanel({ projectId, stage, colorways, sizeCharts, va
 
       <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Standar ukuran</span><h3>{sizeCharts.length} size chart</h3></div></div>
+        <SizeChartBuilder projectId={projectId} category={category} charts={sizeCharts} />
         {sizeCharts.length ? <div className="sourcing-list">{sizeCharts.map(item => <article key={item.id} className={`sourcing-card ${item.status === 'FINAL' ? 'sourcing-locked' : ''}`}>
-          <div className="sourcing-card-head"><span className="material-role"><Ruler size={14} /></span><div><b>{item.name}</b><small>Status: {item.status} · {item.sizes.join(', ') || 'Belum ada ukuran'}</small></div>{item.status === 'FINAL' ? <span className="sourcing-badge"><Check size={13} /> Final</span> : <button type="button" className="button button-primary" disabled={finalizeChart.isPending} onClick={() => finalizeChart.mutate(item.id)}>Tandai final</button>}</div>
+          <div className="sourcing-card-head"><span className="material-role"><Ruler size={14} /></span><div><b>{item.name}</b><small>Status: {item.status} · {item.sizes.join(', ') || 'Belum ada ukuran'} · {item.measurements?.length ?? 0} titik ukur</small></div>{item.status === 'FINAL' ? <span className="sourcing-badge"><Check size={13} /> Final</span> : <button type="button" className="button button-primary" disabled={finalizeChart.isPending} onClick={() => finalizeChart.mutate(item.id)}>Tandai final</button>}<DeleteButton label={`size chart ${item.name}`} pending={deleteChart.isPending} onConfirm={() => deleteChart.mutate(item.id)} /></div>
         </article>)}</div> : <div className="state-panel state-empty"><Ruler size={28} /><h3>Belum ada size chart</h3><p>Size chart awal dibuat dari brief. Tambahkan ukuran melalui brief artikel.</p></div>}
       </section>
 

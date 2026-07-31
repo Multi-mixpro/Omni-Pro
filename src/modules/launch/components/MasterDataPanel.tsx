@@ -1,11 +1,12 @@
 import { FormEvent, useState } from 'react';
 import { Link2, Plus, Save, Star, Trash2, X } from 'lucide-react';
-import { useCreateMasterMaterial, useCreateMasterSupplier, useLinkMaterialSupplier, useMasterSuppliers, useMaterialSuppliers, useUnlinkMaterialSupplier, useUpdateMasterMaterial, useUpdateMasterSupplier, useUpdateMaterialSupplierLink } from '../hooks/useLaunch';
-import type { MasterMaterial, MasterMaterialDraft, MasterSupplier, MasterSupplierDraft, MaterialSupplierLinkDraft } from '../domain/types';
+import { useCreateCostComponent, useCreateMasterMaterial, useCreateMasterSupplier, useLinkMaterialSupplier, useMasterSuppliers, useMaterialSuppliers, useUnlinkMaterialSupplier, useUpdateMasterMaterial, useUpdateMasterSupplier, useUpdateMaterialSupplierLink } from '../hooks/useLaunch';
+import type { CostComponentDraft, MasterMaterial, MasterMaterialDraft, MasterSupplier, MasterSupplierDraft, MaterialSupplierLinkDraft } from '../domain/types';
 
 const MATERIAL_UNITS = ['meter', 'yard', 'kg', 'gram', 'pcs', 'set', 'pasang', 'roll', 'lembar', 'lusin', 'box', 'liter'];
 const MATERIAL_CATEGORIES = ['Kain utama', 'Lining', 'Rib', 'Aksesori', 'Kemasan', 'Benang', 'Label', 'Lainnya'];
 const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+const COST_CATEGORIES = [['MATERIAL', 'Material'], ['ACCESSORY', 'Aksesori'], ['LABOR', 'Tenaga/CMT'], ['PRINTING', 'Sablon'], ['EMBROIDERY', 'Bordir'], ['PACKAGING', 'Kemasan'], ['OVERHEAD', 'Overhead'], ['OTHER', 'Lainnya']] as const;
 
 function emptyMaterial(): MasterMaterialDraft {
   return { name: '', category: '', composition: '', gsm: '', width_cm: '', unit: 'meter', characteristics: '', care_notes: '' };
@@ -154,6 +155,49 @@ export function SupplierFormPanel({ supplier, onClose }: { supplier?: MasterSupp
           <button type="button" className="button button-secondary" onClick={onClose}>Batal</button>
           <button type="submit" className="button button-primary" disabled={!ready || pending}><Save size={17} /> {pending ? 'Menyimpan…' : 'Simpan supplier'}</button>
         </div>
+      </form>
+    </section>
+  );
+}
+
+export function CostComponentFormPanel({ onClose }: { onClose: () => void }) {
+  const create = useCreateCostComponent();
+  const [form, setForm] = useState<CostComponentDraft>({
+    name: '',
+    category: 'LABOR',
+    calculation_method: 'PER_UNIT',
+    unit: 'pcs',
+    default_price: '',
+    notes: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!form.name.trim()) return;
+    setError(null);
+    try {
+      await create.mutateAsync(form);
+      onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Komponen biaya belum dapat disimpan.');
+    }
+  }
+
+  return (
+    <section className="content-card edit-project-card">
+      <div className="section-head"><div><span className="eyebrow">Master komponen biaya</span><h3>Tambahkan variabel HPP reusable</h3></div><button type="button" className="icon-button" onClick={onClose} aria-label="Tutup"><X size={18} /></button></div>
+      <form onSubmit={submit}>
+        <div className="field-grid">
+          <label className="field field-wide"><span>Nama komponen *</span><input required placeholder="Contoh: Washing, bordir logo, ongkir" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></label>
+          <label className="field"><span>Kategori</span><select value={form.category} onChange={event => setForm({ ...form, category: event.target.value as CostComponentDraft['category'] })}>{COST_CATEGORIES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <label className="field"><span>Metode hitung</span><select value={form.calculation_method} onChange={event => setForm({ ...form, calculation_method: event.target.value as CostComponentDraft['calculation_method'] })}><option value="PER_UNIT">Per unit</option><option value="PER_BATCH">Per batch</option><option value="PERCENTAGE">Persentase</option><option value="FIXED">Biaya tetap</option></select></label>
+          <label className="field"><span>Satuan</span><input value={form.unit} onChange={event => setForm({ ...form, unit: event.target.value })} /></label>
+          <label className="field"><span>Harga default</span><input type="number" min={0} value={form.default_price} onChange={event => setForm({ ...form, default_price: event.target.value === '' ? '' : Number(event.target.value) })} /></label>
+          <label className="field field-wide"><span>Catatan penggunaan</span><textarea rows={2} value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })} /></label>
+        </div>
+        {error && <div className="form-error">{error}</div>}
+        <div className="edit-project-actions"><button type="button" className="button button-secondary" onClick={onClose}>Batal</button><button type="submit" className="button button-primary" disabled={!form.name.trim() || create.isPending}><Save size={17} /> {create.isPending ? 'Menyimpan…' : 'Simpan komponen'}</button></div>
       </form>
     </section>
   );

@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { AlertCircle, ArrowLeft, Calculator, Check, CircleDollarSign, Plus, Trash2 } from 'lucide-react';
-import { useAddHppVersion, useDeleteHppVersion, useFinalizeHpp, useUpdateStage } from '../hooks/useLaunch';
+import { AlertCircle, ArrowLeft, Calculator, Check, CircleDollarSign, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { useAddHppVersion, useCostComponents, useDeleteHppVersion, useFinalizeHpp, useUpdateStage } from '../hooks/useLaunch';
 import { DeleteButton } from './DeleteButton';
 import type { HppLineDraft, LaunchStage, ProjectWorkspace } from '../domain/types';
 
@@ -14,14 +14,16 @@ interface CostingPanelProps {
   projectId: string;
   stage?: LaunchStage;
   hpp: ProjectWorkspace['hpp'];
+  materials: ProjectWorkspace['materials'];
   onBack: () => void;
 }
 
-export function CostingPanel({ projectId, stage, hpp, onBack }: CostingPanelProps) {
+export function CostingPanel({ projectId, stage, hpp, materials, onBack }: CostingPanelProps) {
   const addVersion = useAddHppVersion(projectId);
   const finalize = useFinalizeHpp(projectId);
   const deleteVersion = useDeleteHppVersion(projectId);
   const updateStageMutation = useUpdateStage(projectId);
+  const costComponents = useCostComponents();
   const [lines, setLines] = useState<HppLineDraft[]>([emptyLine()]);
   const [targetMargin, setTargetMargin] = useState<number | ''>(30);
   const [showForm, setShowForm] = useState(false);
@@ -53,13 +55,59 @@ export function CostingPanel({ projectId, stage, hpp, onBack }: CostingPanelProp
     finalize.mutate({ hppId: id, recommendedPrice: price });
   }
 
+  function fillFromBom() {
+    const materialLines: HppLineDraft[] = materials.map(material => {
+      const quote = material.quotes?.find(item => item.status === 'SELECTED') ?? material.quotes?.[0];
+      const accessoryRoles = ['ZIPPER', 'BUTTON', 'SNAP', 'VELCRO', 'THREAD', 'DRAWCORD', 'EYELET', 'LABEL', 'PATCH', 'POLYBAG', 'HANGTAG', 'CARTON', 'PACKAGING'];
+      return {
+        category: accessoryRoles.includes(material.role) ? 'ACCESSORY' : 'MATERIAL',
+        item_name: material.proposed_name,
+        quantity: material.estimated_consumption ?? 1,
+        unit: material.unit || quote?.unit || 'pcs',
+        unit_price: quote?.price ?? '',
+        waste_percent: accessoryRoles.includes(material.role) ? 2 : 5,
+        notes: quote?.supplier?.name ? `Harga acuan ${quote.supplier.name}` : 'Harga supplier perlu divalidasi',
+      };
+    });
+    const processLines: HppLineDraft[] = costComponents.data?.length
+      ? costComponents.data.map(component => ({
+        category: component.category,
+        item_name: component.name,
+        quantity: 1,
+        unit: component.unit,
+        unit_price: component.default_price ?? '',
+        waste_percent: 0,
+        notes: 'Diambil dari master komponen biaya',
+      }))
+      : [
+        ['LABOR', 'Cutting', 'pcs'], ['LABOR', 'Jahit / CMT', 'pcs'], ['LABOR', 'Finishing', 'pcs'],
+        ['PACKAGING', 'Packing', 'pcs'], ['OVERHEAD', 'Overhead produksi', 'pcs'],
+      ].map(([category, item_name, unit]) => ({ category: category as HppLineDraft['category'], item_name, quantity: 1, unit, unit_price: '', waste_percent: 0 }));
+    setLines([...materialLines, ...processLines]);
+    setShowForm(true);
+  }
+
+  function addFromMaster(componentId: string) {
+    const component = costComponents.data?.find(item => item.id === componentId);
+    if (!component) return;
+    setLines(current => [...current, {
+      category: component.category,
+      item_name: component.name,
+      quantity: 1,
+      unit: component.unit,
+      unit_price: component.default_price ?? '',
+      waste_percent: 0,
+      notes: 'Diambil dari master komponen biaya',
+    }]);
+  }
+
   return (
     <div className="workstream-panel">
       <button className="back-link" onClick={onBack}><ArrowLeft size={18} /> Kembali ke ruang kerja</button>
       <div className="section-head"><div><span className="eyebrow">Tahap 05 · HPP & harga</span><h3>Hitung biaya pokok dan harga jual</h3><p>Versi HPP tidak menimpa versi lama. Tandai satu versi sebagai final untuk membuka gate costing.</p></div></div>
 
       <section className="content-card">
-        <div className="section-head"><div><span className="eyebrow">Riwayat versi</span><h3>{hpp.length} versi HPP</h3></div><button type="button" className="button button-secondary" onClick={() => setShowForm(value => !value)}><Plus size={17} /> {showForm ? 'Tutup form' : 'Versi HPP baru'}</button></div>
+        <div className="section-head"><div><span className="eyebrow">Riwayat versi</span><h3>{hpp.length} versi HPP</h3></div><div className="section-actions"><button type="button" className="button button-secondary" onClick={fillFromBom}><Sparkles size={17} /> Isi dari BOM</button><button type="button" className="button button-secondary" onClick={() => setShowForm(value => !value)}><Plus size={17} /> {showForm ? 'Tutup form' : 'Versi HPP baru'}</button></div></div>
         {hpp.length ? <div className="sourcing-list">{hpp.map(item => <article key={item.id} className={`sourcing-card ${item.status === 'FINAL' ? 'sourcing-locked' : ''}`}>
           <div className="sourcing-card-head"><span className="material-role">V{item.version}</span><div><b>{money.format(item.total_hpp)}</b><small>Status: {item.status}{item.recommended_price ? ` · Harga jual ${money.format(item.recommended_price)}` : ''}</small></div>{item.status === 'FINAL' ? <span className="sourcing-badge"><Check size={13} /> Final</span> : <button type="button" className="button button-primary" disabled={finalize.isPending} onClick={() => finalizeVersion(item.id, item.total_hpp, item.target_margin_percent)}>Tandai final</button>}<DeleteButton label={`HPP V${item.version}`} pending={deleteVersion.isPending} onConfirm={() => deleteVersion.mutate(item.id)} /></div>
         </article>)}</div> : <div className="state-panel state-empty"><CircleDollarSign size={28} /><h3>Belum ada versi HPP</h3><p>Susun komponen biaya untuk menghitung HPP dan harga rekomendasi.</p></div>}
@@ -68,6 +116,13 @@ export function CostingPanel({ projectId, stage, hpp, onBack }: CostingPanelProp
       {showForm && <section className="content-card">
         <div className="section-head"><div><span className="eyebrow">Versi baru</span><h3>HPP V{nextVersion}</h3></div><button type="button" className="button button-secondary" onClick={() => setLines(current => [...current, emptyLine()])}><Plus size={16} /> Komponen biaya</button></div>
         <form onSubmit={submit}>
+          <div className="cost-library-picker">
+            <div><Sparkles size={18} /><span><b>Tambah dari master biaya</b><small>Harga standar otomatis ikut terisi dan masih dapat disesuaikan.</small></span></div>
+            <select aria-label="Pilih komponen biaya master" value="" disabled={costComponents.isLoading || !costComponents.data?.length} onChange={event => addFromMaster(event.target.value)}>
+              <option value="">{costComponents.isLoading ? 'Memuat komponen…' : 'Pilih komponen…'}</option>
+              {costComponents.data?.map(component => <option value={component.id} key={component.id}>{component.name}{component.default_price ? ` · ${money.format(component.default_price)}/${component.unit}` : ''}</option>)}
+            </select>
+          </div>
           <div className="hpp-table-wrap"><div className="hpp-table-head"><span>Komponen</span><span>Jumlah</span><span>Satuan</span><span>Harga satuan</span><span>Waste</span><span>Total</span><span /></div>
             {lines.map((line, index) => {
               const lineTotal = (Number(line.quantity) || 0) * (Number(line.unit_price) || 0) * (1 + (Number(line.waste_percent) || 0) / 100);

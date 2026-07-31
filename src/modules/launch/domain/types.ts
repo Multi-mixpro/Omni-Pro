@@ -175,6 +175,8 @@ export interface ProjectWorkspace {
     gsm: number | null;
     width_cm: number | null;
     color_notes: string | null;
+    estimated_consumption: number | null;
+    unit: string;
     status: string;
     quotes?: Array<{
       id: string;
@@ -190,12 +192,75 @@ export interface ProjectWorkspace {
   colorways: Array<{ id: string; name: string; hex_code: string | null; status: string }>;
   variantMatrix: VariantMatrixRow[];
   hpp: Array<{ id: string; version: number; total_hpp: number; recommended_price: number | null; target_margin_percent: number | null; status: string }>;
-  sizeCharts: Array<{ id: string; name: string; status: string; sizes: string[] }>;
+  sizeCharts: SizeChartData[];
   qc: Array<{ id: string; result: string; summary: string | null; checked_at: string | null }>;
   samples: Array<{ id: string; version: number; sample_type: string; status: string; is_master: boolean; material_notes: string | null; pattern_notes: string | null; construction_notes: string | null; revision_notes: string | null }>;
   blockers: LaunchBlocker[];
   approvals: LaunchApproval[];
   comments: Comment[];
+  progressUpdates: ProgressUpdate[];
+  productionBatches: ProductionBatch[];
+  releasePlan: ReleasePlan | null;
+}
+
+export type ProgressUpdateType = 'TEAM_UPDATE' | 'OWNER_DIRECTION' | 'MILESTONE' | 'RISK';
+
+export interface ProgressUpdate {
+  id: string;
+  project_id: string;
+  stage_code: StageCode | null;
+  author_id: string;
+  update_type: ProgressUpdateType;
+  completed_text: string | null;
+  current_text: string | null;
+  blocker_text: string | null;
+  decision_needed: string | null;
+  next_step: string | null;
+  forecast_finish: string | null;
+  progress_percent: number | null;
+  created_at: string;
+  author?: Profile | null;
+  project?: Pick<LaunchProject, 'id' | 'code' | 'article_name'>;
+}
+
+export interface ProgressUpdateDraft {
+  stage_code?: StageCode | '';
+  update_type: ProgressUpdateType;
+  completed_text?: string;
+  current_text?: string;
+  blocker_text?: string;
+  decision_needed?: string;
+  next_step?: string;
+  forecast_finish?: string;
+  progress_percent?: number | '';
+}
+
+export interface SizeChartMeasurement {
+  id: string;
+  point_code: string;
+  point_name: string;
+  position: number;
+  tolerance_plus: number;
+  tolerance_minus: number;
+  values: Record<string, number>;
+}
+
+export interface SizeChartData {
+  id: string;
+  name: string;
+  version: number;
+  unit: string;
+  status: string;
+  sizes: string[];
+  measurements: SizeChartMeasurement[];
+}
+
+export interface SizeChartDraft {
+  name: string;
+  unit: string;
+  sizes: string[];
+  measurements: MeasurementDraft[];
+  version: number;
 }
 
 export interface NewProjectInput {
@@ -325,6 +390,91 @@ export interface HppLineDraft {
   unit_price: number | '';
   waste_percent: number | '';
   notes?: string;
+}
+
+export type CostCalculationMethod = 'PER_UNIT' | 'PER_BATCH' | 'PERCENTAGE' | 'FIXED';
+
+export interface CostComponent {
+  id: string;
+  name: string;
+  category: HppLineDraft['category'];
+  calculation_method: CostCalculationMethod;
+  unit: string;
+  default_price: number | null;
+  notes: string | null;
+  is_active: boolean;
+}
+
+export interface CostComponentDraft {
+  name: string;
+  category: HppLineDraft['category'];
+  calculation_method: CostCalculationMethod;
+  unit: string;
+  default_price?: number | '';
+  notes?: string;
+}
+
+export type ProductionBatchStatus = 'PLANNED' | 'IN_PROGRESS' | 'WAITING' | 'COMPLETED' | 'CANCELLED';
+
+export interface ProductionBatch {
+  id: string;
+  project_id: string;
+  batch_code: string;
+  vendor_name: string | null;
+  planned_start: string | null;
+  target_finish: string | null;
+  actual_start: string | null;
+  actual_finish: string | null;
+  total_quantity: number;
+  cutting_progress: number;
+  sewing_progress: number;
+  finishing_progress: number;
+  qc_progress: number;
+  quantity_passed: number;
+  quantity_rejected: number;
+  quantity_reworked: number;
+  status: ProductionBatchStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductionBatchDraft {
+  batch_code: string;
+  vendor_name?: string;
+  planned_start?: string;
+  target_finish?: string;
+  total_quantity: number | '';
+  notes?: string;
+}
+
+export type ReleasePlanStatus = 'NOT_STARTED' | 'IN_PREPARATION' | 'WAITING_PRODUCT' | 'READY' | 'PUBLISHED';
+
+export interface ReleasePlan {
+  id: string;
+  project_id: string;
+  final_product_name: string | null;
+  product_description: string | null;
+  selling_points: string | null;
+  retail_price: number | null;
+  marketing_start_date: string | null;
+  launch_date: string | null;
+  channel_links: Record<string, string>;
+  readiness_checks: Record<string, boolean>;
+  status: ReleasePlanStatus;
+  updated_at: string;
+}
+
+export interface ReleasePlanDraft {
+  final_product_name?: string;
+  product_description?: string;
+  selling_points?: string;
+  retail_price?: number | '';
+  marketing_start_date?: string;
+  launch_date?: string;
+  channel_links: Record<string, string>;
+  readiness_checks: Record<string, boolean>;
+  status: ReleasePlanStatus;
 }
 
 export interface MasterMaterial {

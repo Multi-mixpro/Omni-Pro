@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/core/auth/useAuth';
-import { addColorway, addComment, addHppVersion, addMaterialCandidate, addProjectReference, addQcCheck, addSample, approveMasterSample, completeTask, createMasterMaterial, createMasterSupplier, createProject, deactivateMasterMaterial, deactivateMasterSupplier, decideApproval, decideCommentRequest, deleteColorway, deleteComment, deleteHppVersion, deleteMaterialCandidate, deleteProject, deleteQcCheck, deleteReference, deleteSample, deleteVariantMatrixRow, finalizeHpp, finalizeSizeChart, generateVariantMatrix, getProjectWorkspace, linkMaterialSupplier, listBusinessUnits, listMasterMaterials, listMasterSuppliers, listMaterialSuppliers, listMyTasks, listProfiles, listProjects, reportStageBlocker, requestApproval, resolveStageBlocker, selectSupplierQuote, setColorwayStatus, setTaskDependency, unlinkMaterialSupplier, updateMasterMaterial, updateMasterSupplier, updateMaterialSupplierLink, updateProject, updateResearchSummary, updateStage, updateVariantMatrixRow } from '../data/launchRepository';
-import type { BlockerDraft, ColorwayDraft, HppLineDraft, MasterMaterialDraft, MasterSupplierDraft, MaterialSupplierDraft, MaterialSupplierLinkDraft, ProjectEditInput, SampleDraft } from '../domain/types';
+import { addColorway, addComment, addHppVersion, addMaterialCandidate, addProgressUpdate, addProjectReference, addQcCheck, addSample, approveMasterSample, completeTask, createCostComponent, createMasterMaterial, createMasterSupplier, createProductionBatch, createProject, createSizeChart, deactivateCostComponent, deactivateMasterMaterial, deactivateMasterSupplier, decideApproval, decideCommentRequest, deleteColorway, deleteComment, deleteHppVersion, deleteMaterialCandidate, deleteProgressUpdate, deleteProject, deleteQcCheck, deleteReference, deleteSample, deleteSizeChart, deleteVariantMatrixRow, finalizeHpp, finalizeSizeChart, generateVariantMatrix, getProjectWorkspace, linkMaterialSupplier, listBusinessUnits, listCostComponents, listMasterMaterials, listMasterSuppliers, listMaterialSuppliers, listMyTasks, listProfiles, listProjects, listRecentProgressUpdates, reportStageBlocker, requestApproval, resolveStageBlocker, saveReleasePlan, selectSupplierQuote, setColorwayStatus, setTaskDependency, unlinkMaterialSupplier, updateMasterMaterial, updateMasterSupplier, updateMaterialSupplierLink, updateProductionBatch, updateProject, updateResearchSummary, updateStage, updateVariantMatrixRow } from '../data/launchRepository';
+import type { BlockerDraft, ColorwayDraft, CostComponentDraft, HppLineDraft, MasterMaterialDraft, MasterSupplierDraft, MaterialSupplierDraft, MaterialSupplierLinkDraft, ProductionBatchDraft, ProgressUpdateDraft, ProjectEditInput, ReleasePlanDraft, SampleDraft, SizeChartDraft } from '../domain/types';
 
 export const launchKeys = {
   projects: (status = 'ALL') => ['launch-projects', status] as const,
@@ -14,6 +14,7 @@ export function useProject(id: string) { return useQuery({ queryKey: launchKeys.
 export function useBusinessUnits() { return useQuery({ queryKey: ['business-units'], queryFn: listBusinessUnits }); }
 export function useProfiles() { return useQuery({ queryKey: ['profiles'], queryFn: listProfiles }); }
 export function useMyTasks() { const auth = useAuth(); const id = auth.data?.profile?.id ?? ''; return useQuery({ queryKey: launchKeys.tasks(id), queryFn: () => listMyTasks(id), enabled: Boolean(id) }); }
+export function useRecentProgressUpdates() { return useQuery({ queryKey: ['launch-recent-progress-updates'], queryFn: listRecentProgressUpdates, retry: false }); }
 
 export function useCreateProject() {
   const client = useQueryClient();
@@ -155,6 +156,14 @@ export function useFinalizeSizeChart(projectId: string) {
   return useProjectMutation(projectId, (sizeChartId: string) => finalizeSizeChart(projectId, sizeChartId));
 }
 
+export function useCreateSizeChart(projectId: string) {
+  return useProjectMutation(projectId, (input: SizeChartDraft) => createSizeChart(projectId, input));
+}
+
+export function useDeleteSizeChart(projectId: string) {
+  return useProjectMutation(projectId, (id: string) => deleteSizeChart(id));
+}
+
 export function useAddQcCheck(projectId: string) {
   return useProjectMutation(projectId, (input: { result: string; summary?: string; sample_id?: string }) => addQcCheck(projectId, input));
 }
@@ -177,10 +186,12 @@ export function useUpdateResearchSummary(projectId: string) {
 export const masterKeys = {
   materials: ['master-materials'] as const,
   suppliers: ['master-suppliers'] as const,
+  costs: ['master-cost-components'] as const,
 };
 
 export function useMasterMaterials() { return useQuery({ queryKey: masterKeys.materials, queryFn: listMasterMaterials }); }
 export function useMasterSuppliers() { return useQuery({ queryKey: masterKeys.suppliers, queryFn: listMasterSuppliers }); }
+export function useCostComponents() { return useQuery({ queryKey: masterKeys.costs, queryFn: listCostComponents, retry: false }); }
 
 export function useCreateMasterMaterial() {
   const client = useQueryClient();
@@ -229,4 +240,34 @@ export function useUpdateMaterialSupplierLink(materialId: string) {
 export function useUnlinkMaterialSupplier(materialId: string) {
   const client = useQueryClient();
   return useMutation({ mutationFn: (id: string) => unlinkMaterialSupplier(id), onSuccess: () => client.invalidateQueries({ queryKey: ['material-suppliers', materialId] }) });
+}
+
+export function useCreateCostComponent() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (input: CostComponentDraft) => createCostComponent(input), onSuccess: () => client.invalidateQueries({ queryKey: masterKeys.costs }) });
+}
+
+export function useDeactivateCostComponent() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deactivateCostComponent(id), onSuccess: () => client.invalidateQueries({ queryKey: masterKeys.costs }) });
+}
+
+export function useCreateProductionBatch(projectId: string) {
+  return useProjectMutation(projectId, (input: ProductionBatchDraft) => createProductionBatch(projectId, input));
+}
+
+export function useUpdateProductionBatch(projectId: string) {
+  return useProjectMutation(projectId, ({ id, patch }: { id: string; patch: Parameters<typeof updateProductionBatch>[1] }) => updateProductionBatch(id, patch));
+}
+
+export function useSaveReleasePlan(projectId: string) {
+  return useProjectMutation(projectId, (input: ReleasePlanDraft) => saveReleasePlan(projectId, input));
+}
+
+export function useAddProgressUpdate(projectId: string) {
+  return useProjectMutation(projectId, (input: ProgressUpdateDraft) => addProgressUpdate(projectId, input));
+}
+
+export function useDeleteProgressUpdate(projectId: string) {
+  return useProjectMutation(projectId, (id: string) => deleteProgressUpdate(id));
 }

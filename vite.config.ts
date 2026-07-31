@@ -9,4 +9,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/@supabase')) return 'supabase';
+          if (id.includes('node_modules/@tanstack')) return 'query';
+          if (id.includes('node_modules/lucide-react')) return 'icons';
+          if (id.includes('node_modules/react')) return 'react';
+          return undefined;
+        },
+      },
+    },
+  },
 });

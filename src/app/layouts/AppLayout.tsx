@@ -1,11 +1,12 @@
 import { ReactNode, useState } from 'react';
-import { BookOpen, Boxes, ChevronDown, Command, Grid2X2, Home, LogOut, Menu, Plus, Search, Settings2, Users, X } from 'lucide-react';
+import { BookOpen, Boxes, CalendarDays, ChevronDown, Command, Grid2X2, Home, LogOut, Menu, Plus, Search, Settings2, Users, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut, useAuth } from '@/core/auth/useAuth';
 
 const navigation = [
   { to: '/launch/app/today', label: 'Hari ini', icon: Home },
   { to: '/launch/app/projects', label: 'Artikel', icon: Boxes },
+  { to: '/launch/app/calendar', label: 'Kalender', icon: CalendarDays },
   { to: '/launch/app/library', label: 'Pustaka', icon: BookOpen },
   { to: '/launch/app/team', label: 'Tim', icon: Users },
 ];
@@ -14,6 +15,7 @@ function pageTitle(pathname: string) {
   if (pathname.includes('/projects/new')) return 'Perintah artikel baru';
   if (/\/projects\/[^/]+/.test(pathname)) return 'Ruang kerja artikel';
   if (pathname.includes('/projects')) return 'Semua artikel';
+  if (pathname.includes('/calendar')) return 'Kalender peluncuran';
   if (pathname.includes('/library')) return 'Pustaka sumber daya';
   if (pathname.includes('/team')) return 'Tim peluncuran';
   return 'Fokus hari ini';
@@ -38,7 +40,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <aside className={`side-panel ${menuOpen ? 'side-panel-open' : ''}`}>
         <div className="side-brand">
           <span className="brand-mark">GG</span>
-          <div><b>Launch OS</b><small>GG Indo Apparel</small></div>
+          <div><b>Launch OS</b><small><i /> GG Indo Apparel</small></div>
           <button className="icon-button side-close" aria-label="Tutup menu" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
 
@@ -69,6 +71,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <div><span className="topbar-kicker">Product Launch OS</span><h1>{pageTitle(location.pathname)}</h1></div>
           </div>
           <div className="topbar-actions">
+            <span className="workspace-live"><i /> Workspace aktif</span>
             <button className="command-search" onClick={() => navigate('/launch/app/projects')}><Search size={18} /><span>Cari artikel atau kode…</span><kbd>⌘ K</kbd></button>
             <button className="button button-primary top-create" onClick={() => navigate('/launch/app/projects/new')}><Plus size={18} /><span>Artikel baru</span></button>
             <div className="profile-menu">
