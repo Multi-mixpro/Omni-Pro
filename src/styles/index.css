@@ -396,3 +396,9 @@ h1,h2,h3{letter-spacing:-.045em}
 @media(max-width:1250px){.unified-workspace{grid-template-columns:190px minmax(0,1fr)}.unified-workspace>.blueprint-context-panel{grid-column:1/-1}}
 @media(max-width:900px){.unified-workspace{display:block}.unified-workspace>.blueprint-stage-nav{margin-bottom:12px}.workspace-form-intro{padding:18px}.workspace-accordion-panel{scroll-margin-top:145px}}
 @media(max-width:620px){.workspace-form-intro{align-items:flex-start;flex-direction:column}.workspace-form-intro h3{font-size:19px}.workspace-form-intro>div:last-child{width:100%}.workspace-form-intro button{flex:1}.workspace-accordion-trigger{min-height:84px;padding:12px;grid-template-columns:27px 38px minmax(0,1fr) 20px;gap:8px}.accordion-icon{width:38px;height:38px;border-radius:12px}.accordion-metric{display:none}.accordion-copy em{white-space:normal;line-height:1.4}.workspace-accordion-body{padding:8px}.unified-workspace>.blueprint-context-panel{margin-top:12px}}
+
+/* Halaman Pengaturan & Hak Akses (berdiri sendiri, di luar shell PATEN) */
+.settings-standalone{min-height:100vh;background:#f4f5f7}
+.settings-standalone .page-container{max-width:1180px}
+.settings-back-link{display:inline-flex;align-items:center;margin-bottom:18px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;color:#425065;background:#fff;font-size:12px;font-weight:700;text-decoration:none}
+.settings-back-link:hover{color:#0f172a;background:#fff;box-shadow:var(--shadow)}
