@@ -84,13 +84,18 @@ function ProjectCard({ project }: { project: LaunchProject }) {
       <Link to={`/launch/app/projects/${project.id}?tab=overview`} className="project-thumb">
         <SafeImage src={project.reference_image_url} alt={`Referensi ${project.article_name}`} fallback={<Shirt size={34} />} />
         <span className="unit-chip" style={{ '--unit-color': project.business_unit?.accent_color ?? '#f36b21' } as React.CSSProperties}>{project.business_unit?.short_name ?? 'GG'}</span>
+        <span className={`project-health-overlay health-${health.toLowerCase()}`}><i />{SCHEDULE_HEALTH_LABEL[health]}</span>
       </Link>
       <div className="project-card-body">
-        <div className="project-card-top"><span>{project.code}</span></div>
+        <div className="project-card-top"><span>{project.code}</span><span className={`priority priority-${project.priority.toLowerCase()}`}>{project.priority}</span></div>
         <h3>{project.article_name}</h3>
         <p>{project.category} · {stageMeta[project.current_stage]?.label ?? project.current_stage}</p>
-        <Progress value={project.progress} />
-        <div className="project-card-footer"><StatusPill status={project.status} /><span className={`health-chip health-${health.toLowerCase()}`}>{SCHEDULE_HEALTH_LABEL[health]}</span><span><Clock3 size={14} /> {dueText(project.target_date)}</span></div>
+        <div className="project-stage-line"><span><i style={{ width: `${project.progress}%` }} /></span><b>{project.progress}%</b></div>
+        <div className="project-card-insight">
+          <div><small>Tahap aktif</small><b>{stageMeta[project.current_stage]?.short ?? project.current_stage}</b></div>
+          <div><small>Target selesai</small><b>{dueText(project.target_date)}</b></div>
+          <div><small>Owner</small><b>{project.owner?.full_name?.split(' ')[0] ?? 'Belum ada'}</b></div>
+        </div>
         <div className="project-card-actions"><Link to={`/launch/app/projects/${project.id}?tab=brief`}>Brief</Link><Link to={`/launch/app/projects/${project.id}?tab=overview`}>Detail</Link><Link to={`/launch/app/projects/${project.id}?tab=work`}>Workspace <ChevronRight size={14} /></Link></div>
       </div>
     </article>
@@ -159,8 +164,9 @@ export function TodayPage() {
   if (projects.error) return <ErrorPanel detail="Koneksi layanan tersedia, tetapi struktur Product Launch OS baru belum terbaca. Terapkan migration reset yang disertakan." />;
 
   return (
-    <div className="page-stack">
-      <section className="welcome-row">
+    <div className="page-stack today-command-page">
+      <div className="owner-command-grid">
+      <section className="welcome-row owner-command-head">
         <div><span className="eyebrow">Minggu peluncuran · {date.format(new Date())}</span><h2>Selamat bekerja, {name}.</h2><p>Berikut fokus yang paling mendekatkan artikel ke produksi hari ini.</p></div>
         <Link to="/launch/app/projects/new" className="button button-primary"><Plus size={18} /> Perintah artikel baru</Link>
       </section>
@@ -170,6 +176,8 @@ export function TodayPage() {
         <div><span>PRIORITAS OWNER</span><h3>{review.length ? `${review.length} artikel menunggu keputusan Anda` : 'Tidak ada keputusan yang tertahan'}</h3><p>{review.length ? 'Review HPP, hasil sample, atau persetujuan produksi agar pekerjaan tim terus bergerak.' : 'Seluruh approval terkini sudah tertangani. Pantau artikel aktif di bawah.'}</p></div>
         <Link to="/launch/app/projects?status=IN_REVIEW" className="button button-light">{review.length ? 'Buka antrean' : 'Lihat artikel'} <ArrowRight size={17} /></Link>
       </section>
+
+      </div>
 
       <section className="metric-grid">
         <div className="metric-card"><span className="metric-icon orange"><Activity size={19} /></span><div><small>Artikel berjalan</small><b>{active.length}</b><span>{data.length} total artikel</span></div></div>
@@ -226,8 +234,25 @@ export function ProjectsPage() {
   const projects = useProjects(status);
   const filtered = (projects.data ?? []).filter(item => `${item.article_name} ${item.code} ${item.category}`.toLowerCase().includes(query.toLowerCase()));
   const filters = [['ALL', 'Semua'], ['ACTIVE', 'Berjalan'], ['IN_REVIEW', 'Review'], ['BLOCKED', 'Terhambat'], ['READY_FOR_PRODUCTION', 'Siap produksi']];
+  const allProjects = projects.data ?? [];
 
-  return <div className="page-stack"><section className="page-intro"><div><span className="eyebrow">Portfolio artikel</span><h2>Kelola seluruh peluncuran.</h2><p>Urutkan pekerjaan berdasarkan status, brand, atau kebutuhan keputusan.</p></div><Link className="button button-primary" to="/launch/app/projects/new"><Plus size={18} /> Artikel baru</Link></section>
+  return <div className="page-stack pipeline-page">
+    <section className="pipeline-command">
+      <div className="pipeline-command-copy">
+        <span className="pipeline-live"><i /> LIVE PRODUCT PIPELINE</span>
+        <h2>Dari referensi menuju<br />produk siap jual.</h2>
+        <p>Satu pusat kerja untuk brief, material, sample, HPP, produksi, dan peluncuran artikel GG Supply maupun Gudskuy.</p>
+        <div className="pipeline-command-actions"><Link className="button button-primary" to="/launch/app/projects/new"><Plus size={18} /> Mulai artikel</Link><Link className="button button-dark-ghost" to="/launch/app/calendar">Lihat kalender <ArrowUpRight size={17} /></Link></div>
+      </div>
+      <div className="pipeline-pulse">
+        <div><small>ARTIKEL AKTIF</small><b>{allProjects.filter(item => item.status === 'ACTIVE').length}</b><span>dalam pengembangan</span></div>
+        <div><small>MENUNGGU REVIEW</small><b>{allProjects.filter(item => item.status === 'IN_REVIEW').length}</b><span>butuh keputusan</span></div>
+        <div><small>SIAP PRODUKSI</small><b>{allProjects.filter(item => item.status === 'READY_FOR_PRODUCTION').length}</b><span>lolos gate</span></div>
+        <div className="pulse-visual"><span /><span /><span /><span /><span /><span /></div>
+      </div>
+    </section>
+    <section className="pipeline-heading"><div><span className="eyebrow">Article pipeline</span><h2>Antrean pengembangan</h2><p>{filtered.length} artikel · diperbarui otomatis dari lembar kerja tim</p></div><div className="pipeline-view-note"><span>{view === 'grid' ? 'Visual board' : 'Operational list'}</span><small>Pilih artikel untuk melanjutkan pekerjaan</small></div></section>
+    <section className="page-intro legacy-pipeline-intro"><div><span className="eyebrow">Portfolio artikel</span><h2>Kelola seluruh peluncuran.</h2><p>Urutkan pekerjaan berdasarkan status, brand, atau kebutuhan keputusan.</p></div><Link className="button button-primary" to="/launch/app/projects/new"><Plus size={18} /> Artikel baru</Link></section>
     <section className="toolbar-card"><div className="search-field"><Search size={18} /><input placeholder="Cari nama artikel, kode, atau kategori…" value={query} onChange={event => setQuery(event.target.value)} /></div><div className="filter-scroll">{filters.map(([value, label]) => <button className={status === value ? 'active' : ''} key={value} onClick={() => setStatus(value)}>{label}</button>)}</div><div className="view-toggle"><button type="button" className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')} aria-label="Tampilan grid"><LayoutGrid size={17} /></button><button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')} aria-label="Tampilan list"><List size={17} /></button></div><button className="icon-button filter-button"><Filter size={19} /></button></section>
     {projects.isLoading ? <LoadingBlocks /> : projects.error ? <ErrorPanel /> : filtered.length ? (view === 'grid' ? <section className="project-grid">{filtered.map(project => <ProjectCard project={project} key={project.id} />)}</section> : <ProjectListView projects={filtered} />) : <EmptyPanel icon={<FileSearch size={30} />} title="Tidak ada artikel yang cocok" detail="Ubah kata pencarian atau filter status untuk melihat artikel lainnya." />}
   </div>;
@@ -317,7 +342,13 @@ export function ProjectDetailPage() {
       <section className="content-card"><div className="section-head"><div><span className="eyebrow">Kelengkapan artikel</span><h3>Gate produksi</h3></div></div><div className="gate-list"><div className={colorways.length ? 'done' : ''}><span>{colorways.length ? <Check size={15} /> : <Palette size={16} />}</span><b>Varian warna</b><small>{colorways.length} final/kandidat</small></div><div className={latestHpp?.status === 'FINAL' ? 'done' : ''}><span>{latestHpp?.status === 'FINAL' ? <Check size={15} /> : <CircleDollarSign size={16} />}</span><b>HPP final</b><small>{latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'}</small></div><div className={sizeCharts.some(item => item.status === 'FINAL') ? 'done' : ''}><span>{sizeCharts.some(item => item.status === 'FINAL') ? <Check size={15} /> : <Layers3 size={16} />}</span><b>Size chart</b><small>{sizeCharts.length ? sizeCharts[0].status : 'Belum tersedia'}</small></div><div className={qc.some(item => item.result === 'PASS') ? 'done' : ''}><span>{qc.some(item => item.result === 'PASS') ? <Check size={15} /> : <PackageCheck size={16} />}</span><b>QC sample</b><small>{qc.length ? qc[0].result : 'Belum diperiksa'}</small></div></div></section>
       <section className="content-card"><div className="section-head"><div><span className="eyebrow">Tugas terbuka</span><h3>Yang perlu diselesaikan</h3></div><button className="text-button" onClick={() => setTab('tasks')}>Lihat semua</button></div>{openTasks.length ? <div className="task-list">{openTasks.slice(0, 5).map(task => <TaskRow task={task} key={task.id} allTasks={tasks} onComplete={() => completeTaskMutation.mutateAsync(task.id)} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={27} />} title="Semua tugas selesai" detail="Tidak ada tugas terbuka pada artikel ini." />}</section></div></>}
 
-    {tab === 'work' && <>
+    {tab === 'work' && <div className="blueprint-workspace">
+      <aside className="blueprint-stage-nav">
+        <div className="stage-nav-head"><span>LEMBAR KERJA</span><b>{project.progress}% selesai</b></div>
+        <button type="button" className={activeWorkstream === null ? 'active' : ''} onClick={() => setActiveWorkstream(null)}><Layers3 size={17} /><span><b>Ringkasan</b><small>Semua panel kerja</small></span></button>
+        {WORKSTREAM_TABS.filter(item => item.code !== null).map(item => <button type="button" key={item.label} className={activeWorkstream === item.code ? 'active' : ''} onClick={() => setActiveWorkstream(item.code)}>{item.icon}<span><b>{item.label}</b><small>{item.code && stageOf(item.code as StageCode) ? `${stageOf(item.code as StageCode)?.progress ?? 0}% lengkap` : 'Panel operasional'}</small></span></button>)}
+      </aside>
+      <main className="blueprint-workspace-main">
       <div className="workstream-tabs">{WORKSTREAM_TABS.map(item => <button type="button" key={item.label} className={activeWorkstream === item.code ? 'active' : ''} onClick={() => setActiveWorkstream(item.code)}>{item.icon}{item.label}</button>)}</div>
       {activeWorkstream === 'RESEARCH'
       ? <ResearchPanel projectId={project.id} stage={stageOf('RESEARCH')} references={references} researchSummary={project.research_summary} onBack={() => setActiveWorkstream(null)} />
@@ -338,7 +369,21 @@ export function ProjectDetailPage() {
       : activeWorkstream === 'LAUNCH'
       ? <LaunchPreparationPanel projectId={project.id} projectName={project.article_name} targetLaunchDate={project.target_launch_date} releasePlan={releasePlan} onBack={() => setActiveWorkstream(null)} />
       : <section className="workstream-grid"><Workstream icon={<BookOpen />} tone="blue" title="Riset & referensi" metric={`${references.length} referensi`} detail="Benchmark, fungsi, target pengguna, dan insight artikel." onClick={() => setActiveWorkstream('RESEARCH')} /><Workstream icon={<Factory />} tone="purple" title="Bahan & supplier" metric={`${materials.length} kandidat`} detail="Kandidat bahan, quotation, MOQ, lead time, dan supplier terpilih." onClick={() => setActiveWorkstream('SOURCING')} /><Workstream icon={<Shirt />} tone="orange" title="Sampling" metric={samples.length ? `${samples.length} versi sample` : 'Belum ada sample'} detail="Konstruksi, pola, revisi, foto, dan master sample." onClick={() => setActiveWorkstream('SAMPLING')} /><Workstream icon={<CircleDollarSign />} tone="green" title="HPP & harga" metric={latestHpp ? money.format(latestHpp.total_hpp) : 'Belum dihitung'} detail="Bahan, aksesori, jasa, overhead, margin, dan harga rekomendasi." onClick={() => setActiveWorkstream('COSTING')} /><Workstream icon={<Palette />} tone="pink" title="Warna & size chart" metric={`${colorways.length} warna · ${sizeCharts.length} chart`} detail="Varian final, titik ukur, toleransi, dan standar produksi." onClick={() => setActiveWorkstream('SPECIFICATION')} /><Workstream icon={<PackageCheck />} tone="yellow" title="QC" metric={qc[0]?.result ?? 'Belum diperiksa'} detail="Checklist kualitas dan bukti pemeriksaan sebelum approval." onClick={() => setActiveWorkstream('QC')} /><Workstream icon={<ShieldCheck />} tone="blue" title="Approval produksi" metric={workspace.data.approvals[0]?.status ?? 'Belum diajukan'} detail="Persetujuan owner sebelum artikel ditandai siap produksi." onClick={() => setActiveWorkstream('OWNER_APPROVAL')} /><Workstream icon={<Factory />} tone="purple" title="Produksi massal" metric={productionBatches.length ? `${productionBatches.length} batch` : 'Belum ada batch'} detail="Monitor cutting, jahit, finishing, QC, output, reject, dan rework." onClick={() => setActiveWorkstream('PRODUCTION')} /><Workstream icon={<Megaphone />} tone="orange" title="Persiapan rilis" metric={releasePlan?.status ? releasePlan.status.replace(/_/g, ' ') : 'Belum dimulai'} detail="Nama final, konten, harga, kanal penjualan, dan checklist publikasi." onClick={() => setActiveWorkstream('LAUNCH')} /></section>}
-    </>}
+      </main>
+      <aside className="blueprint-context-panel">
+        <div className="context-score"><span className="progress-ring" style={{ '--progress': `${project.progress * 3.6}deg` } as React.CSSProperties}><b>{project.progress}%</b></span><div><small>KESIAPAN ARTIKEL</small><b>{project.progress < 100 ? 'Masih dikembangkan' : 'Siap diproduksi'}</b></div></div>
+        <div className="context-section"><span>TARGET BERIKUTNYA</span><b>{project.target_fix_date ? date.format(new Date(project.target_fix_date)) : 'Belum ditentukan'}</b><small>Fix artikel dan seluruh spesifikasi</small></div>
+        <div className="context-section"><span>PIC UTAMA</span><b>{project.owner?.full_name ?? 'Belum ditetapkan'}</b><small>{openTasks.length} tugas masih terbuka</small></div>
+        <div className="context-checks">
+          <span>GATE UTAMA</span>
+          <div className={materials.length ? 'done' : ''}><i>{materials.length ? <Check size={12} /> : null}</i><b>Material & supplier</b></div>
+          <div className={colorways.length ? 'done' : ''}><i>{colorways.length ? <Check size={12} /> : null}</i><b>Varian warna</b></div>
+          <div className={sizeCharts.length ? 'done' : ''}><i>{sizeCharts.length ? <Check size={12} /> : null}</i><b>Size chart</b></div>
+          <div className={hpp.length ? 'done' : ''}><i>{hpp.length ? <Check size={12} /> : null}</i><b>Draft HPP</b></div>
+        </div>
+        <button className="button button-primary context-update" onClick={() => setTab('progress')}><Activity size={16} /> Tambah update tim</button>
+      </aside>
+    </div>}
 
     {tab === 'progress' && <ProgressSheetPanel projectId={project.id} currentStage={project.current_stage} updates={workspace.data.progressUpdates} />}
     {tab === 'tasks' && <section className="content-card tasks-full"><div className="section-head"><div><span className="eyebrow">Eksekusi tim</span><h3>Daftar tugas artikel</h3></div></div>{tasks.length ? <div className="task-list">{tasks.map(task => <TaskRow key={task.id} task={task} allTasks={tasks} onComplete={task.status === 'DONE' ? undefined : () => completeTaskMutation.mutateAsync(task.id)} onSetDependency={(dependsOnId, type) => dependencyMutation.mutateAsync({ taskId: task.id, dependsOnId, type })} />)}</div> : <EmptyPanel icon={<CheckCircle2 size={28} />} title="Belum ada tugas" detail="Tugas otomatis akan muncul ketika tahapan mulai dikerjakan." />}</section>}

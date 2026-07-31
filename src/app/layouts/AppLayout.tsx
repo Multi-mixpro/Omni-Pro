@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { BookOpen, Boxes, CalendarDays, ChevronDown, Command, Grid2X2, Home, LogOut, Menu, Plus, Search, Settings2, Users, X } from 'lucide-react';
+import { Bell, BookOpen, Boxes, CalendarDays, ChevronDown, Command, Grid2X2, Home, LogOut, Menu, Plus, Search, Settings2, Users, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut, useAuth } from '@/core/auth/useAuth';
 
@@ -40,12 +40,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <aside className={`side-panel ${menuOpen ? 'side-panel-open' : ''}`}>
         <div className="side-brand">
           <span className="brand-mark">GG</span>
-          <div><b>Launch OS</b><small><i /> GG Indo Apparel</small></div>
+          <div><b>Launch OS</b><small>GG Indo Apparel</small></div>
           <button className="icon-button side-close" aria-label="Tutup menu" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
 
         <nav className="side-nav" aria-label="Navigasi Product Launch OS">
-          <span className="nav-caption">Workspace</span>
           {navigation.map(item => (
             <NavLink key={item.to} to={item.to} onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? 'active' : ''}>
               <item.icon size={20} /><span>{item.label}</span>
@@ -54,12 +53,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="side-bottom">
-          <div className="system-card">
-            <Command size={18} />
-            <div><b>Product Launch OS</b><small>Sistem aktif · 01</small></div>
-          </div>
-          <button className="side-settings" onClick={() => navigate('/')}><Grid2X2 size={18} /> Portal semua sistem</button>
-          <button className="side-settings" onClick={() => navigate('/launch/app/settings')}><Settings2 size={18} /> Pengaturan</button>
+          <button className="rail-action" onClick={() => navigate('/')} title="Portal semua sistem"><Grid2X2 size={19} /><span>Portal</span></button>
+          <button className="rail-action" onClick={() => navigate('/launch/app/settings')} title="Pengaturan"><Settings2 size={19} /><span>Pengaturan</span></button>
+          <span className="rail-status" title="Product Launch OS aktif"><Command size={17} /><i /></span>
         </div>
       </aside>
       {menuOpen && <button className="menu-scrim" aria-label="Tutup menu" onClick={() => setMenuOpen(false)} />}
@@ -68,11 +64,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <header className="topbar">
           <div className="topbar-leading">
             <button className="icon-button menu-trigger" aria-label="Buka menu" onClick={() => setMenuOpen(true)}><Menu size={22} /></button>
-            <div><span className="topbar-kicker">Product Launch OS</span><h1>{pageTitle(location.pathname)}</h1></div>
+            <div><span className="topbar-kicker">GG INDO APPAREL / PRODUCT DEVELOPMENT</span><h1>{pageTitle(location.pathname)}</h1></div>
           </div>
           <div className="topbar-actions">
-            <span className="workspace-live"><i /> Workspace aktif</span>
             <button className="command-search" onClick={() => navigate('/launch/app/projects')}><Search size={18} /><span>Cari artikel atau kode…</span><kbd>⌘ K</kbd></button>
+            <button className="icon-button notification-trigger" aria-label="Notifikasi"><Bell size={18} /><i /></button>
             <button className="button button-primary top-create" onClick={() => navigate('/launch/app/projects/new')}><Plus size={18} /><span>Artikel baru</span></button>
             <div className="profile-menu">
               <button className="profile-trigger" onClick={() => setProfileOpen(open => !open)} aria-expanded={profileOpen}>
