@@ -57,6 +57,7 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('*, user_roles(role:roles(code, name))')
+    .eq('is_active', true)
     .order('full_name');
   if (error) throw error;
 
