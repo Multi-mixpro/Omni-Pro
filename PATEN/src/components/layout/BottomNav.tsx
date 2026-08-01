@@ -16,6 +16,7 @@ import {
   Layers,
   Rocket,
   Calendar,
+  Settings,
 } from 'lucide-react';
 import { BusinessUnit } from '../../types';
 
@@ -224,6 +225,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 <BarChart3 className="w-4 h-4 text-purple-600" />
                 <span>Reports & KPI</span>
               </button>
+
+              <a
+                href="/launch/app/settings"
+                onClick={() => setShowMoreSheet(false)}
+                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-left text-xs font-bold text-slate-900"
+              >
+                <Settings className="w-4 h-4 text-slate-500" />
+                <span>Pengaturan & Akses</span>
+              </a>
 
             </div>
           </div>

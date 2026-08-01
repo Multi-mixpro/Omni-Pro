@@ -24,8 +24,6 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   pendingApprovalsCount: number;
   blockedTasksCount: number;
-  /** Menu Pengaturan hanya tampil untuk admin/owner. */
-  canManageSettings?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -35,7 +33,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   pendingApprovalsCount,
   blockedTasksCount,
-  canManageSettings = false,
 }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tint: 'text-sky-600', activeBg: 'bg-sky-50', activeBorder: 'border-sky-200' },
@@ -92,21 +89,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Pengaturan tim & hak akses (admin/owner) */}
-      {canManageSettings && (
-        <div className="px-2 pb-1">
-          <a
-            href="/launch/app/settings"
-            title={isCollapsed ? 'Pengaturan & Hak Akses' : undefined}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent transition-all group"
-          >
-            <Settings className="w-4 h-4 shrink-0 text-slate-400 group-hover:text-slate-600" />
-            {!isCollapsed && (
-              <span className="truncate flex-1 text-left tracking-tight">Pengaturan & Akses</span>
-            )}
-          </a>
-        </div>
-      )}
+      {/* Halaman tetap mengelola pembatasan hak akses; menu perlu selalu terlihat. */}
+      <div className="px-2 pb-1">
+        <a
+          href="/launch/app/settings"
+          title={isCollapsed ? 'Pengaturan & Hak Akses' : undefined}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent transition-all group"
+        >
+          <Settings className="w-4 h-4 shrink-0 text-slate-400 group-hover:text-slate-600" />
+          {!isCollapsed && (
+            <span className="truncate flex-1 text-left tracking-tight">Pengaturan & Akses</span>
+          )}
+        </a>
+      </div>
 
       {/* Footer Collapse Toggle */}
       <div className="p-2 border-t border-slate-200">

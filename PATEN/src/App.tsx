@@ -554,7 +554,6 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         pendingApprovalsCount={pendingApprovalsCount}
         blockedTasksCount={blockedTasksCount}
-        canManageSettings={permissions.includes('launch.admin')}
       />
 
       <div className={`paten-main ${isSidebarCollapsed ? 'md:pl-[76px]' : 'md:pl-[232px]'} transition-all duration-200 min-h-screen flex flex-col`}>
