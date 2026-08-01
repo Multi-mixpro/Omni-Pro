@@ -6,20 +6,22 @@ import {
   KeyRound,
   Loader2,
   PencilLine,
+  Plus,
   Rocket,
   Save,
   ShieldCheck,
-  UserPlus,
+  Trash2,
   Users,
   X,
 } from 'lucide-react';
-import { useAuth } from '@/core/auth/useAuth';
+import { useNavigate } from '@/app/router/simpleRouter';
+import { signOut, useAuth } from '@/core/auth/useAuth';
 import {
-  createTeamUser, deactivateTeamUser, listProjectAccess, listRoles, listTeamMembers,
-  reactivateTeamUser,
+  createTeamUser, deleteTeamUser, listProjectAccess, listRoles, listTeamMembers,
   setMemberCanLaunch,
   setProjectMember,
   updateTeamUser,
+  type DeleteTeamUserResult,
   type NewTeamUserInput,
   type TeamMember,
   type UpdateTeamUserInput,
@@ -67,6 +69,7 @@ function SectionHead({
 
 export function SettingsPage() {
   const auth = useAuth();
+  const navigate = useNavigate();
   const client = useQueryClient();
   const isAdmin = auth.data?.permissions.includes('launch.admin') ?? false;
 
@@ -77,9 +80,11 @@ export function SettingsPage() {
   const [draft, setDraft] = useState<NewTeamUserInput>(emptyUser());
   const [editDraft, setEditDraft] = useState<UpdateTeamUserInput>(emptyEditUser());
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createNotice, setCreateNotice] = useState<string | null>(null);
   const [memberFeedback, setMemberFeedback] = useState<string | null>(null);
+  const [memberFeedbackTone, setMemberFeedbackTone] = useState<'success' | 'error'>('success');
   const [projectId, setProjectId] = useState('');
 
   const access = useQuery({
@@ -96,14 +101,30 @@ export function SettingsPage() {
     onSuccess: () => {
       setDraft(emptyUser());
       setCreateNotice('Pengguna baru berhasil dibuat.');
+      setShowCreateModal(false);
       void refreshTeam();
     },
   });
-  const deactivate = useMutation({ mutationFn: deactivateTeamUser, onSuccess: refreshTeam });
-  const reactivate = useMutation({ mutationFn: reactivateTeamUser, onSuccess: refreshTeam });
+  const deleteUser = useMutation({
+    mutationFn: deleteTeamUser,
+    onSuccess: async (result: DeleteTeamUserResult) => {
+      setMemberFeedbackTone('success');
+      setMemberFeedback(result.deleted_self
+        ? 'Akun berhasil dihapus. Anda akan keluar dari Product Launch OS.'
+        : 'Pengguna berhasil dihapus.');
+      setEditingUserId(null);
+      setEditDraft(emptyEditUser());
+      await refreshTeam();
+      if (result.deleted_self) {
+        await signOut();
+        navigate('/launch/login');
+      }
+    },
+  });
   const updateUser = useMutation({
     mutationFn: updateTeamUser,
     onSuccess: async () => {
+      setMemberFeedbackTone('success');
       setMemberFeedback('Data pengguna berhasil diperbarui.');
       setEditingUserId(null);
       setEditDraft(emptyEditUser());
@@ -139,6 +160,7 @@ export function SettingsPage() {
   }
 
   function startEdit(person: TeamMember) {
+    setMemberFeedbackTone('success');
     setMemberFeedback(null);
     setEditingUserId(person.id);
     setEditDraft({
@@ -154,6 +176,7 @@ export function SettingsPage() {
   function cancelEdit() {
     setEditingUserId(null);
     setEditDraft(emptyEditUser());
+    setMemberFeedbackTone('success');
     setMemberFeedback(null);
   }
 
@@ -172,6 +195,24 @@ export function SettingsPage() {
       await updateUser.mutateAsync(editDraft);
     } catch (reason) {
       setMemberFeedback(reason instanceof Error ? reason.message : 'Data pengguna gagal diperbarui.');
+    }
+  }
+
+  async function handleDeleteUser(person: TeamMember) {
+    const confirmed = window.confirm(
+      person.id === auth.data?.profile?.id
+        ? `Hapus akun Anda sendiri (@${person.username})? Setelah dihapus Anda akan langsung keluar dari Product Launch OS.`
+        : `Hapus pengguna @${person.username}? Tindakan ini akan menghapus akun login dan akses pengguna tersebut.`,
+    );
+    if (!confirmed) return;
+
+    setMemberFeedbackTone('success');
+    setMemberFeedback(null);
+    try {
+      await deleteUser.mutateAsync(person.id);
+    } catch (reason) {
+      setMemberFeedbackTone('error');
+      setMemberFeedback(reason instanceof Error ? reason.message : 'Pengguna gagal dihapus.');
     }
   }
 
@@ -205,65 +246,38 @@ export function SettingsPage() {
       <div className="bg-gradient-to-br from-sky-50 to-sky-100/50 border border-sky-200 rounded-2xl p-4 space-y-3">
         <SectionHead
           step={1}
-          icon={<UserPlus className="w-5 h-5" />}
+          icon={<Plus className="w-5 h-5" />}
           tint="bg-white text-sky-600 shadow-2xs"
           title="Buat pengguna baru"
-          subtitle="PIN dipakai sebagai kata sandi saat masuk. Minimal 6 digit angka."
+          subtitle="Form pembuatan pengguna dibuka lewat modal agar halaman utama tetap rapi."
         />
 
-        <form onSubmit={submitUser} className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <label className="block">
-              <span className="block font-bold text-slate-700 mb-1">Nama lengkap *</span>
-              <input required placeholder="Contoh: Dodi Setiawan" className={inputClass}
-                value={draft.full_name} onChange={e => setDraft({ ...draft, full_name: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="block font-bold text-slate-700 mb-1">Username *</span>
-              <input required placeholder="dodi" className={`${inputClass} font-mono`}
-                value={draft.username} onChange={e => setDraft({ ...draft, username: e.target.value.toLowerCase() })} />
-            </label>
-            <label className="block">
-              <span className="block font-bold text-slate-700 mb-1">PIN *</span>
-              <div className="relative">
-                <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <input required inputMode="numeric" pattern="\d{6,12}" placeholder="6-12 digit angka"
-                  className={`${inputClass} pl-9 font-mono`}
-                  value={draft.pin} onChange={e => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, '') })} />
-              </div>
-            </label>
-            <label className="block">
-              <span className="block font-bold text-slate-700 mb-1">Jabatan</span>
-              <input placeholder="Product Research &amp; Costing" className={inputClass}
-                value={draft.job_title} onChange={e => setDraft({ ...draft, job_title: e.target.value })} />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className="block font-bold text-slate-700 mb-1">Role *</span>
-              <select required className={inputClass}
-                value={draft.role_code} onChange={e => setDraft({ ...draft, role_code: e.target.value })}>
-                <option value="">Pilih role</option>
-                {roles.data?.map(role => <option value={role.code} key={role.code}>{role.name}</option>)}
-              </select>
-            </label>
+        <div className="rounded-2xl border border-sky-200 bg-white/80 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-sky-700">Modal Pengguna Baru</p>
+            <p className="mt-1 text-[11px] text-slate-600">
+              Buka modal hanya saat perlu membuat akun baru, agar daftar tim dan akses pengguna lebih fokus.
+            </p>
           </div>
-
-          {createError && (
-            <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {createError}
-            </p>
-          )}
-          {createNotice && (
-            <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">
-              <CheckCircle2 className="w-4 h-4 shrink-0" /> {createNotice}
-            </p>
-          )}
-
-          <button type="submit" disabled={createUser.isPending}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#087E79] hover:bg-[#066864] text-white font-bold transition-colors shadow-2xs disabled:opacity-50">
-            {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-            {createUser.isPending ? 'Membuat…' : 'Buat pengguna'}
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(emptyUser());
+              setCreateError(null);
+              setShowCreateModal(true);
+            }}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full bg-[#087E79] hover:bg-[#066864] text-white font-bold transition-colors shadow-2xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Buka form pengguna</span>
           </button>
-        </form>
+        </div>
+
+        {createNotice && (
+          <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">
+            <CheckCircle2 className="w-4 h-4 shrink-0" /> {createNotice}
+          </p>
+        )}
       </div>
 
       {/* Langkah 2 — Daftar tim */}
@@ -273,16 +287,16 @@ export function SettingsPage() {
           icon={<Users className="w-5 h-5" />}
           tint="bg-teal-100 text-teal-600"
           title={`Daftar tim (${members.data?.length ?? 0} pengguna)`}
-          subtitle="Edit nama, jabatan, role, dan status akun tanpa menghapus riwayat kerja."
+          subtitle="Edit data login, role, hak akses, dan hapus pengguna bila memang sudah tidak dipakai."
         />
 
         {memberFeedback && (
           <p className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border font-bold ${
-            updateUser.isError
+            memberFeedbackTone === 'error'
               ? 'bg-rose-50 border-rose-200 text-rose-700'
               : 'bg-emerald-50 border-emerald-200 text-emerald-700'
           }`}>
-            {updateUser.isError ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+            {memberFeedbackTone === 'error' ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
             {memberFeedback}
           </p>
         )}
@@ -320,17 +334,15 @@ export function SettingsPage() {
                     <PencilLine className="w-3.5 h-3.5" />
                     Edit pengguna
                   </button>
-                  {person.id !== auth.data?.profile?.id && (person.is_active ? (
-                    <button type="button" disabled={deactivate.isPending} onClick={() => deactivate.mutate(person.id)}
-                      className="px-2.5 py-1 rounded-full border border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 shrink-0">
-                      Nonaktifkan
-                    </button>
-                  ) : (
-                    <button type="button" disabled={reactivate.isPending} onClick={() => reactivate.mutate(person.id)}
-                      className="px-2.5 py-1 rounded-full bg-[#087E79] text-white text-[10px] font-bold hover:bg-[#066864] disabled:opacity-50 shrink-0">
-                      Aktifkan
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    disabled={deleteUser.isPending}
+                    onClick={() => void handleDeleteUser(person)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-rose-200 bg-rose-50 text-[10px] font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {person.id === auth.data?.profile?.id ? 'Hapus akun utama' : 'Hapus pengguna'}
+                  </button>
                 </div>
 
                 {editingUserId === person.id && (
@@ -517,6 +529,123 @@ export function SettingsPage() {
           </div>
         )}
       </div>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm p-4 sm:p-6">
+          <div className="max-w-3xl mx-auto h-full flex items-center justify-center">
+            <div className="w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+              <div className="flex items-start justify-between gap-4 p-5 sm:p-6 border-b border-slate-100">
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#087E79]">Modal Pengguna Baru</p>
+                  <h2 className="mt-2 text-lg font-extrabold text-slate-900">Buat pengguna Product Launch</h2>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    Isi identitas, username, PIN, dan role untuk menambahkan akun tim baru.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setCreateError(null);
+                  }}
+                  className="inline-flex items-center justify-center w-10 h-10 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                  aria-label="Tutup modal pengguna baru"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={submitUser} className="p-5 sm:p-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="block font-bold text-slate-700 mb-1">Nama lengkap *</span>
+                    <input
+                      required
+                      placeholder="Contoh: Dodi Setiawan"
+                      className={inputClass}
+                      value={draft.full_name}
+                      onChange={e => setDraft({ ...draft, full_name: e.target.value })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block font-bold text-slate-700 mb-1">Username *</span>
+                    <input
+                      required
+                      placeholder="dodi"
+                      className={`${inputClass} font-mono`}
+                      value={draft.username}
+                      onChange={e => setDraft({ ...draft, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block font-bold text-slate-700 mb-1">PIN *</span>
+                    <div className="relative">
+                      <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        required
+                        inputMode="numeric"
+                        pattern="\d{6,12}"
+                        placeholder="6-12 digit angka"
+                        className={`${inputClass} pl-9 font-mono`}
+                        value={draft.pin}
+                        onChange={e => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, '') })}
+                      />
+                    </div>
+                  </label>
+                  <label className="block">
+                    <span className="block font-bold text-slate-700 mb-1">Jabatan</span>
+                    <input
+                      placeholder="Product Research & Costing"
+                      className={inputClass}
+                      value={draft.job_title}
+                      onChange={e => setDraft({ ...draft, job_title: e.target.value })}
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="block font-bold text-slate-700 mb-1">Role *</span>
+                    <select
+                      required
+                      className={inputClass}
+                      value={draft.role_code}
+                      onChange={e => setDraft({ ...draft, role_code: e.target.value })}
+                    >
+                      <option value="">Pilih role</option>
+                      {roles.data?.map(role => <option value={role.code} key={role.code}>{role.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                {createError && (
+                  <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold">
+                    <AlertCircle className="w-4 h-4 shrink-0" /> {createError}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="submit"
+                    disabled={createUser.isPending}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#087E79] hover:bg-[#066864] text-white font-bold transition-colors shadow-2xs disabled:opacity-50"
+                  >
+                    {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    {createUser.isPending ? 'Membuat…' : 'Buat pengguna'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setCreateError(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-slate-200 bg-white text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,6 +25,12 @@ export interface UpdateTeamUserInput {
   password?: string;
 }
 
+export interface DeleteTeamUserResult {
+  id: string;
+  deleted: boolean;
+  deleted_self?: boolean;
+}
+
 async function authorizedFetch(path: string, body: unknown) {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -62,7 +68,7 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
 }
 
 export const createTeamUser = (input: NewTeamUserInput) => authorizedFetch('/api/team-user-create', input);
-export const deactivateTeamUser = (userId: string) => authorizedFetch('/api/team-user-delete', { user_id: userId });
+export const deleteTeamUser = (userId: string) => authorizedFetch('/api/team-user-delete', { user_id: userId }) as Promise<DeleteTeamUserResult>;
 export const updateTeamUser = (input: UpdateTeamUserInput) => authorizedFetch('/api/team-user-update', input);
 
 export async function reactivateTeamUser(userId: string) {

@@ -20,19 +20,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: userData, error: userError } = await caller.auth.getUser();
   if (userError || !userData.user) return res.status(401).json({ error: 'Sesi tidak valid' });
   const { data: allowed, error: permissionError } = await caller.rpc('has_permission', { permission_code: 'launch.admin' });
-  if (permissionError || !allowed) return res.status(403).json({ error: 'Hanya owner/admin yang dapat menonaktifkan pengguna' });
+  if (permissionError || !allowed) return res.status(403).json({ error: 'Hanya owner/admin yang dapat menghapus pengguna' });
 
   const targetId = String(req.body?.user_id ?? '').trim();
   if (!targetId) return res.status(400).json({ error: 'user_id wajib diisi.' });
-  if (targetId === userData.user.id) return res.status(400).json({ error: 'Tidak dapat menonaktifkan akun sendiri.' });
 
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  // Work history stays attached to the profile, so access is revoked by
-  // deactivating rather than deleting the person.
-  const { error } = await admin.from('profiles').update({ is_active: false }).eq('id', targetId);
-  if (error) return res.status(500).json({ error: 'Gagal menonaktifkan pengguna.' });
+  const { error } = await admin.auth.admin.deleteUser(targetId);
+  if (error) return res.status(500).json({ error: error.message || 'Gagal menghapus pengguna.' });
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ id: targetId, is_active: false });
+  return res.status(200).json({ id: targetId, deleted: true, deleted_self: targetId === userData.user.id });
 }
