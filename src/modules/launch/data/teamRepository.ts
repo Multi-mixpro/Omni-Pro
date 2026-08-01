@@ -16,6 +16,13 @@ export interface NewTeamUserInput {
   role_code: string;
 }
 
+export interface UpdateTeamUserInput {
+  user_id: string;
+  full_name: string;
+  job_title?: string;
+  role_code: string;
+}
+
 async function authorizedFetch(path: string, body: unknown) {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -54,6 +61,7 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
 
 export const createTeamUser = (input: NewTeamUserInput) => authorizedFetch('/api/team-user-create', input);
 export const deactivateTeamUser = (userId: string) => authorizedFetch('/api/team-user-delete', { user_id: userId });
+export const updateTeamUser = (input: UpdateTeamUserInput) => authorizedFetch('/api/team-user-update', input);
 
 export async function reactivateTeamUser(userId: string) {
   const { error } = await supabase.from('profiles').update({ is_active: true }).eq('id', userId);

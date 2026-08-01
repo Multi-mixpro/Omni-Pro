@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
-    "typecheck:api": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --skipLibCheck api/cloudinary-sign.ts api/cloudinary-delete.ts api/team-user-create.ts api/team-user-delete.ts",
+    "typecheck:api": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --skipLibCheck api/cloudinary-sign.ts api/cloudinary-delete.ts api/team-user-create.ts api/team-user-delete.ts api/team-user-update.ts",
     "build": "tsc -b && npm run typecheck:api && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

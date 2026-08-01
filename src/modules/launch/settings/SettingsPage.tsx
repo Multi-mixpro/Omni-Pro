@@ -1,16 +1,33 @@
-import { FormEvent, useState } from 'react';
+import { type ReactNode, FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertCircle, CheckCircle2, KeyRound, Rocket, ShieldCheck, UserPlus, Users, Loader2,
+  AlertCircle,
+  CheckCircle2,
+  KeyRound,
+  Loader2,
+  PencilLine,
+  Rocket,
+  Save,
+  ShieldCheck,
+  UserPlus,
+  Users,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/core/auth/useAuth';
 import {
   createTeamUser, deactivateTeamUser, listProjectAccess, listRoles, listTeamMembers,
-  reactivateTeamUser, setMemberCanLaunch, setProjectMember, type NewTeamUserInput,
+  reactivateTeamUser,
+  setMemberCanLaunch,
+  setProjectMember,
+  updateTeamUser,
+  type NewTeamUserInput,
+  type TeamMember,
+  type UpdateTeamUserInput,
 } from '../data/teamRepository';
 import { useProjects } from '../hooks/useLaunch';
 
 const emptyUser = (): NewTeamUserInput => ({ username: '', pin: '', full_name: '', job_title: '', role_code: '' });
+const emptyEditUser = (): UpdateTeamUserInput => ({ user_id: '', full_name: '', job_title: '', role_code: '' });
 
 const inputClass =
   'w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-[#087E79] focus:outline-none focus:ring-4 focus:ring-[#087E79]/10 transition-all';
@@ -20,7 +37,7 @@ function SectionHead({
   step, icon, tint, title, subtitle,
 }: {
   step: number;
-  icon: React.ReactNode;
+  icon: ReactNode;
   tint: string;
   title: string;
   subtitle: string;
@@ -51,8 +68,11 @@ export function SettingsPage() {
   const projects = useProjects();
 
   const [draft, setDraft] = useState<NewTeamUserInput>(emptyUser());
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<UpdateTeamUserInput>(emptyEditUser());
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createNotice, setCreateNotice] = useState<string | null>(null);
+  const [memberFeedback, setMemberFeedback] = useState<string | null>(null);
   const [projectId, setProjectId] = useState('');
 
   const access = useQuery({
@@ -66,10 +86,26 @@ export function SettingsPage() {
 
   const createUser = useMutation({
     mutationFn: createTeamUser,
-    onSuccess: () => { setDraft(emptyUser()); setNotice('Pengguna baru berhasil dibuat.'); void refreshTeam(); },
+    onSuccess: () => {
+      setDraft(emptyUser());
+      setCreateNotice('Pengguna baru berhasil dibuat.');
+      void refreshTeam();
+    },
   });
   const deactivate = useMutation({ mutationFn: deactivateTeamUser, onSuccess: refreshTeam });
   const reactivate = useMutation({ mutationFn: reactivateTeamUser, onSuccess: refreshTeam });
+  const updateUser = useMutation({
+    mutationFn: updateTeamUser,
+    onSuccess: async () => {
+      setMemberFeedback('Data pengguna berhasil diperbarui.');
+      setEditingUserId(null);
+      setEditDraft(emptyEditUser());
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['launch-team'] }),
+        client.invalidateQueries({ queryKey: ['product-launch-auth'] }),
+      ]);
+    },
+  });
   const toggleMember = useMutation({
     mutationFn: ({ userId, enabled }: { userId: string; enabled: boolean }) => setProjectMember(projectId, userId, enabled),
     onSuccess: refreshAccess,
@@ -95,11 +131,39 @@ export function SettingsPage() {
     );
   }
 
+  function startEdit(person: TeamMember) {
+    setMemberFeedback(null);
+    setEditingUserId(person.id);
+    setEditDraft({
+      user_id: person.id,
+      full_name: person.full_name,
+      job_title: person.job_title ?? '',
+      role_code: person.role_code ?? '',
+    });
+  }
+
+  function cancelEdit() {
+    setEditingUserId(null);
+    setEditDraft(emptyEditUser());
+    setMemberFeedback(null);
+  }
+
   async function submitUser(event: FormEvent) {
     event.preventDefault();
-    setError(null); setNotice(null);
+    setCreateError(null);
+    setCreateNotice(null);
     try { await createUser.mutateAsync(draft); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Pengguna gagal dibuat.'); }
+    catch (reason) { setCreateError(reason instanceof Error ? reason.message : 'Pengguna gagal dibuat.'); }
+  }
+
+  async function submitEdit(event: FormEvent) {
+    event.preventDefault();
+    setMemberFeedback(null);
+    try {
+      await updateUser.mutateAsync(editDraft);
+    } catch (reason) {
+      setMemberFeedback(reason instanceof Error ? reason.message : 'Data pengguna gagal diperbarui.');
+    }
   }
 
   const accessRows = access.data ?? [];
@@ -174,14 +238,14 @@ export function SettingsPage() {
             </label>
           </div>
 
-          {error && (
+          {createError && (
             <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+              <AlertCircle className="w-4 h-4 shrink-0" /> {createError}
             </p>
           )}
-          {notice && (
+          {createNotice && (
             <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">
-              <CheckCircle2 className="w-4 h-4 shrink-0" /> {notice}
+              <CheckCircle2 className="w-4 h-4 shrink-0" /> {createNotice}
             </p>
           )}
 
@@ -200,8 +264,19 @@ export function SettingsPage() {
           icon={<Users className="w-5 h-5" />}
           tint="bg-teal-100 text-teal-600"
           title={`Daftar tim (${members.data?.length ?? 0} pengguna)`}
-          subtitle="Nonaktifkan akun yang sudah tidak bekerja tanpa menghapus riwayatnya."
+          subtitle="Edit nama, jabatan, role, dan status akun tanpa menghapus riwayat kerja."
         />
+
+        {memberFeedback && (
+          <p className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border font-bold ${
+            updateUser.isError
+              ? 'bg-rose-50 border-rose-200 text-rose-700'
+              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          }`}>
+            {updateUser.isError ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+            {memberFeedback}
+          </p>
+        )}
 
         {members.isLoading ? (
           <p className="text-slate-400 italic py-4 text-center">Memuat daftar tim…</p>
@@ -209,32 +284,122 @@ export function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {members.data.map(person => (
               <div key={person.id}
-                className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                <span className="w-9 h-9 rounded-full bg-slate-900 text-white font-mono font-bold text-[11px] grid place-items-center shrink-0">
-                  {person.username.slice(0, 2).toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <b className="block font-extrabold text-slate-900 truncate">{person.full_name}</b>
-                  <small className="text-[10px] text-slate-500 truncate block">
-                    @{person.username} · {person.role_name ?? 'Tanpa role'}{person.job_title ? ` · ${person.job_title}` : ''}
-                  </small>
+                className="rounded-xl bg-white border border-slate-200 shadow-2xs p-3 space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-9 h-9 rounded-full bg-slate-900 text-white font-mono font-bold text-[11px] grid place-items-center shrink-0">
+                    {person.username.slice(0, 2).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <b className="block font-extrabold text-slate-900 truncate">{person.full_name}</b>
+                    <small className="text-[10px] text-slate-500 truncate block">
+                      @{person.username} · {person.role_name ?? 'Tanpa role'}{person.job_title ? ` · ${person.job_title}` : ''}
+                    </small>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
+                    person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {person.is_active ? 'Aktif' : 'Nonaktif'}
+                  </span>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
-                  person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {person.is_active ? 'Aktif' : 'Nonaktif'}
-                </span>
-                {person.id !== auth.data?.profile?.id && (person.is_active ? (
-                  <button type="button" disabled={deactivate.isPending} onClick={() => deactivate.mutate(person.id)}
-                    className="px-2.5 py-1 rounded-full border border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 shrink-0">
-                    Nonaktifkan
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(person)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    <PencilLine className="w-3.5 h-3.5" />
+                    Edit pengguna
                   </button>
-                ) : (
-                  <button type="button" disabled={reactivate.isPending} onClick={() => reactivate.mutate(person.id)}
-                    className="px-2.5 py-1 rounded-full bg-[#087E79] text-white text-[10px] font-bold hover:bg-[#066864] disabled:opacity-50 shrink-0">
-                    Aktifkan
-                  </button>
-                ))}
+                  {person.id !== auth.data?.profile?.id && (person.is_active ? (
+                    <button type="button" disabled={deactivate.isPending} onClick={() => deactivate.mutate(person.id)}
+                      className="px-2.5 py-1 rounded-full border border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 shrink-0">
+                      Nonaktifkan
+                    </button>
+                  ) : (
+                    <button type="button" disabled={reactivate.isPending} onClick={() => reactivate.mutate(person.id)}
+                      className="px-2.5 py-1 rounded-full bg-[#087E79] text-white text-[10px] font-bold hover:bg-[#066864] disabled:opacity-50 shrink-0">
+                      Aktifkan
+                    </button>
+                  ))}
+                </div>
+
+                {editingUserId === person.id && (
+                  <form onSubmit={submitEdit} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">Edit Pengguna</p>
+                        <p className="text-[11px] text-slate-600 mt-1">
+                          Username <span className="font-mono font-bold">@{person.username}</span> tetap dipakai untuk login internal.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100"
+                        aria-label="Tutup edit pengguna"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2.5">
+                      <label className="block">
+                        <span className="block font-bold text-slate-700 mb-1">Nama lengkap *</span>
+                        <input
+                          required
+                          className={inputClass}
+                          value={editDraft.full_name}
+                          onChange={e => setEditDraft(current => ({ ...current, full_name: e.target.value }))}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block font-bold text-slate-700 mb-1">Jabatan</span>
+                        <input
+                          className={inputClass}
+                          value={editDraft.job_title ?? ''}
+                          onChange={e => setEditDraft(current => ({ ...current, job_title: e.target.value }))}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block font-bold text-slate-700 mb-1">Role *</span>
+                        <select
+                          required
+                          className={inputClass}
+                          value={editDraft.role_code}
+                          onChange={e => setEditDraft(current => ({ ...current, role_code: e.target.value }))}
+                          disabled={person.id === auth.data?.profile?.id}
+                        >
+                          <option value="">Pilih role</option>
+                          {roles.data?.map(role => <option value={role.code} key={role.code}>{role.name}</option>)}
+                        </select>
+                        {person.id === auth.data?.profile?.id && (
+                          <p className="mt-1 text-[10px] text-amber-700">
+                            Role akun Anda dikunci di form ini untuk mencegah kehilangan akses admin.
+                          </p>
+                        )}
+                      </label>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="submit"
+                        disabled={updateUser.isPending}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#087E79] text-white text-[11px] font-bold hover:bg-[#066864] disabled:opacity-50"
+                      >
+                        {updateUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        {updateUser.isPending ? 'Menyimpan…' : 'Simpan perubahan'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200 bg-white text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             ))}
           </div>
@@ -254,7 +419,7 @@ export function SettingsPage() {
           icon={<Rocket className="w-5 h-5" />}
           tint="bg-white text-amber-600 shadow-2xs"
           title="Hak akses per artikel"
-          subtitle="Pilih artikel, tentukan anggota yang terlibat, lalu aktifkan izin rilis untuk yang berwenang."
+          subtitle="Pilih artikel, tentukan anggota yang terlibat, lalu aktifkan izin rilis untuk pengguna yang berwenang."
         />
 
         <label className="block max-w-md">
