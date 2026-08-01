@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Save,
   Pencil,
+  Link as LinkIcon,
+  ExternalLink,
 } from 'lucide-react';
 import { Article } from '../../types';
 import { formatIDR } from '../../utils/calculations';
@@ -167,25 +169,76 @@ export const ArticleBriefView: React.FC<ArticleBriefViewProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {article.galleryImages.map((imgUrl, idx) => (
-                <a
-                  key={idx}
-                  href={imgUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  title="Buka foto ukuran penuh"
-                  className="block"
-                >
-                  <ProductImage
-                    src={imgUrl}
-                    alt={`Referensi ${idx + 1}`}
-                    fit="contain"
-                    displayWidth={320}
-                    className="aspect-square rounded-xl border border-slate-200 bg-slate-50 hover:border-[#087E79] transition-colors"
-                  />
-                </a>
-              ))}
+            {article.galleryImages.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {article.galleryImages.map((imgUrl, idx) => (
+                  <a
+                    key={idx}
+                    href={imgUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    title="Buka foto ukuran penuh"
+                    className="block"
+                  >
+                    <ProductImage
+                      src={imgUrl}
+                      alt={`Referensi ${idx + 1}`}
+                      fit="contain"
+                      displayWidth={320}
+                      className="aspect-square rounded-xl border border-slate-200 bg-slate-50 hover:border-[#087E79] transition-colors"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic py-2">
+                Belum ada foto. Tambahkan lewat tombol Edit Data Artikel.
+              </p>
+            )}
+
+            {/* Tautan referensi brief (Pinterest, kompetitor, moodboard) */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex items-center gap-2">
+                <LinkIcon className="w-3.5 h-3.5 text-violet-600" />
+                <h4 className="font-extrabold text-xs text-slate-900">
+                  Link Referensi Brief
+                </h4>
+                <span className="px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-extrabold">
+                  {article.references?.length || 0}
+                </span>
+              </div>
+
+              {(article.references || []).length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {(article.references || []).map((ref) => (
+                    <a
+                      key={ref.id}
+                      href={ref.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={ref.url}
+                      className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200 hover:border-violet-400 transition-colors shadow-2xs"
+                    >
+                      <span className="w-8 h-8 rounded-lg bg-violet-50 border border-violet-100 grid place-items-center shrink-0">
+                        <LinkIcon className="w-3.5 h-3.5 text-violet-500" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-bold text-xs text-slate-900 truncate">
+                          {ref.title}
+                        </span>
+                        <span className="block text-[10px] text-violet-700 truncate">
+                          {ref.url}
+                        </span>
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic">
+                  Belum ada link referensi. Tambahkan lewat tombol Edit Data Artikel.
+                </p>
+              )}
             </div>
           </div>
         </div>
