@@ -27,7 +27,14 @@ import {
 import { useProjects } from '../hooks/useLaunch';
 
 const emptyUser = (): NewTeamUserInput => ({ username: '', pin: '', full_name: '', job_title: '', role_code: '' });
-const emptyEditUser = (): UpdateTeamUserInput => ({ user_id: '', full_name: '', job_title: '', role_code: '' });
+const emptyEditUser = (): UpdateTeamUserInput => ({
+  user_id: '',
+  username: '',
+  full_name: '',
+  job_title: '',
+  role_code: '',
+  password: '',
+});
 
 const inputClass =
   'w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-[#087E79] focus:outline-none focus:ring-4 focus:ring-[#087E79]/10 transition-all';
@@ -136,9 +143,11 @@ export function SettingsPage() {
     setEditingUserId(person.id);
     setEditDraft({
       user_id: person.id,
+      username: person.username,
       full_name: person.full_name,
       job_title: person.job_title ?? '',
       role_code: person.role_code ?? '',
+      password: '',
     });
   }
 
@@ -330,7 +339,7 @@ export function SettingsPage() {
                       <div>
                         <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">Edit Pengguna</p>
                         <p className="text-[11px] text-slate-600 mt-1">
-                          Username <span className="font-mono font-bold">@{person.username}</span> tetap dipakai untuk login internal.
+                          Anda bisa ubah username login internal dan set password baru bila diperlukan.
                         </p>
                       </div>
                       <button
@@ -344,6 +353,21 @@ export function SettingsPage() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-2.5">
+                      <label className="block">
+                        <span className="block font-bold text-slate-700 mb-1">Username *</span>
+                        <input
+                          required
+                          className={`${inputClass} font-mono`}
+                          value={editDraft.username}
+                          onChange={e => setEditDraft(current => ({
+                            ...current,
+                            username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''),
+                          }))}
+                        />
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          Dipakai untuk login internal. Hanya huruf kecil, angka, titik, garis bawah, atau strip.
+                        </p>
+                      </label>
                       <label className="block">
                         <span className="block font-bold text-slate-700 mb-1">Nama lengkap *</span>
                         <input
@@ -360,6 +384,19 @@ export function SettingsPage() {
                           value={editDraft.job_title ?? ''}
                           onChange={e => setEditDraft(current => ({ ...current, job_title: e.target.value }))}
                         />
+                      </label>
+                      <label className="block">
+                        <span className="block font-bold text-slate-700 mb-1">Password / PIN baru</span>
+                        <input
+                          type="password"
+                          className={`${inputClass} font-mono`}
+                          value={editDraft.password ?? ''}
+                          onChange={e => setEditDraft(current => ({ ...current, password: e.target.value }))}
+                          placeholder="Kosongkan jika tidak ingin mengganti"
+                        />
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          Opsional. Isi hanya jika ingin mengganti password login pengguna.
+                        </p>
                       </label>
                       <label className="block">
                         <span className="block font-bold text-slate-700 mb-1">Role *</span>

@@ -18,9 +18,11 @@ export interface NewTeamUserInput {
 
 export interface UpdateTeamUserInput {
   user_id: string;
+  username: string;
   full_name: string;
   job_title?: string;
   role_code: string;
+  password?: string;
 }
 
 async function authorizedFetch(path: string, body: unknown) {
