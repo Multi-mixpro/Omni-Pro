@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
@@ -43,8 +43,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const timestamp = Math.round(Date.now() / 1000);
   const folder = `gg-indo-apparel/product-launch/${projectId}/${kind}`;
   const allowedFormats = 'docx,jpeg,jpg,pdf,png,webp,xlsx';
+  // Cloudinary mensyaratkan SHA-1 dari (parameter terurut + api_secret) yang
+  // DIGABUNG, bukan HMAC. Memakai HMAC menghasilkan tanda tangan berbeda dan
+  // ditolak upload dengan 401. Formatnya sama seperti di cloudinary-delete.ts.
   const paramsToSign = `allowed_formats=${allowedFormats}&folder=${folder}&timestamp=${timestamp}`;
-  const signature = createHmac('sha256', apiSecret).update(paramsToSign).digest('hex');
+  const signature = createHash('sha1').update(`${paramsToSign}${apiSecret}`).digest('hex');
   res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({
     signature,

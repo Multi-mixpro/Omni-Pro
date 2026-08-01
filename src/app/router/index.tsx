@@ -66,13 +66,18 @@ function ProtectedSettingsPage() {
   }
 
   return (
-    <div className="settings-standalone">
-      <div className="page-container">
-        <a href="/launch/app/today" className="settings-back-link">
-          ← Kembali ke Product Launch OS
-        </a>
+    <div className="paten-shell min-h-screen text-slate-900 font-sans antialiased">
+      <main className="py-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <a
+            href="/launch/app/today"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-600 hover:text-slate-900 hover:border-slate-300 shadow-2xs transition-colors"
+          >
+            ← Kembali ke Product Launch OS
+          </a>
+        </div>
         <SettingsPage />
-      </div>
+      </main>
     </div>
   );
 }
