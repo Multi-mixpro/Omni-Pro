@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Article, SampleIteration, SampleFinding } from '../../../types';
 import { uploadArticleMedia } from '../../../services/media';
+import { optimizedImageUrl } from '../../../utils/cloudinary';
 
 interface SamplingPanelProps {
   article: Article;
@@ -267,7 +268,7 @@ export const SamplingPanel: React.FC<SamplingPanelProps> = ({
                 {fnd.photoUrl && (
                   <a href={fnd.photoUrl} target="_blank" rel="noreferrer" className="block pt-1">
                     <img
-                      src={fnd.photoUrl}
+                      src={optimizedImageUrl(fnd.photoUrl, 200)}
                       alt={`Bukti temuan ${fnd.location}`}
                       className="h-28 w-full rounded-lg border border-slate-200 object-cover"
                     />

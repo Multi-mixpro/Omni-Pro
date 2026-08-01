@@ -27,6 +27,7 @@ import { ReportsView } from './components/reports/ReportsView';
 
 import { StorageService } from './services/storage';
 import { uploadArticleMedia } from './services/media';
+import { compressImageForUpload } from './utils/cloudinary';
 import { deriveArticleIndicators } from './utils/calculations';
 import { useLocation, useNavigate } from '../../src/app/router/simpleRouter';
 import {
@@ -739,7 +740,10 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
           onUploadPhoto={
             editingArticleId
               ? async (file) => {
-                  const uploaded = await uploadArticleMedia(editingArticleId, file, 'REFERENCE');
+                  // Perkecil di browser dulu: menghemat kuota bandwidth unggah
+                  // sekaligus storage Cloudinary, tanpa mengubah alur upload.
+                  const optimized = await compressImageForUpload(file);
+                  const uploaded = await uploadArticleMedia(editingArticleId, optimized, 'REFERENCE');
                   return uploaded.url;
                 }
               : undefined

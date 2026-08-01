@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Target, Users, CheckCircle, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
 import { Article } from '../../../types';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
+import { optimizedImageUrl } from '../../../utils/cloudinary';
 
 interface BriefPanelProps {
   article: Article;
@@ -113,7 +114,7 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ article, onUpdateArticle
                 {isImage ? (
                   <a href={ref.url} target="_blank" rel="noreferrer" className="shrink-0">
                     <img
-                      src={ref.url}
+                      src={optimizedImageUrl(ref.url, 96)}
                       alt={ref.title}
                       loading="lazy"
                       className="w-11 h-11 rounded-lg object-cover border border-slate-200"

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Article, BusinessUnit, CategoryType, MaterialMaster } from '../../types';
 import { formatIDR } from '../../utils/calculations';
+import { optimizedImageUrl } from '../../utils/cloudinary';
 
 interface QuickCreateModalProps {
   isOpen?: boolean;
@@ -735,7 +736,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                       }`}
                     >
                       <div className="aspect-square relative overflow-hidden bg-slate-100">
-                        <img src={photo.url} alt={photo.label} className="w-full h-full object-cover" />
+                        <img src={optimizedImageUrl(photo.url, 200)} alt={photo.label} className="w-full h-full object-cover" />
 
                         {/* Primary Badge */}
                         {photo.isPrimary && (

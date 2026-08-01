@@ -15,6 +15,7 @@ import { Article, ArticleStage, BusinessUnit } from '../../types';
 import { formatIDR } from '../../utils/calculations';
 import { stageBadgeClass, stageDotClass } from '../../utils/stageStyles';
 import { ConfirmDeleteButton } from '../shared/ConfirmDeleteButton';
+import { optimizedImageUrl } from '../../utils/cloudinary';
 
 interface ArticlePipelineViewProps {
   articles: Article[];
@@ -240,7 +241,7 @@ export const ArticlePipelineView: React.FC<ArticlePipelineViewProps> = ({
                 {/* Header Row & Image */}
                 <div className="flex items-start gap-3">
                   <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
-                    <img src={art.mainImage} alt={art.name} className="w-full h-full object-cover" />
+                    <img src={optimizedImageUrl(art.mainImage, 400)} alt={art.name} className="w-full h-full object-cover" />
                     {art.blockerCount > 0 && (
                       <div className="absolute top-0.5 right-0.5 bg-rose-600 text-white text-[8px] font-bold px-1 rounded flex items-center">
                         !
@@ -381,7 +382,7 @@ export const ArticlePipelineView: React.FC<ArticlePipelineViewProps> = ({
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={art.mainImage}
+                          src={optimizedImageUrl(art.mainImage, 40)}
                           alt={art.name}
                           className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
                         />
@@ -485,7 +486,7 @@ export const ArticlePipelineView: React.FC<ArticlePipelineViewProps> = ({
                     >
                       <div className="flex items-center gap-2">
                         <img
-                          src={art.mainImage}
+                          src={optimizedImageUrl(art.mainImage, 40)}
                           alt={art.name}
                           className="w-9 h-9 rounded-lg object-cover border border-slate-200"
                         />

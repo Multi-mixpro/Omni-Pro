@@ -16,6 +16,7 @@ import {
 import { Article, ApprovalGate, DecisionRequest, BlockerItem, BusinessUnit } from '../../types';
 import { formatIDR } from '../../utils/calculations';
 import { stageBadgeClass } from '../../utils/stageStyles';
+import { optimizedImageUrl } from '../../utils/cloudinary';
 
 interface DashboardViewProps {
   articles: Article[];
@@ -279,7 +280,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="p-3 space-y-2">
                 <div className="flex items-start gap-2.5">
                   <img
-                    src={art.mainImage}
+                    src={optimizedImageUrl(art.mainImage, 56)}
                     alt={art.name}
                     className="w-14 h-14 rounded-lg object-cover border border-slate-200 shrink-0"
                   />

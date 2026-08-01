@@ -19,6 +19,7 @@ import {
 } from '../../../services/media';
 import { addArticleComment } from '../../../services/collaboration';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
+import { compressImageForUpload } from '../../../utils/cloudinary';
 
 interface FilesPanelProps {
   article: Article;
@@ -80,8 +81,10 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
     try {
       const uploaded: ArticleFile[] = [];
       for (const file of selected) {
+        // Gambar diperkecil dulu; PDF/XLSX/DOCX dilewatkan apa adanya.
+        const payload = await compressImageForUpload(file);
         uploaded.push(
-          await uploadArticleMedia(article.id, file, kindFor(file)),
+          await uploadArticleMedia(article.id, payload, kindFor(file)),
         );
       }
       onUpdateArticle({

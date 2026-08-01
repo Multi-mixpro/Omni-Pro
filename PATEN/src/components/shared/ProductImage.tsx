@@ -9,6 +9,7 @@
 
 import React, { useState } from 'react';
 import { AlertTriangle, ImageOff } from 'lucide-react';
+import { optimizedImageUrl } from '../../utils/cloudinary';
 
 interface ProductImageProps {
   src?: string | null;
@@ -49,9 +50,10 @@ export const ProductImage: React.FC<ProductImageProps> = ({
   return (
     <div className={`relative overflow-hidden ${className}`}>
       <img
-        src={src}
+        src={optimizedImageUrl(src, displayWidth)}
         alt={alt}
         loading="lazy"
+        decoding="async"
         onLoad={(e) => setNaturalWidth(e.currentTarget.naturalWidth)}
         onError={() => setFailed(true)}
         className={`w-full h-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}

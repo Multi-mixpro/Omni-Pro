@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Package, Building2, ArrowRight } from 'lucide-react';
 import { Article, MaterialMaster, Supplier, TaskItem } from '../../types';
+import { optimizedImageUrl } from '../../utils/cloudinary';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -116,7 +117,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                   >
                     <div className="flex items-center gap-3">
                       <img
-                        src={art.mainImage}
+                        src={optimizedImageUrl(art.mainImage, 32)}
                         alt={art.name}
                         className="w-8 h-8 rounded-lg object-cover border"
                       />

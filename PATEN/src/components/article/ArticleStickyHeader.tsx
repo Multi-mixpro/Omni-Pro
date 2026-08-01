@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Article } from '../../types';
+import { optimizedImageUrl } from '../../utils/cloudinary';
 
 interface ArticleStickyHeaderProps {
   article: Article;
@@ -42,7 +43,7 @@ export const ArticleStickyHeader: React.FC<ArticleStickyHeaderProps> = ({
           </button>
 
           <img
-            src={article.mainImage}
+            src={optimizedImageUrl(article.mainImage, 32)}
             alt={article.name}
             className="w-8 h-8 rounded-lg object-cover border border-slate-200"
           />
