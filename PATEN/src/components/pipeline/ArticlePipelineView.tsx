@@ -9,6 +9,7 @@ import {
   Kanban as KanbanIcon,
   Search,
   Pencil,
+  Plus,
 } from 'lucide-react';
 import { Article, ArticleStage, BusinessUnit } from '../../types';
 import { formatIDR } from '../../utils/calculations';
@@ -21,6 +22,8 @@ interface ArticlePipelineViewProps {
   onOpenArticle: (articleId: string, initialTab?: 'brief' | 'detail' | 'workspace') => void;
   onDeleteArticle?: (articleId: string) => void;
   onEditArticle?: (articleId: string) => void;
+  onOpenQuickCreate?: () => void;
+  canCreate?: boolean;
 }
 
 export const ArticlePipelineView: React.FC<ArticlePipelineViewProps> = ({
@@ -29,6 +32,8 @@ export const ArticlePipelineView: React.FC<ArticlePipelineViewProps> = ({
   onOpenArticle,
   onDeleteArticle,
   onEditArticle,
+  onOpenQuickCreate,
+  canCreate = false,
 }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,6 +129,15 @@ export const ArticlePipelineView: React.FC<ArticlePipelineViewProps> = ({
             </button>
           </div>
 
+          {canCreate && onOpenQuickCreate && (
+            <button
+              onClick={onOpenQuickCreate}
+              className="paten-primary-action flex items-center gap-1.5 px-4 py-2 text-white text-xs font-bold transition-all shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Tambah Artikel</span>
+            </button>
+          )}
         </div>
       </div>
 

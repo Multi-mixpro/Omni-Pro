@@ -494,6 +494,13 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     setShowQuickCreateModal(true);
   };
 
+  // Selalu bersihkan target edit, agar "Tambah Artikel" tidak membuka modal
+  // dalam mode edit setelah sebelumnya dipakai untuk mengubah artikel.
+  const handleOpenQuickCreate = () => {
+    setEditingArticleId(null);
+    setShowQuickCreateModal(true);
+  };
+
   const pendingApprovals = approvals.filter((a) => a.status === 'Pending');
   const pendingApprovalsCount = pendingApprovals.length;
   const blockedTasksCount = blockers.length;
@@ -528,7 +535,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
       <Navbar
         activeBusinessUnit={selectedUnit}
         onSelectBusinessUnit={setSelectedUnit}
-        onOpenQuickCreate={() => setShowQuickCreateModal(true)}
+        onOpenQuickCreate={handleOpenQuickCreate}
         pendingApprovals={pendingApprovals}
         onOpenGlobalSearch={() => setShowGlobalSearchModal(true)}
         onSelectTab={(tab) => selectTab(tab as PatenTab)}
@@ -575,6 +582,8 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
                 selectTab(initialTab || 'workspace', artId);
               }}
               onSelectTab={(tab) => selectTab(tab as PatenTab)}
+              onOpenQuickCreate={handleOpenQuickCreate}
+              canCreate={canCreate}
             />
           )}
 
@@ -587,6 +596,8 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
               }}
               onDeleteArticle={canEdit ? handleDeleteArticle : undefined}
               onEditArticle={canEdit ? openArticleEditor : undefined}
+              onOpenQuickCreate={handleOpenQuickCreate}
+              canCreate={canCreate}
             />
           )}
 
@@ -700,7 +711,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
         <BottomNav
           activeTab={activeTab}
           onSelectTab={(tab) => selectTab(tab as PatenTab)}
-          onOpenQuickCreate={() => setShowQuickCreateModal(true)}
+          onOpenQuickCreate={handleOpenQuickCreate}
           pendingApprovalsCount={pendingApprovalsCount}
           activeBusinessUnit={selectedUnit}
           onSelectBusinessUnit={setSelectedUnit}

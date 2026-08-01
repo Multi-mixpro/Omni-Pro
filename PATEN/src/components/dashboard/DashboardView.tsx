@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ShieldAlert,
   ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 import { Article, ApprovalGate, DecisionRequest, BlockerItem, BusinessUnit } from '../../types';
 import { formatIDR } from '../../utils/calculations';
@@ -24,6 +25,8 @@ interface DashboardViewProps {
   activeBusinessUnit: BusinessUnit;
   onOpenArticle: (articleId: string, initialTab?: 'brief' | 'detail' | 'workspace') => void;
   onSelectTab: (tab: string) => void;
+  onOpenQuickCreate?: () => void;
+  canCreate?: boolean;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -34,6 +37,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   activeBusinessUnit = 'Mainline Studio',
   onOpenArticle,
   onSelectTab,
+  onOpenQuickCreate,
+  canCreate = false,
 }) => {
   // Filter articles by active business unit
   const filteredArticles = (articles || []).filter(
@@ -61,7 +66,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-4 pb-10">
       {/* Greeting Header Banner */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
             <span className="px-2 py-0.5 rounded-md bg-[#087E79]/10 text-[#087E79] font-mono">
@@ -76,6 +81,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {activeCount} artikel aktif berjalan. {safeApprovals.length} approval dan {safeBlockers.length} blocker pending.
           </p>
         </div>
+
+        {canCreate && onOpenQuickCreate && (
+          <button
+            onClick={onOpenQuickCreate}
+            className="paten-primary-action px-4 py-2 text-white font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Tambah Artikel</span>
+          </button>
+        )}
       </div>
 
       {/* Action Required Priority Queue */}
