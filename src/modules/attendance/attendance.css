@@ -1,0 +1,256 @@
+/**
+ * Central Attendance — Design Tokens & Component Kit
+ *
+ * Warna mengikuti DESIGN_CENTRAL_ATTENDANCE_PERFORMANCE.md bagian 4 (Design tokens).
+ * Bentuk/komposisi (kartu membulat, stat chip dengan badge delta, hierarki mobile
+ * yang lapang) mengikuti gaya referensi UI yang dilampirkan.
+ *
+ * Unit theming: hanya --att-primary yang berubah per unit; token semantik
+ * success/warning/danger tetap sama agar arti status tidak bergeser antar unit.
+ */
+
+.att-app {
+  /* Netral portal */
+  --att-canvas: #f6f7f9;
+  --att-surface: #ffffff;
+  --att-text: #18212f;
+  --att-text-2: #667085;
+  --att-border: #e4e7ec;
+  --att-chip: #eef1f4;
+
+  /* Aksen unit — default Bakso Ujo */
+  --att-primary: #e96a12;
+  --att-primary-hover: #c95408;
+
+  /* Semantik */
+  --att-success: #16865b;
+  --att-warning: #d8890b;
+  --att-danger: #d53f3f;
+  --att-info: #3178c6;
+
+  /* Radius sesuai dokumen */
+  --att-r-control: 10px;
+  --att-r-card: 14px;
+  --att-r-modal: 18px;
+
+  min-height: 100vh;
+  background: var(--att-canvas);
+  color: var(--att-text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Aksen per unit bisnis */
+.att-app[data-unit='gg-supply'] { --att-primary: #3178c6; --att-primary-hover: #245a97; }
+.att-app[data-unit='gudskuy']   { --att-primary: #16865b; --att-primary-hover: #0f6544; }
+
+/* ---------- Layout ---------- */
+
+.att-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 16px 96px;
+}
+
+.att-shell-wide {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 20px 64px;
+}
+
+/* ---------- Kartu ---------- */
+
+.att-card {
+  padding: 16px;
+  border: 1px solid var(--att-border);
+  border-radius: var(--att-r-card);
+  background: var(--att-surface);
+}
+
+/* Kartu hero: dipakai untuk ringkasan utama layar Today */
+.att-card-hero {
+  padding: 20px;
+  border: 0;
+  border-radius: var(--att-r-card);
+  color: #fff;
+  background: linear-gradient(135deg, var(--att-primary), var(--att-primary-hover));
+}
+
+/* ---------- Tipografi ---------- */
+
+.att-h1 { font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.att-h2 { font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.015em; margin: 0; }
+.att-h3 { font-size: 18px; line-height: 26px; font-weight: 600; margin: 0; }
+.att-body { font-size: 15px; line-height: 22px; }
+.att-small { font-size: 13px; line-height: 18px; color: var(--att-text-2); }
+.att-label {
+  font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--att-text-2);
+}
+.att-metric { font-size: 28px; line-height: 32px; font-weight: 700; letter-spacing: -0.02em; }
+
+/* ---------- Tombol ---------- */
+
+.att-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--att-r-control);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .16s ease, opacity .16s ease;
+}
+.att-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.att-btn-primary { color: #fff; background: var(--att-primary); }
+.att-btn-primary:hover:not(:disabled) { background: var(--att-primary-hover); }
+
+.att-btn-secondary {
+  color: var(--att-text);
+  background: var(--att-surface);
+  border: 1px solid var(--att-border);
+}
+.att-btn-secondary:hover:not(:disabled) { background: var(--att-chip); }
+
+/* Tombol aksi utama absen — target sentuh besar, satu aksi jelas per layar */
+.att-btn-action {
+  width: 100%;
+  min-height: 56px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ---------- Chip status ---------- */
+
+.att-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--att-chip);
+  color: var(--att-text-2);
+}
+.att-chip-success { background: rgba(22, 134, 91, .12); color: var(--att-success); }
+.att-chip-warning { background: rgba(216, 137, 11, .14); color: var(--att-warning); }
+.att-chip-danger  { background: rgba(213, 63, 63, .12);  color: var(--att-danger); }
+.att-chip-info    { background: rgba(49, 120, 198, .12); color: var(--att-info); }
+
+/* ---------- Stat (pola referensi: nilai besar + badge delta) ---------- */
+
+.att-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 768px) {
+  .att-stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.att-stat {
+  padding: 14px;
+  border: 1px solid var(--att-border);
+  border-radius: var(--att-r-card);
+  background: var(--att-surface);
+}
+.att-stat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.att-stat-value { font-size: 24px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.att-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.att-delta-up   { background: rgba(22, 134, 91, .12); color: var(--att-success); }
+.att-delta-down { background: rgba(213, 63, 63, .12);  color: var(--att-danger); }
+
+/* ---------- Baris daftar ---------- */
+
+.att-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--att-border);
+}
+.att-row:last-child { border-bottom: 0; }
+
+/* ---------- Input ---------- */
+
+.att-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--att-border);
+  border-radius: var(--att-r-control);
+  background: var(--att-surface);
+  color: var(--att-text);
+  font-size: 15px;
+  outline: none;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.att-input:focus {
+  border-color: var(--att-primary);
+  box-shadow: 0 0 0 4px rgba(233, 106, 18, .12);
+}
+
+/* ---------- Bottom nav mobile ---------- */
+
+.att-bottom-nav {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  z-index: 40;
+  max-width: 456px;
+  margin: 0 auto;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  border: 1px solid var(--att-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 12px 32px rgba(24, 33, 47, .1);
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+.att-bottom-nav a {
+  flex: 1;
+  min-height: 46px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--att-text-2);
+}
+.att-bottom-nav a[data-active='true'] { color: var(--att-primary); background: var(--att-chip); }
+
+/* ---------- Sticky action bar (bayangan halus di atas, sesuai dokumen) ---------- */
+
+.att-sticky-action {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 0;
+  background: linear-gradient(to top, var(--att-canvas) 70%, transparent);
+}

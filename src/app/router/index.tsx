@@ -6,6 +6,10 @@ import { useAuth } from '@/core/auth/useAuth';
 import PatenApp from '../../../PATEN/src/App';
 import { SettingsPage } from '@/modules/launch/settings/SettingsPage';
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
+import { LoginPage } from '@/modules/attendance/pages/LoginPage';
+import { TodayPage } from '@/modules/attendance/pages/TodayPage';
+import { HistoryPage, LeavePage, SchedulePage, ProfilePage } from '@/modules/attendance/pages/HistoryPage';
+import { AdminDashboardPage } from '@/modules/attendance/pages/AdminDashboardPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,8 +94,15 @@ function RouteView() {
     return <AuthGate />;
   }
   if (pathname === '/attendance' || pathname === '/attendance/' || pathname === '/attendance/login') {
-    return <ModuleLoginPreview system="Attendance" />;
+    return <LoginPage />;
   }
+  if (pathname === '/attendance/today') return <TodayPage />;
+  if (pathname === '/attendance/schedule') return <SchedulePage />;
+  if (pathname === '/attendance/history') return <HistoryPage />;
+  if (pathname === '/attendance/leave') return <LeavePage />;
+  if (pathname === '/attendance/profile') return <ProfilePage />;
+  if (pathname.startsWith('/attendance/admin')) return <AdminDashboardPage />;
+
   if (pathname === '/pos' || pathname === '/pos/' || pathname === '/pos/login') {
     return <ModuleLoginPreview system="POS Seller" />;
   }
