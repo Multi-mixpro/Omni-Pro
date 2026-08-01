@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
@@ -19,9 +20,8 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Domain dibedakan dari Product Launch agar dua kolam pengguna mudah dipisahkan.
 const INTERNAL_DOMAIN = 'attendance.ggindoapparel.internal';
 const EMPLOYEE_NO_PATTERN = /^[A-Za-z0-9-]{3,32}$/;
-const PASSWORD_PATTERN = /^.{6,72}$/;
+const PIN_PATTERN = /^\d{6}$/;
 const ALLOWED_ROLES = new Set([
-  'BUSINESS_UNIT_ADMIN',
   'LOCATION_MANAGER',
   'SUPERVISOR',
   'EMPLOYEE',
@@ -60,18 +60,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const employeeNo = String(req.body?.employee_no ?? '').trim().toUpperCase();
-  const password = String(req.body?.password ?? '');
+  const pin = String(req.body?.pin ?? '').trim();
   const fullName = String(req.body?.full_name ?? '').trim();
   const phone = String(req.body?.phone ?? '').trim();
   const role = String(req.body?.role ?? 'EMPLOYEE').trim().toUpperCase();
   const businessUnitId = String(req.body?.business_unit_id ?? '').trim();
   const locationId = String(req.body?.location_id ?? '').trim();
+  const jobTitle = String(req.body?.job_title ?? '').trim();
 
   if (!EMPLOYEE_NO_PATTERN.test(employeeNo)) {
     return res.status(400).json({ error: 'Nomor pegawai 3-32 karakter, hanya huruf, angka, atau strip.' });
   }
-  if (!PASSWORD_PATTERN.test(password)) {
-    return res.status(400).json({ error: 'Password minimal 6 karakter.' });
+  if (!PIN_PATTERN.test(pin)) {
+    return res.status(400).json({ error: 'PIN kru harus tepat 6 digit.' });
   }
   if (!fullName) return res.status(400).json({ error: 'Nama lengkap wajib diisi.' });
   if (!ALLOWED_ROLES.has(role)) return res.status(400).json({ error: 'Peran tidak dikenal.' });
@@ -99,12 +100,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (existing) return res.status(409).json({ error: `Nomor pegawai ${employeeNo} sudah dipakai.` });
 
   const email = `${employeeNo.toLowerCase()}@${INTERNAL_DOMAIN}`;
+  // Kru tidak mengetahui password Auth-nya. Login harian memakai PIN kios yang
+  // diverifikasi endpoint server, kemudian ditukar menjadi sesi Supabase.
+  const authPassword = `${randomBytes(48).toString('base64url')}aA1!`;
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email,
-    password,
+    password: authPassword,
     email_confirm: true,
-    user_metadata: { full_name: fullName, employee_no: employeeNo, system: 'attendance' },
+    user_metadata: {
+      full_name: fullName,
+      employee_no: employeeNo,
+      system: 'attendance',
+      login_method: 'attendance_pin',
+    },
   });
   if (createError || !created.user) {
     return res.status(400).json({ error: createError?.message ?? 'Akun Auth gagal dibuat.' });
@@ -140,6 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       employee_id: employee.id,
       business_unit_id: businessUnitId,
       location_id: locationId,
+      job_title: jobTitle || null,
       is_primary: true,
       is_active: true,
     });
@@ -166,6 +176,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return rollback(membershipInsertError.message);
   }
 
+  const { error: pinError } = await admin.rpc('set_attendance_pin', {
+    p_user_id: newUserId,
+    p_pin: pin,
+    p_label: employeeNo,
+  });
+  if (pinError) {
+    await admin.from('attendance_memberships').delete().eq('user_id', newUserId);
+    await admin.from('attendance_employee_assignments').delete().eq('employee_id', employee.id);
+    await admin.from('attendance_employees').delete().eq('id', employee.id);
+    return rollback(pinError.message);
+  }
+
   await admin.from('attendance_audit_logs').insert({
     organization_id: organizationId,
     business_unit_id: businessUnitId,
@@ -173,14 +195,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     entity_id: employee.id,
     action: 'CREATE',
     actor_user_id: userData.user.id,
-    after_data: { employee_no: employeeNo, full_name: fullName, role },
+    after_data: { employee_no: employeeNo, full_name: fullName, role, login_method: 'PIN_KIOSK' },
   }).select('id').maybeSingle();
 
   return res.status(200).json({
     employee_id: employee.id,
     user_id: newUserId,
     employee_no: employeeNo,
-    login_email: email,
     role,
+    pin_configured: true,
   });
 }

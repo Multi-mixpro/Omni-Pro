@@ -1,225 +1,292 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import { CalendarCheck2, Eye, EyeOff, KeyRound, Loader2, ShieldCheck, UserRound } from 'lucide-react';
 import { useNavigate } from '@/app/router/simpleRouter';
 import { supabase } from '@/integrations/supabase/client';
 import '../attendance.css';
 
+type LoginMode = 'pin' | 'account';
+
+type PinLoginResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  error?: string;
+};
+
+const INTERNAL_ATTENDANCE_DOMAIN = 'attendance.ggindoapparel.internal';
+const INTERNAL_TEAM_DOMAIN = 'team.ggindoapparel.internal';
+const DEVICE_STORAGE_KEY = 'central-attendance-device-id-v1';
+let volatileDeviceId = '';
+
+function getDeviceId(): string {
+  try {
+    const existing = window.localStorage.getItem(DEVICE_STORAGE_KEY);
+    if (existing) return existing;
+
+    const id = `att-${window.crypto.randomUUID()}`;
+    window.localStorage.setItem(DEVICE_STORAGE_KEY, id);
+    return id;
+  } catch {
+    if (!volatileDeviceId) volatileDeviceId = `att-${window.crypto.randomUUID()}`;
+    return volatileDeviceId;
+  }
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [mode, setMode] = useState<LoginMode>('pin');
+  const [pin, setPin] = useState('');
+  const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
+  function switchMode(nextMode: LoginMode) {
+    setMode(nextMode);
     setErrorMsg('');
-    if (!email.trim() || !password) {
-      setErrorMsg('Email dan password wajib diisi.');
+  }
+
+  async function handlePinLogin(event: FormEvent) {
+    event.preventDefault();
+    setErrorMsg('');
+
+    if (!/^\d{6}$/.test(pin)) {
+      setErrorMsg('Masukkan PIN kru tepat 6 digit.');
       return;
     }
 
     setLoading(true);
+    try {
+      const response = await fetch('/api/attendance-pin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin, device_id: getDeviceId() }),
+      });
+      if (!response.headers.get('content-type')?.includes('application/json')) {
+        throw new Error('Login PIN membutuhkan server aplikasi. Jalankan melalui deployment, bukan Vite localhost.');
+      }
+      const payload = await response.json().catch(() => ({})) as PinLoginResponse;
 
-    // Kolom menerima email lengkap ATAU nomor pegawai/username. Supabase hanya
-    // menerima email, jadi nilai tanpa "@" dicoba pada domain internal
-    // Attendance lebih dulu, baru domain tim Product Launch.
-    const raw = email.trim();
-    const kandidat = raw.includes('@')
-      ? [raw]
-      : [
-        `${raw.toLowerCase()}@attendance.ggindoapparel.internal`,
-        `${raw.toLowerCase()}@team.ggindoapparel.internal`,
-      ];
+      if (!response.ok || !payload.access_token || !payload.refresh_token) {
+        if (response.status === 404) {
+          throw new Error('Login PIN membutuhkan server aplikasi. Jalankan melalui deployment, bukan Vite localhost.');
+        }
+        throw new Error(payload.error ?? 'PIN tidak dapat diverifikasi.');
+      }
 
-    let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data'] | null = null;
-    let error: { message: string } | null = null;
+      const { error } = await supabase.auth.setSession({
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
+      });
+      if (error) throw error;
 
-    for (const kandidatEmail of kandidat) {
-      const attempt = await supabase.auth.signInWithPassword({ email: kandidatEmail, password });
-      if (!attempt.error) { data = attempt.data; error = null; break; }
-      error = attempt.error;
-    }
-
-    setLoading(false);
-
-    if (error || !data?.user) {
-      setErrorMsg(
-        error?.message === 'Invalid login credentials'
-          ? 'Nomor pegawai/email atau password salah.'
-          : error?.message ?? 'Gagal masuk.',
-      );
-      return;
-    }
-
-    const { data: mems } = await supabase
-      .from('attendance_memberships')
-      .select('role')
-      .eq('user_id', data.user.id)
-      .eq('is_active', true);
-
-    const roles = mems?.map(m => m.role) ?? [];
-
-    // Akun Product Launch tidak otomatis boleh masuk Attendance.
-    if (roles.length === 0) {
-      await supabase.auth.signOut();
-      setErrorMsg(
-        'Akun ini tidak terdaftar pada sistem Attendance. '
-        + 'Akun Product Launch OS memakai kredensial terpisah. Hubungi admin unit untuk didaftarkan.',
-      );
-      return;
-    }
-
-    if (roles.includes('OWNER') || roles.includes('BUSINESS_UNIT_ADMIN')) {
-      navigate('/attendance/admin/dashboard');
-    } else {
       navigate('/attendance/today');
+    } catch (reason) {
+      setErrorMsg(reason instanceof Error ? reason.message : 'Login PIN gagal.');
+      setPin('');
+    } finally {
+      setLoading(false);
     }
   }
 
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        backgroundColor: '#F6F7F9',
-        color: '#18212F',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 20,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      {/* iOS Clean Login Card */}
-      <div
-        style={{
-          width: '100%',
-          maxWidth: 400,
-          backgroundColor: '#ffffff',
-          border: '1px solid #E4E7EC',
-          borderRadius: 24,
-          padding: '36px 30px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 24,
-          boxShadow: '0 12px 35px rgba(0, 0, 0, 0.04)',
-        }}
-      >
-        {/* Brand Header */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
-          <div
-            style={{
-              width: 54,
-              height: 54,
-              borderRadius: 18,
-              background: 'linear-gradient(135deg, #3178C6 0%, #3178C6 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 24,
-              fontWeight: 800,
-              color: '#ffffff',
-              boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)',
-            }}
-          >
-            CA
-          </div>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#18212F', margin: 0, letterSpacing: '-0.5px' }}>Central Attendance</h1>
-            <p style={{ fontSize: 13, color: '#667085', margin: '4px 0 0', fontWeight: 500 }}>Satu Akses Seluruh Unit Bisnis</p>
-          </div>
-        </div>
+  async function handleAccountLogin(event: FormEvent) {
+    event.preventDefault();
+    setErrorMsg('');
+    if (!identity.trim() || !password) {
+      setErrorMsg('Nomor pegawai/email dan password wajib diisi.');
+      return;
+    }
 
-        {/* Login Form */}
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {errorMsg && (
-            <div
-              style={{
-                padding: '12px 14px',
-                backgroundColor: '#EEF1F4',
-                border: '1px solid #EEF1F4',
-                borderRadius: 12,
-                fontSize: 12,
-                color: '#D53F3F',
-                fontWeight: 600,
-              }}
-            >
-              {errorMsg}
+    setLoading(true);
+    const raw = identity.trim();
+    const candidates = raw.includes('@')
+      ? [raw]
+      : [
+        `${raw.toLowerCase()}@${INTERNAL_ATTENDANCE_DOMAIN}`,
+        `${raw.toLowerCase()}@${INTERNAL_TEAM_DOMAIN}`,
+      ];
+
+    let signedInUserId: string | null = null;
+    let lastError: { message: string } | null = null;
+
+    for (const email of candidates) {
+      const attempt = await supabase.auth.signInWithPassword({ email, password });
+      if (!attempt.error && attempt.data.user) {
+        signedInUserId = attempt.data.user.id;
+        lastError = null;
+        break;
+      }
+      lastError = attempt.error;
+    }
+
+    if (!signedInUserId) {
+      setLoading(false);
+      setErrorMsg(
+        lastError?.message === 'Invalid login credentials'
+          ? 'Identitas atau password salah.'
+          : lastError?.message ?? 'Gagal masuk.',
+      );
+      return;
+    }
+
+    const { data: memberships, error: membershipError } = await supabase
+      .from('attendance_memberships')
+      .select('role')
+      .eq('user_id', signedInUserId)
+      .eq('is_active', true);
+    const roles = memberships?.map((membership) => membership.role) ?? [];
+
+    if (membershipError || roles.length === 0) {
+      await supabase.auth.signOut();
+      setLoading(false);
+      setErrorMsg(
+        membershipError
+          ? 'Keanggotaan Attendance belum dapat diverifikasi.'
+          : 'Akun ini tidak terdaftar pada sistem Attendance.',
+      );
+      return;
+    }
+
+    setLoading(false);
+    navigate(
+      roles.includes('OWNER') || roles.includes('BUSINESS_UNIT_ADMIN')
+        ? '/attendance/admin/dashboard'
+        : '/attendance/today',
+    );
+  }
+
+  return (
+    <main className="att-login-page">
+      <section className="att-login-intro" aria-labelledby="attendance-login-title">
+        <div className="att-login-brand">
+          <span className="att-login-logo"><CalendarCheck2 size={27} /></span>
+          <span>Central Attendance</span>
+        </div>
+        <div>
+          <p className="att-login-eyebrow">Satu akses · seluruh unit bisnis</p>
+          <h1 id="attendance-login-title">Masuk, absen, lalu kembali bekerja.</h1>
+          <p>
+            PIN kios mempercepat akses kru. Akun pengelola tetap dilindungi
+            identitas dan password terpisah.
+          </p>
+        </div>
+        <div className="att-login-trust">
+          <span><ShieldCheck size={17} /> Sesi Supabase terverifikasi</span>
+          <span><KeyRound size={17} /> PIN disimpan sebagai hash</span>
+        </div>
+      </section>
+
+      <section className="att-login-panel" aria-label="Form login Attendance">
+        <div className="att-login-card">
+          <div className="att-login-mobile-brand">
+            <span className="att-login-logo"><CalendarCheck2 size={24} /></span>
+            <div><strong>Central Attendance</strong><small>Secure workspace</small></div>
+          </div>
+
+          <div className="att-login-heading">
+            <span className="att-login-mode-icon">
+              {mode === 'pin' ? <KeyRound size={20} /> : <UserRound size={20} />}
+            </span>
+            <div>
+              <h2>{mode === 'pin' ? 'PIN kru' : 'Akun pengelola'}</h2>
+              <p>
+                {mode === 'pin'
+                  ? 'Untuk absen cepat di perangkat pribadi atau kios.'
+                  : 'Untuk owner dan admin dengan akses pengelolaan.'}
+              </p>
             </div>
+          </div>
+
+          <div className="att-login-segment" role="tablist" aria-label="Metode login">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'pin'}
+              className={mode === 'pin' ? 'is-active' : ''}
+              onClick={() => switchMode('pin')}
+            >
+              PIN Kru
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'account'}
+              className={mode === 'account' ? 'is-active' : ''}
+              onClick={() => switchMode('account')}
+            >
+              Admin / Owner
+            </button>
+          </div>
+
+          {errorMsg && <div className="att-login-error" role="alert">{errorMsg}</div>}
+
+          {mode === 'pin' ? (
+            <form onSubmit={handlePinLogin} className="att-login-form">
+              <label htmlFor="attendance-pin">PIN 6 digit</label>
+              <input
+                id="attendance-pin"
+                className="att-pin-input"
+                type="password"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                pattern="[0-9]{6}"
+                placeholder="••••••"
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                autoFocus
+              />
+              <p className="att-login-hint">
+                PIN owner/admin tidak diterima di mode ini. Lima percobaan gagal
+                akan mengunci perangkat sementara.
+              </p>
+              <button className="att-login-submit" type="submit" disabled={loading || pin.length !== 6}>
+                {loading ? <><Loader2 className="att-spin" size={18} /> Memverifikasi…</> : 'Masuk untuk Absen'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleAccountLogin} className="att-login-form">
+              <label htmlFor="attendance-identity">Nomor pegawai atau email</label>
+              <input
+                id="attendance-identity"
+                type="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="username"
+                placeholder="Nomor pegawai atau email"
+                value={identity}
+                onChange={(event) => setIdentity(event.target.value)}
+                autoFocus
+              />
+
+              <label htmlFor="attendance-password">Password</label>
+              <div className="att-login-password">
+                <input
+                  id="attendance-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Masukkan password akun"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+
+              <button className="att-login-submit" type="submit" disabled={loading}>
+                {loading ? <><Loader2 className="att-spin" size={18} /> Memverifikasi…</> : 'Masuk ke Dashboard'}
+              </button>
+            </form>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, color: '#667085', fontWeight: 700 }}>Nomor Pegawai / Email</label>
-            <input
-              type="text"
-              autoCapitalize="none"
-              autoCorrect="off"
-              placeholder="UJO-001 atau email lengkap"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={{
-                padding: '12px 16px',
-                backgroundColor: '#F6F7F9',
-                border: '1px solid #E4E7EC',
-                borderRadius: 14,
-                color: '#18212F',
-                fontSize: 14,
-                fontWeight: 500,
-                outline: 'none',
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, color: '#667085', fontWeight: 700 }}>Password</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={{
-                padding: '12px 16px',
-                backgroundColor: '#F6F7F9',
-                border: '1px solid #E4E7EC',
-                borderRadius: 14,
-                color: '#18212F',
-                fontSize: 14,
-                fontWeight: 500,
-                outline: 'none',
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              marginTop: 8,
-              padding: '14px',
-              backgroundColor: loading ? '#667085' : '#3178C6',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: 14,
-              fontSize: 15,
-              fontWeight: 800,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
-              letterSpacing: '0.3px',
-            }}
-          >
-            {loading ? 'Memverifikasi...' : 'Masuk ke Attendance'}
-          </button>
-        </form>
-
-        {/* Catatan: pintasan "Demo Quick Access" ke dashboard admin dihapus.
-            Pintasan itu melompati proses login sehingga siapa pun dapat membuka
-            dashboard tanpa kredensial. */}
-
-        {/* Footer info */}
-        <div style={{ fontSize: 11, color: '#667085', textAlign: 'center', fontWeight: 600 }}>
-          Bakso Ujo • GG Supply • GUDSKUY
+          <p className="att-login-footer">Bakso Ujo · GG Supply · GUDSKUY</p>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

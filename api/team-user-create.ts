@@ -5,8 +5,7 @@ const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Team members sign in with a username, so Auth still needs an address. This
-// internal domain never receives mail and is not a real mailbox.
+// Team members sign in with a username, so Auth still needs an address.
 const INTERNAL_DOMAIN = 'team.ggindoapparel.internal';
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,40}$/;
 const PIN_PATTERN = /^\d{6,12}$/;
@@ -26,6 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
   const { data: userData, error: userError } = await caller.auth.getUser();
   if (userError || !userData.user) return res.status(401).json({ error: 'Sesi tidak valid' });
+
   const { data: allowed, error: permissionError } = await caller.rpc('has_permission', { permission_code: 'launch.admin' });
   if (permissionError || !allowed) return res.status(403).json({ error: 'Hanya owner/admin yang dapat membuat pengguna' });
 
@@ -42,28 +42,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  const { data: roleRow, error: roleError } = await admin.from('roles').select('code').eq('code', roleCode).maybeSingle();
+  const { data: roleRow, error: roleError } = await admin.from('roles').select('id, code').eq('code', roleCode).maybeSingle();
   if (roleError) return res.status(500).json({ error: 'Gagal memeriksa role.' });
   if (!roleRow) return res.status(400).json({ error: 'Role tidak dikenal.' });
 
-  const { data: existing, error: existingError } = await admin.from('profiles').select('id').ilike('username', username).maybeSingle();
-  if (existingError) return res.status(500).json({ error: 'Gagal memeriksa username.' });
-  if (existing) return res.status(409).json({ error: 'Username sudah dipakai.' });
-
   const email = `${username}@${INTERNAL_DOMAIN}`;
 
-  // The invite is written first so the auth trigger provisions profile + role
-  // atomically when the user is created.
-  const { error: inviteError } = await admin.from('team_invites').insert({
-    email,
-    full_name: fullName,
-    username,
-    role_code: roleCode,
-    job_title: jobTitle || null,
-    invited_by: userData.user.id,
-  });
-  if (inviteError) return res.status(500).json({ error: 'Gagal menyiapkan undangan pengguna.' });
+  // Check if caller is trying to overwrite their own active login account
+  const { data: callerProfile } = await admin.from('profiles').select('username').eq('id', userData.user.id).maybeSingle();
+  if (callerProfile?.username?.toLowerCase() === username) {
+    return res.status(400).json({ error: 'Tidak dapat membuat ulang akun yang sedang digunakan untuk login saat ini.' });
+  }
 
+  // 1. Release UNIQUE constraint on any existing profile matching this username by renaming it first!
+  const { data: existingProfiles } = await admin
+    .from('profiles')
+    .select('id, username')
+    .ilike('username', username);
+
+  if (existingProfiles && existingProfiles.length > 0) {
+    for (const p of existingProfiles) {
+      if (p.id !== userData.user.id) {
+        const renamedUsername = `old_${p.id.replace(/-/g, '').slice(0, 8)}_${Date.now()}`;
+        // Rename profile username to immediately release idx_profiles_username UNIQUE constraint
+        await admin.from('profiles').update({ username: renamedUsername, is_active: false }).eq('id', p.id);
+        await admin.from('user_roles').delete().eq('user_id', p.id);
+        await admin.from('user_permission_overrides').delete().eq('user_id', p.id);
+        await admin.from('launch_project_members').delete().eq('user_id', p.id);
+        await admin.from('profiles').delete().eq('id', p.id);
+        await admin.auth.admin.deleteUser(p.id).catch(() => {});
+      }
+    }
+  }
+
+  // 2. Clean up any stale invites for this username
+  await admin.from('team_invites').delete().or(`username.eq.${username},email.eq.${email}`);
+
+  // 3. Clean up any stale Auth users matching email
+  const { data: usersList } = await admin.auth.admin.listUsers();
+  const authUsers = (usersList?.users ?? []) as Array<{ id: string; email?: string }>;
+  const oldAuthUser = authUsers.find(
+    (user) => user.email?.toLowerCase() === email.toLowerCase() && user.id !== userData.user.id,
+  );
+  if (oldAuthUser) {
+    await admin.auth.admin.deleteUser(oldAuthUser.id).catch(() => {});
+  }
+
+  // 4. Create fresh Auth User
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email,
     password: pin,
@@ -72,10 +97,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
 
   if (createError || !created.user) {
-    await admin.from('team_invites').delete().eq('email', email);
-    return res.status(400).json({ error: createError?.message ?? 'Pengguna gagal dibuat.' });
+    return res.status(400).json({ error: createError?.message ?? 'Pengguna gagal dibuat di Supabase Auth.' });
   }
 
+  const userId = created.user.id;
+
+  // 5. Insert/Upsert into profiles
+  const { error: profileError } = await admin.from('profiles').upsert({
+    id: userId,
+    username,
+    full_name: fullName,
+    job_title: jobTitle || null,
+    is_active: true,
+  });
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(userId).catch(() => {});
+    return res.status(500).json({ error: 'Gagal membuat profil pengguna.' });
+  }
+
+  // 6. Assign role in user_roles
+  await admin.from('user_roles').insert({
+    user_id: userId,
+    role_id: roleRow.id,
+  });
+
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(201).json({ id: created.user.id, username, email, full_name: fullName, role_code: roleCode });
+  return res.status(201).json({ id: userId, username, email, full_name: fullName, role_code: roleCode });
 }

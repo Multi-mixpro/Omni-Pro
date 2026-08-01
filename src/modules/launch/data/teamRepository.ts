@@ -68,6 +68,20 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
   });
 }
 
+export async function listAllProfiles(): Promise<TeamMember[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*, user_roles(role:roles(code, name))')
+    .order('full_name');
+  if (error) throw error;
+
+  type Row = Profile & { user_roles?: Array<{ role?: { code: string; name: string } | null }> };
+  return ((data ?? []) as unknown as Row[]).map(row => {
+    const role = row.user_roles?.find(item => item.role)?.role ?? null;
+    return { ...row, role_code: role?.code ?? null, role_name: role?.name ?? null };
+  });
+}
+
 export const createTeamUser = (input: NewTeamUserInput) => authorizedFetch('/api/team-user-create', input);
 export const deleteTeamUser = (userId: string) => authorizedFetch('/api/team-user-delete', { user_id: userId }) as Promise<DeleteTeamUserResult>;
 export const updateTeamUser = (input: UpdateTeamUserInput) => authorizedFetch('/api/team-user-update', input);

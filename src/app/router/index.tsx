@@ -105,7 +105,13 @@ function RouteView() {
   if (pathname === '/attendance/history') return <AttendanceGuard><HistoryPage /></AttendanceGuard>;
   if (pathname === '/attendance/leave') return <AttendanceGuard><LeavePage /></AttendanceGuard>;
   if (pathname === '/attendance/profile') return <AttendanceGuard><ProfilePage /></AttendanceGuard>;
-  if (pathname.startsWith('/attendance/admin')) return <AttendanceGuard><AdminDashboardPage /></AttendanceGuard>;
+  if (pathname.startsWith('/attendance/admin')) {
+    return (
+      <AttendanceGuard allowedRoles={['OWNER', 'BUSINESS_UNIT_ADMIN']}>
+        <AdminDashboardPage />
+      </AttendanceGuard>
+    );
+  }
 
   if (pathname === '/pos' || pathname === '/pos/' || pathname === '/pos/login') {
     return <ModuleLoginPreview system="POS Seller" />;

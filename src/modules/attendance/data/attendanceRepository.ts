@@ -30,20 +30,21 @@ function mapError(error: unknown): AppError {
 /** Input pembuatan pengguna Attendance (akun login + karyawan sekaligus). */
 export interface NewAttendanceUserInput {
   employee_no: string;
-  password: string;
+  pin: string;
   full_name: string;
   phone?: string;
-  role: 'BUSINESS_UNIT_ADMIN' | 'LOCATION_MANAGER' | 'SUPERVISOR' | 'EMPLOYEE' | 'AUDITOR';
+  role: 'LOCATION_MANAGER' | 'SUPERVISOR' | 'EMPLOYEE' | 'AUDITOR';
   business_unit_id: string;
   location_id: string;
+  job_title?: string;
 }
 
 export interface NewAttendanceUserResult {
   employee_id: string;
   user_id: string;
   employee_no: string;
-  login_email: string;
   role: string;
+  pin_configured: boolean;
 }
 
 /**
@@ -65,6 +66,10 @@ export async function createAttendanceUser(
     body: JSON.stringify(input),
   });
 
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('Pembuatan pengguna hanya tersedia pada deployment server, bukan Vite localhost.');
+  }
+
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     // Di dev server Vite, fungsi serverless tidak berjalan sehingga selalu 404.
@@ -74,6 +79,36 @@ export async function createAttendanceUser(
     throw new Error(payload.error ?? 'Pengguna Attendance gagal dibuat.');
   }
   return payload as NewAttendanceUserResult;
+}
+
+export interface UpdateAttendanceUserInput {
+  employee_id: string;
+  employee_no: string;
+  full_name: string;
+  job_title?: string;
+  pin?: string;
+}
+
+export async function updateAttendanceUser(input: UpdateAttendanceUserInput): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('Sesi tidak tersedia. Silakan masuk kembali.');
+
+  const response = await fetch('/api/attendance-user-update', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('Pembaruan pengguna hanya tersedia pada deployment server, bukan Vite localhost.');
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error('Pembaruan pengguna hanya tersedia pada deployment server, bukan Vite localhost.');
+    }
+    throw new Error(payload.error ?? 'Pengguna Attendance gagal diperbarui.');
+  }
 }
 
 /** Scope organisasi/unit/lokasi milik seorang employee. */
@@ -210,93 +245,6 @@ export const attendanceRepository = {
       return { data: data ?? [] };
     } catch (err) {
       return { data: [], error: mapError(err) };
-    }
-  },
-
-  async registerEmployee(input: {
-    full_name: string;
-    employee_no: string;
-    username?: string;
-    email?: string;
-    phone?: string;
-    pin_code?: string;
-    job_title?: string;
-    business_unit_id: string;
-    location_id: string;
-    face_enrolled?: boolean;
-  }): Promise<{ data: Employee | null; error?: AppError }> {
-    try {
-      const { data: org } = await supabase.from('attendance_organizations').select('id').limit(1).single();
-      const orgId = org?.id ?? '00000000-0000-0000-0000-000000000000';
-
-      const { data: emp, error: empErr } = await supabase
-        .from('attendance_employees')
-        .insert({
-          organization_id: orgId,
-          employee_no: input.employee_no,
-          full_name: input.full_name,
-          email: input.email ?? `${input.employee_no.toLowerCase()}@baksoujo.com`,
-          phone: input.phone ?? null,
-          pin_code: input.pin_code ?? '123456',
-        })
-        .select('*')
-        .single();
-
-      if (empErr || !emp) return { data: null, error: mapError(empErr) };
-
-      // Create employee assignment
-      await supabase.from('attendance_employee_assignments').insert({
-        employee_id: emp.id,
-        business_unit_id: input.business_unit_id,
-        location_id: input.location_id,
-        job_title: input.job_title ?? 'Staf Operasional',
-        is_primary: true,
-      });
-
-      // Audit log
-      await supabase.from('attendance_audit_logs').insert({
-        organization_id: orgId,
-        business_unit_id: input.business_unit_id,
-        entity_type: 'EMPLOYEE',
-        entity_id: emp.id,
-        action: 'CREATE',
-        after_data: { full_name: input.full_name, employee_no: input.employee_no, job_title: input.job_title },
-      });
-
-      return { data: emp as Employee };
-    } catch (err) {
-      return { data: null, error: mapError(err) };
-    }
-  },
-
-  async updateEmployee(id: string, input: {
-    full_name?: string;
-    employee_no?: string;
-    email?: string;
-    phone?: string;
-    pin_code?: string;
-    job_title?: string;
-    is_active?: boolean;
-  }): Promise<{ data: boolean; error?: AppError }> {
-    try {
-      const empUpdate: Record<string, unknown> = {};
-      if (input.full_name) empUpdate.full_name = input.full_name;
-      if (input.employee_no) empUpdate.employee_no = input.employee_no;
-      if (input.email) empUpdate.email = input.email;
-      if (input.phone) empUpdate.phone = input.phone;
-      if (input.pin_code) empUpdate.pin_code = input.pin_code;
-      if (typeof input.is_active === 'boolean') empUpdate.is_active = input.is_active;
-
-      const { error: empErr } = await supabase.from('attendance_employees').update(empUpdate).eq('id', id);
-      if (empErr) return { data: false, error: mapError(empErr) };
-
-      if (input.job_title) {
-        await supabase.from('attendance_employee_assignments').update({ job_title: input.job_title }).eq('employee_id', id);
-      }
-
-      return { data: true };
-    } catch (err) {
-      return { data: false, error: mapError(err) };
     }
   },
 

@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from '@/app/router/simpleRouter';
 import { useAttendanceUnits, useLiveMonitorStats } from '../hooks/useAttendance';
-import { attendanceRepository, createAttendanceUser } from '../data/attendanceRepository';
+import {
+  attendanceRepository,
+  createAttendanceUser,
+  updateAttendanceUser,
+} from '../data/attendanceRepository';
 import { useQueryClient } from '@tanstack/react-query';
 import { LoadingState } from '../components/AttendanceStateComponents';
 import '../attendance.css';
@@ -30,8 +34,7 @@ export function AdminDashboardPage() {
   // Employee Form State
   const [newEmpName, setNewEmpName] = useState('');
   const [newEmpNo, setNewEmpNo] = useState('');
-  const [newEmpUsername, setNewEmpUsername] = useState('');
-  const [newEmpPassword, setNewEmpPassword] = useState('');
+  const [newEmpPin, setNewEmpPin] = useState('');
   const [newEmpRole, setNewEmpRole] = useState('Staf Service & Frontline');
   const [newEmpUnitId, setNewEmpUnitId] = useState<string>('');
   const [faceEnrolled, setFaceEnrolled] = useState(false);
@@ -104,27 +107,24 @@ export function AdminDashboardPage() {
     setActionLoadingId('save_emp');
 
     if (editingEmp) {
-      // UPDATE Realtime
-      const res = await attendanceRepository.updateEmployee(editingEmp.id, {
-        full_name: newEmpName,
-        employee_no: newEmpNo,
-        pin_code: newEmpPassword || editingEmp.pin_code,
-        job_title: newEmpRole,
-      });
-
-      if (res.data) {
+      try {
+        await updateAttendanceUser({
+          employee_id: editingEmp.id,
+          full_name: newEmpName,
+          employee_no: newEmpNo,
+          pin: newEmpPin || undefined,
+          job_title: newEmpRole,
+        });
         alert(`Pegawai ${newEmpName} berhasil diperbarui di Supabase!`);
         setShowEmployeeModal(false);
         setEditingEmp(null);
         fetchRealtimeData();
-      } else {
-        alert(`Gagal: ${res.error?.message}`);
+      } catch (reason) {
+        alert(`Gagal: ${reason instanceof Error ? reason.message : 'Pegawai gagal diperbarui.'}`);
       }
     } else {
       // CREATE — membuat akun login Attendance sekaligus data karyawan.
-      // Jalur lama (registerEmployee) membuat karyawan TANPA akun auth, sehingga
-      // user_id selalu NULL dan pegawai tidak pernah bisa masuk. Password default
-      // '123456' juga dihapus: password wajib ditentukan admin.
+      // Akun Auth kru memakai secret acak; PIN hanya disimpan sebagai hash.
       const chosenUnitId = newEmpUnitId || units[0]?.id;
       if (!chosenUnitId) {
         alert('Unit bisnis belum tersedia. Buat unit terlebih dahulu.');
@@ -140,8 +140,8 @@ export function AdminDashboardPage() {
         return;
       }
 
-      if (!newEmpPassword || newEmpPassword.length < 6) {
-        alert('Password login wajib diisi, minimal 6 karakter.');
+      if (!/^\d{6}$/.test(newEmpPin)) {
+        alert('PIN kru wajib tepat 6 digit.');
         setActionLoadingId(null);
         return;
       }
@@ -149,24 +149,23 @@ export function AdminDashboardPage() {
       try {
         const created = await createAttendanceUser({
           employee_no: newEmpNo,
-          password: newEmpPassword,
+          pin: newEmpPin,
           full_name: newEmpName,
           role: 'EMPLOYEE',
           business_unit_id: chosenUnitId,
           location_id: mainLoc.id,
+          job_title: newEmpRole,
         });
 
         alert(
           `Pegawai ${newEmpName} berhasil dibuat.\n\n`
           + `Nomor pegawai: ${created.employee_no}\n`
-          + `Email login: ${created.login_email}\n\n`
-          + 'Akun ini hanya berlaku untuk sistem Attendance.',
+          + 'PIN kios sudah disimpan sebagai hash. Akun ini hanya berlaku untuk sistem Attendance.',
         );
         setShowEmployeeModal(false);
         setNewEmpName('');
         setNewEmpNo('');
-        setNewEmpUsername('');
-        setNewEmpPassword('');
+        setNewEmpPin('');
         setFaceEnrolled(false);
         await attendanceRepository.ensureDailySchedules();
         fetchRealtimeData();
@@ -272,8 +271,7 @@ export function AdminDashboardPage() {
     setEditingEmp(emp);
     setNewEmpName(emp.full_name);
     setNewEmpNo(emp.employee_no);
-    setNewEmpUsername(emp.email?.split('@')[0] ?? '');
-    setNewEmpPassword(emp.pin_code ?? '');
+    setNewEmpPin('');
     setNewEmpRole(emp.assignments?.[0]?.job_title ?? 'Staf Operasional');
     setShowEmployeeModal(true);
   }
@@ -692,8 +690,7 @@ export function AdminDashboardPage() {
                   setEditingEmp(null);
                   setNewEmpName('');
                   setNewEmpNo('');
-                  setNewEmpUsername('');
-                  setNewEmpPassword('');
+                  setNewEmpPin('');
                   setShowEmployeeModal(true);
                 }}
                 style={{
@@ -737,7 +734,9 @@ export function AdminDashboardPage() {
                         <td style={{ padding: '6px 12px', color: '#E96A12', fontWeight: 700 }}>{emp.employee_no}</td>
                         <td style={{ padding: '6px 12px', color: '#18212F', fontWeight: 700 }}>{emp.full_name}</td>
                         <td style={{ padding: '6px 12px', color: '#667085', fontWeight: 500 }}>
-                          <span style={{ color: '#3178C6' }}>{emp.email ?? emp.employee_no}</span> • PIN: <strong>{emp.pin_code ?? '••••'}</strong>
+                          <span style={{ color: '#3178C6' }}>{emp.email ?? emp.employee_no}</span>
+                          {' · '}
+                          <strong>{emp.user_id ? 'PIN hash terlindungi' : 'Akun belum aktif'}</strong>
                         </td>
                         <td style={{ padding: '6px 12px', color: '#667085', fontWeight: 500 }}>
                           {emp.assignments?.[0]?.business_unit?.name ?? 'Bakso Ujo'} — <strong style={{ color: '#18212F' }}>{emp.assignments?.[0]?.job_title ?? 'Staf Operasional'}</strong>
@@ -986,24 +985,22 @@ export function AdminDashboardPage() {
                 <input type="text" placeholder="Misal: Ahmad Zaky" value={newEmpName} onChange={e => setNewEmpName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid #E4E7EC', fontSize: 13, marginTop: 4 }} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <div>
                   <label style={{ fontSize: 11, color: '#667085', fontWeight: 700 }}>NIP / No Pegawai</label>
                   <input type="text" placeholder="UJO-006" value={newEmpNo} onChange={e => setNewEmpNo(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid #E4E7EC', fontSize: 13, marginTop: 4 }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: '#667085', fontWeight: 700 }}>Username Login</label>
-                  <input type="text" placeholder="ahmad.ujo" value={newEmpUsername} onChange={e => setNewEmpUsername(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid #E4E7EC', fontSize: 13, marginTop: 4 }} />
-                </div>
-                <div>
                   <label style={{ fontSize: 11, color: '#667085', fontWeight: 700 }}>
-                    Password Login {!editingEmp && <span style={{ color: '#D53F3F' }}>*</span>}
+                    PIN Kios 6 Digit {!editingEmp && <span style={{ color: '#D53F3F' }}>*</span>}
                   </label>
                   <input
                     type="password"
-                    placeholder={editingEmp ? 'Kosongkan bila tidak diubah' : 'Minimal 6 karakter'}
-                    value={newEmpPassword}
-                    onChange={e => setNewEmpPassword(e.target.value)}
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder={editingEmp ? 'Kosongkan bila tidak diubah' : 'Tepat 6 digit'}
+                    value={newEmpPin}
+                    onChange={e => setNewEmpPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid #E4E7EC', fontSize: 13, marginTop: 4 }}
                   />
                 </div>
@@ -1012,7 +1009,8 @@ export function AdminDashboardPage() {
               {!editingEmp && (
                 <p style={{ fontSize: 11, color: '#667085', margin: '2px 0 0', lineHeight: 1.5 }}>
                   Akun dibuat khusus untuk sistem <strong>Attendance</strong> dan tidak memperoleh akses
-                  Product Launch OS. Login memakai <strong>nomor pegawai</strong> beserta password ini.
+                  Product Launch OS. Kru masuk melalui mode <strong>PIN Kru</strong>; owner/admin wajib
+                  memakai identitas dan password akun penuh.
                 </p>
               )}
 

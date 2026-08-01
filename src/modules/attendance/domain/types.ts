@@ -79,7 +79,6 @@ export interface Employee {
   username?: string | null;
   email: string | null;
   phone: string | null;
-  pin_code: string | null;
   avatar_url: string | null;
   face_enrolled?: boolean;
   face_enrolled_at?: string | null;

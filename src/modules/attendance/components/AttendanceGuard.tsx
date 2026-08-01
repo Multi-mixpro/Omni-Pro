@@ -16,13 +16,14 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { AttendanceRole } from '../domain/types';
 import '../attendance.css';
 
 type AccessState =
   | { status: 'checking' }
   | { status: 'no-session' }
   | { status: 'not-member'; email: string | null }
-  | { status: 'allowed'; role: string };
+  | { status: 'allowed'; roles: AttendanceRole[] };
 
 /** Cek sesi + keanggotaan Attendance milik user yang sedang login. */
 export function useAttendanceAccess(): AccessState {
@@ -41,22 +42,23 @@ export function useAttendanceAccess(): AccessState {
         return;
       }
 
-      const { data: membership } = await supabase
+      const { data: memberships } = await supabase
         .from('attendance_memberships')
         .select('role')
         .eq('user_id', user.id)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+        .eq('is_active', true);
 
       if (!active) return;
 
-      if (!membership) {
+      if (!memberships?.length) {
         setState({ status: 'not-member', email: user.email ?? null });
         return;
       }
 
-      setState({ status: 'allowed', role: membership.role });
+      setState({
+        status: 'allowed',
+        roles: memberships.map((membership) => membership.role as AttendanceRole),
+      });
     }
 
     void evaluate();
@@ -84,7 +86,13 @@ function Notice({ title, body, action }: { title: string; body: string; action?:
   );
 }
 
-export function AttendanceGuard({ children }: { children: ReactNode }) {
+export function AttendanceGuard({
+  children,
+  allowedRoles,
+}: {
+  children: ReactNode;
+  allowedRoles?: AttendanceRole[];
+}) {
   const access = useAttendanceAccess();
 
   if (access.status === 'checking') {
@@ -130,6 +138,20 @@ export function AttendanceGuard({ children }: { children: ReactNode }) {
               Masuk akun lain
             </button>
           </div>
+        }
+      />
+    );
+  }
+
+  if (allowedRoles && !access.roles.some((role) => allowedRoles.includes(role))) {
+    return (
+      <Notice
+        title="Akses pengelolaan diperlukan"
+        body="Halaman ini hanya dapat dibuka oleh owner atau admin unit Attendance."
+        action={
+          <a className="att-btn att-btn-primary" href="/attendance/today">
+            Kembali ke halaman Today
+          </a>
         }
       />
     );

@@ -17,7 +17,7 @@ import {
 import { useNavigate } from '@/app/router/simpleRouter';
 import { signOut, useAuth } from '@/core/auth/useAuth';
 import {
-  createTeamUser, deleteTeamUser, listProjectAccess, listRoles, listTeamMembers,
+  createTeamUser, deleteTeamUser, listAllProfiles, listProjectAccess, listRoles, listTeamMembers,
   setMemberCanLaunch,
   setProjectMember,
   updateTeamUser,
@@ -75,6 +75,7 @@ export function SettingsPage() {
 
   const roles = useQuery({ queryKey: ['launch-roles'], queryFn: listRoles, enabled: isAdmin });
   const members = useQuery({ queryKey: ['launch-team'], queryFn: listTeamMembers, enabled: isAdmin });
+  const allProfiles = useQuery({ queryKey: ['launch-all-profiles'], queryFn: listAllProfiles, enabled: isAdmin });
   const projects = useProjects();
 
   const [draft, setDraft] = useState<NewTeamUserInput>(emptyUser());
@@ -93,7 +94,10 @@ export function SettingsPage() {
     enabled: isAdmin && Boolean(projectId),
   });
 
-  const refreshTeam = () => client.invalidateQueries({ queryKey: ['launch-team'] });
+  const refreshTeam = () => {
+    client.invalidateQueries({ queryKey: ['launch-team'] });
+    client.invalidateQueries({ queryKey: ['launch-all-profiles'] });
+  };
   const refreshAccess = () => client.invalidateQueries({ queryKey: ['launch-access', projectId] });
 
   const createUser = useMutation({
@@ -457,6 +461,38 @@ export function SettingsPage() {
             <Users className="mx-auto w-6 h-6 text-slate-300" />
             <p className="mt-2 font-bold text-slate-600">Belum ada pengguna lain</p>
             <p className="mt-1 text-[10px] text-slate-400">Tambahkan anggota tim melalui form di atas.</p>
+          </div>
+        )}
+
+        {/* Inspection Panel for All Profiles in Database */}
+        {allProfiles.data && allProfiles.data.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-700">
+                🔍 Inspect Database: Total {allProfiles.data.length} Profil Tersimpan di Database Supabase
+              </span>
+              <span className="text-[10px] text-slate-400">Termasuk profil tersangkut / non-aktif</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-1">
+              {allProfiles.data.map(p => (
+                <div key={p.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px]">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <span className="font-mono font-extrabold text-slate-900">@{p.username}</span>
+                    <span className="text-slate-500 ml-1.5 truncate inline-block max-w-[120px] align-bottom">({p.full_name})</span>
+                    <span className={`ml-1.5 px-1.5 py-0.5 text-[9px] font-extrabold rounded-full ${p.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {p.is_active ? 'Aktif' : 'Tersangkut/Inaktif'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteUser(p)}
+                    className="shrink-0 px-2.5 py-1 text-[10px] font-extrabold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
+                  >
+                    Hapus Permanen
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

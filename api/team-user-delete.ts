@@ -39,46 +39,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const deletedUsername = `deleted_${targetId.replace(/-/g, '').slice(0, 8)}_${Date.now()}`;
   const deletedEmail = `${deletedUsername}@${DELETED_DOMAIN}`;
-  const deletedPassword = `${randomUUID()}${randomUUID()}`;
 
-  const [
-    authUpdate,
-    roleDelete,
-    overrideDelete,
-    memberDelete,
-    profileUpdate,
-  ] = await Promise.all([
-    admin.auth.admin.updateUserById(targetId, {
-      email: deletedEmail,
-      password: deletedPassword,
-      user_metadata: {
-        deleted_at: new Date().toISOString(),
-        deleted_from_launch: true,
-        previous_username: profile.username,
-        previous_full_name: profile.full_name,
-      },
-      email_confirm: true,
-    }),
-    admin.from('user_roles').delete().eq('user_id', targetId),
-    admin.from('user_permission_overrides').delete().eq('user_id', targetId),
-    admin.from('launch_project_members').delete().eq('user_id', targetId),
-    admin
+  // 1. Rename profile username FIRST to release the UNIQUE constraint index immediately
+  await admin.from('profiles').update({ username: deletedUsername, is_active: false }).eq('id', targetId);
+
+  // 2. Delete dependent tables & invites
+  await admin.from('team_invites').delete().or(`username.eq.${profile.username},email.eq.${profile.username}@team.ggindoapparel.internal`);
+  await admin.from('user_roles').delete().eq('user_id', targetId);
+  await admin.from('user_permission_overrides').delete().eq('user_id', targetId);
+  await admin.from('launch_project_members').delete().eq('user_id', targetId);
+
+  // 3. Try hard delete profile
+  const { error: profileDeleteErr } = await admin.from('profiles').delete().eq('id', targetId);
+  if (profileDeleteErr) {
+    await admin
       .from('profiles')
       .update({
-        username: deletedUsername,
         full_name: `[Deleted] ${profile.full_name}`,
         job_title: null,
         avatar_url: null,
         is_active: false,
       })
-      .eq('id', targetId),
-  ]);
+      .eq('id', targetId);
+  }
 
-  if (authUpdate.error) return res.status(500).json({ error: authUpdate.error.message || 'Gagal menonaktifkan login pengguna.' });
-  if (roleDelete.error) return res.status(500).json({ error: 'Gagal membersihkan role pengguna.' });
-  if (overrideDelete.error) return res.status(500).json({ error: 'Gagal membersihkan override izin pengguna.' });
-  if (memberDelete.error) return res.status(500).json({ error: 'Gagal membersihkan akses artikel pengguna.' });
-  if (profileUpdate.error) return res.status(500).json({ error: 'Gagal menandai pengguna sebagai dihapus.' });
+  // 3. Delete from Auth or update auth user email
+  const authDeleteRes = await admin.auth.admin.deleteUser(targetId);
+  if (authDeleteRes.error) {
+    await admin.auth.admin.updateUserById(targetId, {
+      email: deletedEmail,
+      password: `${randomUUID()}${randomUUID()}`,
+      user_metadata: {
+        deleted_at: new Date().toISOString(),
+        deleted_from_launch: true,
+        previous_username: profile.username,
+      },
+      email_confirm: true,
+    });
+  }
 
   res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({ id: targetId, deleted: true, deleted_self: targetId === userData.user.id });
