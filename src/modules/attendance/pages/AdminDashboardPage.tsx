@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from '@/app/router/simpleRouter';
 import { useAttendanceUnits, useLiveMonitorStats } from '../hooks/useAttendance';
-import { attendanceRepository } from '../data/attendanceRepository';
+import { attendanceRepository, createAttendanceUser } from '../data/attendanceRepository';
 import { useQueryClient } from '@tanstack/react-query';
 import { LoadingState } from '../components/AttendanceStateComponents';
 import '../attendance.css';
@@ -121,25 +121,47 @@ export function AdminDashboardPage() {
         alert(`Gagal: ${res.error?.message}`);
       }
     } else {
-      // CREATE Realtime
+      // CREATE — membuat akun login Attendance sekaligus data karyawan.
+      // Jalur lama (registerEmployee) membuat karyawan TANPA akun auth, sehingga
+      // user_id selalu NULL dan pegawai tidak pernah bisa masuk. Password default
+      // '123456' juga dihapus: password wajib ditentukan admin.
       const chosenUnitId = newEmpUnitId || units[0]?.id;
+      if (!chosenUnitId) {
+        alert('Unit bisnis belum tersedia. Buat unit terlebih dahulu.');
+        setActionLoadingId(null);
+        return;
+      }
+
       const locRes = await attendanceRepository.listLocations(chosenUnitId);
       const mainLoc = locRes.data[0];
+      if (!mainLoc) {
+        alert('Unit ini belum memiliki lokasi kerja. Tambahkan lokasi sebelum mendaftarkan pegawai.');
+        setActionLoadingId(null);
+        return;
+      }
 
-      const res = await attendanceRepository.registerEmployee({
-        full_name: newEmpName,
-        employee_no: newEmpNo,
-        username: newEmpUsername || newEmpNo.toLowerCase(),
-        email: `${(newEmpUsername || newEmpNo).toLowerCase()}@baksoujo.com`,
-        pin_code: newEmpPassword || '123456',
-        job_title: newEmpRole,
-        business_unit_id: chosenUnitId ?? '00000000-0000-0000-0000-000000000000',
-        location_id: mainLoc?.id ?? '00000000-0000-0000-0000-000000000000',
-        face_enrolled: faceEnrolled,
-      });
+      if (!newEmpPassword || newEmpPassword.length < 6) {
+        alert('Password login wajib diisi, minimal 6 karakter.');
+        setActionLoadingId(null);
+        return;
+      }
 
-      if (res.data) {
-        alert(`Pegawai ${newEmpName} berhasil didaftarkan ke Supabase!`);
+      try {
+        const created = await createAttendanceUser({
+          employee_no: newEmpNo,
+          password: newEmpPassword,
+          full_name: newEmpName,
+          role: 'EMPLOYEE',
+          business_unit_id: chosenUnitId,
+          location_id: mainLoc.id,
+        });
+
+        alert(
+          `Pegawai ${newEmpName} berhasil dibuat.\n\n`
+          + `Nomor pegawai: ${created.employee_no}\n`
+          + `Email login: ${created.login_email}\n\n`
+          + 'Akun ini hanya berlaku untuk sistem Attendance.',
+        );
         setShowEmployeeModal(false);
         setNewEmpName('');
         setNewEmpNo('');
@@ -149,8 +171,8 @@ export function AdminDashboardPage() {
         await attendanceRepository.ensureDailySchedules();
         fetchRealtimeData();
         refetch();
-      } else {
-        alert(`Gagal: ${res.error?.message}`);
+      } catch (reason) {
+        alert(`Gagal: ${reason instanceof Error ? reason.message : 'Pegawai gagal dibuat.'}`);
       }
     }
 
@@ -974,10 +996,25 @@ export function AdminDashboardPage() {
                   <input type="text" placeholder="ahmad.ujo" value={newEmpUsername} onChange={e => setNewEmpUsername(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid #E4E7EC', fontSize: 13, marginTop: 4 }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: '#667085', fontWeight: 700 }}>PIN / Pass</label>
-                  <input type="password" placeholder="••••••" value={newEmpPassword} onChange={e => setNewEmpPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid #E4E7EC', fontSize: 13, marginTop: 4 }} />
+                  <label style={{ fontSize: 11, color: '#667085', fontWeight: 700 }}>
+                    Password Login {!editingEmp && <span style={{ color: '#D53F3F' }}>*</span>}
+                  </label>
+                  <input
+                    type="password"
+                    placeholder={editingEmp ? 'Kosongkan bila tidak diubah' : 'Minimal 6 karakter'}
+                    value={newEmpPassword}
+                    onChange={e => setNewEmpPassword(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid #E4E7EC', fontSize: 13, marginTop: 4 }}
+                  />
                 </div>
               </div>
+
+              {!editingEmp && (
+                <p style={{ fontSize: 11, color: '#667085', margin: '2px 0 0', lineHeight: 1.5 }}>
+                  Akun dibuat khusus untuk sistem <strong>Attendance</strong> dan tidak memperoleh akses
+                  Product Launch OS. Login memakai <strong>nomor pegawai</strong> beserta password ini.
+                </p>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>

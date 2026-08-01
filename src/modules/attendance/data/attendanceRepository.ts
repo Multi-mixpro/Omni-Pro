@@ -27,6 +27,55 @@ function mapError(error: unknown): AppError {
   return { code: 'UNKNOWN_ERROR', message: 'Terjadi kesalahan tidak dikenal' };
 }
 
+/** Input pembuatan pengguna Attendance (akun login + karyawan sekaligus). */
+export interface NewAttendanceUserInput {
+  employee_no: string;
+  password: string;
+  full_name: string;
+  phone?: string;
+  role: 'BUSINESS_UNIT_ADMIN' | 'LOCATION_MANAGER' | 'SUPERVISOR' | 'EMPLOYEE' | 'AUDITOR';
+  business_unit_id: string;
+  location_id: string;
+}
+
+export interface NewAttendanceUserResult {
+  employee_id: string;
+  user_id: string;
+  employee_no: string;
+  login_email: string;
+  role: string;
+}
+
+/**
+ * Buat pengguna Attendance lewat endpoint server.
+ *
+ * Akun yang dihasilkan hanya memperoleh attendance_memberships; tidak pernah
+ * diberi user_roles, sehingga tidak bisa masuk Product Launch OS.
+ */
+export async function createAttendanceUser(
+  input: NewAttendanceUserInput,
+): Promise<NewAttendanceUserResult> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('Sesi tidak tersedia. Silakan masuk kembali.');
+
+  const response = await fetch('/api/attendance-user-create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    // Di dev server Vite, fungsi serverless tidak berjalan sehingga selalu 404.
+    if (response.status === 404) {
+      throw new Error('Pembuatan pengguna hanya tersedia pada deployment (Vercel), bukan di localhost.');
+    }
+    throw new Error(payload.error ?? 'Pengguna Attendance gagal dibuat.');
+  }
+  return payload as NewAttendanceUserResult;
+}
+
 /** Scope organisasi/unit/lokasi milik seorang employee. */
 export interface EmployeeScope {
   organization_id: string;
