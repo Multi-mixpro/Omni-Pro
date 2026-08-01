@@ -19,31 +19,60 @@ export function LoginPage() {
     }
 
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+
+    // Kolom menerima email lengkap ATAU nomor pegawai/username. Supabase hanya
+    // menerima email, jadi nilai tanpa "@" dicoba pada domain internal
+    // Attendance lebih dulu, baru domain tim Product Launch.
+    const raw = email.trim();
+    const kandidat = raw.includes('@')
+      ? [raw]
+      : [
+        `${raw.toLowerCase()}@attendance.ggindoapparel.internal`,
+        `${raw.toLowerCase()}@team.ggindoapparel.internal`,
+      ];
+
+    let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data'] | null = null;
+    let error: { message: string } | null = null;
+
+    for (const kandidatEmail of kandidat) {
+      const attempt = await supabase.auth.signInWithPassword({ email: kandidatEmail, password });
+      if (!attempt.error) { data = attempt.data; error = null; break; }
+      error = attempt.error;
+    }
 
     setLoading(false);
 
-    if (error) {
-      setErrorMsg(error.message === 'Invalid login credentials' ? 'Email atau password salah.' : error.message);
+    if (error || !data?.user) {
+      setErrorMsg(
+        error?.message === 'Invalid login credentials'
+          ? 'Nomor pegawai/email atau password salah.'
+          : error?.message ?? 'Gagal masuk.',
+      );
       return;
     }
 
-    if (data.user) {
-      const { data: mems } = await supabase
-        .from('attendance_memberships')
-        .select('*')
-        .eq('user_id', data.user.id)
-        .eq('is_active', true);
+    const { data: mems } = await supabase
+      .from('attendance_memberships')
+      .select('role')
+      .eq('user_id', data.user.id)
+      .eq('is_active', true);
 
-      const roles = mems?.map(m => m.role) ?? [];
-      if (roles.includes('OWNER') || roles.includes('BUSINESS_UNIT_ADMIN')) {
-        navigate('/attendance/admin/dashboard');
-      } else {
-        navigate('/attendance/today');
-      }
+    const roles = mems?.map(m => m.role) ?? [];
+
+    // Akun Product Launch tidak otomatis boleh masuk Attendance.
+    if (roles.length === 0) {
+      await supabase.auth.signOut();
+      setErrorMsg(
+        'Akun ini tidak terdaftar pada sistem Attendance. '
+        + 'Akun Product Launch OS memakai kredensial terpisah. Hubungi admin unit untuk didaftarkan.',
+      );
+      return;
+    }
+
+    if (roles.includes('OWNER') || roles.includes('BUSINESS_UNIT_ADMIN')) {
+      navigate('/attendance/admin/dashboard');
+    } else {
+      navigate('/attendance/today');
     }
   }
 
@@ -120,10 +149,12 @@ export function LoginPage() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, color: '#667085', fontWeight: 700 }}>Email / Username</label>
+            <label style={{ fontSize: 12, color: '#667085', fontWeight: 700 }}>Nomor Pegawai / Email</label>
             <input
-              type="email"
-              placeholder="nama@perusahaan.com"
+              type="text"
+              autoCapitalize="none"
+              autoCorrect="off"
+              placeholder="UJO-001 atau email lengkap"
               value={email}
               onChange={e => setEmail(e.target.value)}
               style={{
@@ -180,25 +211,9 @@ export function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Demo Access Bar */}
-        <div style={{ borderTop: '1px solid #EEF1F4', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: '#667085', fontWeight: 600 }}>Demo Quick Access:</div>
-          <button
-            onClick={() => navigate('/attendance/admin/dashboard')}
-            style={{
-              padding: '10px 14px',
-              backgroundColor: '#EEF1F4',
-              border: '1px solid #E4E7EC',
-              borderRadius: 12,
-              color: '#3178C6',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Buka Dashboard Admin (Owner View) →
-          </button>
-        </div>
+        {/* Catatan: pintasan "Demo Quick Access" ke dashboard admin dihapus.
+            Pintasan itu melompati proses login sehingga siapa pun dapat membuka
+            dashboard tanpa kredensial. */}
 
         {/* Footer info */}
         <div style={{ fontSize: 11, color: '#667085', textAlign: 'center', fontWeight: 600 }}>
