@@ -10,6 +10,7 @@ import { LoginPage } from '@/modules/attendance/pages/LoginPage';
 import { TodayPage } from '@/modules/attendance/pages/TodayPage';
 import { HistoryPage, LeavePage, SchedulePage, ProfilePage } from '@/modules/attendance/pages/HistoryPage';
 import { AdminDashboardPage } from '@/modules/attendance/pages/AdminDashboardPage';
+import { AttendanceGuard } from '@/modules/attendance/components/AttendanceGuard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,12 +97,15 @@ function RouteView() {
   if (pathname === '/attendance' || pathname === '/attendance/' || pathname === '/attendance/login') {
     return <LoginPage />;
   }
-  if (pathname === '/attendance/today') return <TodayPage />;
-  if (pathname === '/attendance/schedule') return <SchedulePage />;
-  if (pathname === '/attendance/history') return <HistoryPage />;
-  if (pathname === '/attendance/leave') return <LeavePage />;
-  if (pathname === '/attendance/profile') return <ProfilePage />;
-  if (pathname.startsWith('/attendance/admin')) return <AdminDashboardPage />;
+  // Seluruh layar Attendance wajib melewati AttendanceGuard: sesi aktif DAN
+  // terdaftar di attendance_memberships. Akun Product Launch tidak otomatis
+  // memperoleh akses ke sini.
+  if (pathname === '/attendance/today') return <AttendanceGuard><TodayPage /></AttendanceGuard>;
+  if (pathname === '/attendance/schedule') return <AttendanceGuard><SchedulePage /></AttendanceGuard>;
+  if (pathname === '/attendance/history') return <AttendanceGuard><HistoryPage /></AttendanceGuard>;
+  if (pathname === '/attendance/leave') return <AttendanceGuard><LeavePage /></AttendanceGuard>;
+  if (pathname === '/attendance/profile') return <AttendanceGuard><ProfilePage /></AttendanceGuard>;
+  if (pathname.startsWith('/attendance/admin')) return <AttendanceGuard><AdminDashboardPage /></AttendanceGuard>;
 
   if (pathname === '/pos' || pathname === '/pos/' || pathname === '/pos/login') {
     return <ModuleLoginPreview system="POS Seller" />;
