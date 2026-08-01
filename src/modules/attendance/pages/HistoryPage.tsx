@@ -7,52 +7,139 @@ import { LoadingState, EmptyState } from '../components/AttendanceStateComponent
 import type { Employee } from '../domain/types';
 import '../attendance.css';
 
+/** Employee id milik user yang sedang login. */
+function useCurrentEmployeeId() {
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user || !active) return;
+      const { data: emp } = await supabase
+        .from('attendance_employees')
+        .select('id')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+      if (emp && active) setEmployeeId(emp.id);
+    })();
+    return () => { active = false; };
+  }, []);
+  return employeeId;
+}
+
+function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      <h1 className="att-h2">{title}</h1>
+      <button
+        type="button"
+        className="att-btn att-btn-secondary"
+        onClick={onBack}
+        style={{ minHeight: 36, padding: '0 12px', fontSize: 13 }}
+      >
+        ← Hari Ini
+      </button>
+    </div>
+  );
+}
+
+const DAY_LABEL = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+/** Tujuh hari ke depan mulai hari ini (format ISO). */
+function weekRange() {
+  const days: string[] = [];
+  const base = new Date();
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(base);
+    d.setDate(base.getDate() + i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
 export function SchedulePage() {
   const navigate = useNavigate();
-  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const employeeId = useCurrentEmployeeId();
+  const [rows, setRows] = useState<Array<{ date: string; shift?: string; time?: string; area?: string }> | null>(null);
 
   useEffect(() => {
-    async function initUser() {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        const { data: emp } = await supabase.from('attendance_employees').select('id').eq('user_id', data.user.id).maybeSingle();
-        if (emp) setEmployeeId(emp.id);
-      }
-    }
-    initUser();
-  }, []);
+    if (!employeeId) return;
+    let active = true;
+    (async () => {
+      const dates = weekRange();
+      // Roster diambil dari database, bukan contoh statis, supaya yang tampil
+      // benar-benar jadwal pegawai yang bersangkutan.
+      const { data } = await supabase
+        .from('attendance_schedules')
+        .select('schedule_date, shift_template:attendance_shift_templates(name, start_time, end_time), work_area:attendance_work_areas(name)')
+        .eq('employee_id', employeeId)
+        .gte('schedule_date', dates[0])
+        .lte('schedule_date', dates[dates.length - 1]);
+
+      if (!active) return;
+
+      const byDate = new Map<string, { name?: string; start_time?: string; end_time?: string; area?: string }>();
+      (data ?? []).forEach((row: Record<string, unknown>) => {
+        const tpl = row.shift_template as { name?: string; start_time?: string; end_time?: string } | null;
+        const area = row.work_area as { name?: string } | null;
+        byDate.set(String(row.schedule_date), {
+          name: tpl?.name,
+          start_time: tpl?.start_time,
+          end_time: tpl?.end_time,
+          area: area?.name,
+        });
+      });
+
+      setRows(dates.map((date) => {
+        const hit = byDate.get(date);
+        return {
+          date,
+          shift: hit?.name,
+          time: hit?.start_time && hit?.end_time
+            ? `${hit.start_time.slice(0, 5)} – ${hit.end_time.slice(0, 5)}`
+            : undefined,
+          area: hit?.area,
+        };
+      }));
+    })();
+    return () => { active = false; };
+  }, [employeeId]);
 
   return (
-    <div style={{ maxWidth: 430, margin: '0 auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, color: '#E4E7EC', margin: 0 }}>Jadwal Kerja Pegawai</h1>
-        <button onClick={() => navigate('/attendance/today')} style={{ padding: '6px 12px', backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 7, color: '#667085', fontSize: 12, cursor: 'pointer' }}>
-          ← Hari Ini
-        </button>
-      </div>
+    <div className="att-app">
+      <div className="att-shell" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <PageHeader title="Jadwal Kerja" onBack={() => navigate('/attendance/today')} />
 
-      <div style={{ backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 14, padding: '18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#3178C6' }}>📅 Jadwal Minggu Ini (Bakso Ujo)</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { day: 'Senin', shift: 'Produksi Dini Hari (03:00 - 15:00)', area: 'Produksi' },
-            { day: 'Selasa', shift: 'Produksi Dini Hari (03:00 - 15:00)', area: 'Produksi' },
-            { day: 'Rabu', shift: 'Produksi Pagi A (05:00 - 17:00)', area: 'Service' },
-            { day: 'Kamis', shift: 'Persiapan & Service (09:00 - 21:00)', area: 'Persiapan' },
-            { day: 'Jumat', shift: 'Outlet & Closing (10:00 - 22:00)', area: 'Closing' },
-            { day: 'Sabtu', shift: 'Outlet & Closing (10:00 - 22:00)', area: 'Closing' },
-            { day: 'Minggu', shift: 'OFF / LIBUR', area: '—' },
-          ].map(s => (
-            <div key={s.day} style={{ backgroundColor: '#18212F', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#E4E7EC' }}>{s.day}</div>
-                <div style={{ fontSize: 11, color: '#667085', marginTop: 2 }}>{s.shift}</div>
-              </div>
-              <span style={{ fontSize: 11, backgroundColor: s.area === '—' ? '#18212F' : '#3178C622', color: s.area === '—' ? '#667085' : '#3178C6', padding: '2px 8px', borderRadius: 8, fontWeight: 600 }}>
-                {s.area}
-              </span>
+        <div className="att-card">
+          <div className="att-label" style={{ marginBottom: 12 }}>Tujuh hari ke depan</div>
+
+          {rows === null ? (
+            <p className="att-small">Memuat jadwal…</p>
+          ) : (
+            <div>
+              {rows.map((row) => {
+                const d = new Date(`${row.date}T00:00:00`);
+                const kosong = !row.shift;
+                return (
+                  <div key={row.date} className="att-row">
+                    <div style={{ minWidth: 58 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{DAY_LABEL[d.getDay()]}</div>
+                      <div className="att-small">{row.date.slice(8, 10)}/{row.date.slice(5, 7)}</div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>
+                        {row.shift ?? 'Tidak dijadwalkan'}
+                      </div>
+                      {row.time && <div className="att-small">{row.time} WIB</div>}
+                    </div>
+                    <span className={`att-chip ${kosong ? '' : 'att-chip-info'}`}>
+                      {row.area ?? (kosong ? 'Libur' : 'Shift')}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
@@ -61,92 +148,80 @@ export function SchedulePage() {
 
 export function HistoryPage() {
   const navigate = useNavigate();
-  const [employeeId, setEmployeeId] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function initUser() {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        const { data: emp } = await supabase
-          .from('attendance_employees')
-          .select('id')
-          .eq('user_id', data.user.id)
-          .maybeSingle();
-        if (emp) setEmployeeId(emp.id);
-      }
-    }
-    initUser();
-  }, []);
-
+  const employeeId = useCurrentEmployeeId();
   const { data: histRes, isLoading } = useEmployeeHistory(employeeId);
   const history = histRes?.data ?? [];
 
   if (isLoading) return <LoadingState message="Memuat histori presensi..." />;
 
-  return (
-    <div style={{ maxWidth: 430, margin: '0 auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, color: '#E4E7EC', margin: 0 }}>Histori Presensi</h1>
-        <button onClick={() => navigate('/attendance/today')} style={{ padding: '6px 12px', backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 7, color: '#667085', fontSize: 12, cursor: 'pointer' }}>
-          ← Hari Ini
-        </button>
-      </div>
+  const chipFor = (status: string) =>
+    status === 'PRESENT' ? 'att-chip att-chip-success'
+      : status === 'LATE' ? 'att-chip att-chip-warning'
+        : 'att-chip att-chip-danger';
 
-      {history.length === 0 ? (
-        <EmptyState title="Belum ada histori presensi" icon="📜" message="Histori presensi Anda akan muncul di sini." />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {history.map(day => (
-            <div key={day.id} style={{ backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 12, padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#E4E7EC' }}>{day.work_date}</div>
-                <div style={{ fontSize: 11, color: '#667085', marginTop: 2 }}>
-                  Masuk: <strong style={{ color: '#667085' }}>{day.check_in_time ? new Date(day.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'}</strong>
-                  {' • '}
-                  Pulang: <strong style={{ color: '#667085' }}>{day.check_out_time ? new Date(day.check_out_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'}</strong>
+  return (
+    <div className="att-app">
+      <div className="att-shell" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <PageHeader title="Histori Presensi" onBack={() => navigate('/attendance/today')} />
+
+        {history.length === 0 ? (
+          <EmptyState title="Belum ada histori presensi" icon="📜" message="Histori presensi Anda akan muncul di sini." />
+        ) : (
+          <div className="att-card">
+            {history.map((day) => (
+              <div key={day.id} className="att-row">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{day.work_date}</div>
+                  <div className="att-small">
+                    Masuk {day.check_in_time ? new Date(day.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                    {' · '}
+                    Pulang {day.check_out_time ? new Date(day.check_out_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                  </div>
                 </div>
+                <span className={chipFor(day.status)}>{day.status}</span>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 10, backgroundColor: day.status === 'PRESENT' ? '#16865B22' : day.status === 'LATE' ? '#D8890B22' : '#D53F3F22', color: day.status === 'PRESENT' ? '#16865B' : day.status === 'LATE' ? '#D8890B' : '#D53F3F' }}>
-                {day.status}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 export function LeavePage() {
   const navigate = useNavigate();
-  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const employeeId = useCurrentEmployeeId();
   const [leaveType, setLeaveType] = useState<'SICK' | 'ANNUAL_LEAVE' | 'PERMISSION' | 'BUSINESS_TRIP'>('SICK');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
 
   const requestLeaveMut = useRequestLeave();
 
-  useEffect(() => {
-    async function initUser() {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        const { data: emp } = await supabase.from('attendance_employees').select('id').eq('user_id', data.user.id).maybeSingle();
-        if (emp) setEmployeeId(emp.id);
-      }
-    }
-    initUser();
-  }, []);
+  const invalidRange = Boolean(startDate && endDate && endDate < startDate);
+  const canSubmit = Boolean(employeeId && startDate && endDate && reason.trim() && !invalidRange && !submitting);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!employeeId || !startDate || !endDate || !reason.trim()) return;
+    if (!employeeId || !canSubmit) return;
 
     setSubmitting(true);
+    setFeedback(null);
+
+    // Scope diambil dari assignment nyata. Sebelumnya dipakai UUID nil sebagai
+    // fallback, yang selalu ditolak foreign key dengan pesan membingungkan.
+    const scope = await attendanceRepository.resolveEmployeeScope(employeeId);
+    if (!scope.data) {
+      setSubmitting(false);
+      setFeedback({ tone: 'err', text: scope.error?.message ?? 'Unit penempatan tidak ditemukan.' });
+      return;
+    }
+
     const result = await requestLeaveMut.mutateAsync({
-      organization_id: '00000000-0000-0000-0000-000000000000',
-      business_unit_id: '00000000-0000-0000-0000-000000000000',
+      organization_id: scope.data.organization_id,
+      business_unit_id: scope.data.business_unit_id,
       employee_id: employeeId,
       leave_type: leaveType,
       start_date: startDate,
@@ -156,44 +231,85 @@ export function LeavePage() {
     setSubmitting(false);
 
     if (result.data) {
-      alert('Pengajuan izin berhasil dikirim!');
-      navigate('/attendance/today');
+      setFeedback({ tone: 'ok', text: 'Pengajuan terkirim dan menunggu persetujuan.' });
+      setStartDate(''); setEndDate(''); setReason('');
+      setTimeout(() => navigate('/attendance/today'), 1200);
     } else {
-      alert(`Gagal: ${result.error?.message}`);
+      setFeedback({ tone: 'err', text: result.error?.message ?? 'Pengajuan gagal dikirim.' });
     }
   }
 
   return (
-    <div style={{ maxWidth: 430, margin: '0 auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, color: '#E4E7EC', margin: 0 }}>Pengajuan Izin / Cuti</h1>
-        <button onClick={() => navigate('/attendance/today')} style={{ padding: '6px 12px', backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 7, color: '#667085', fontSize: 12, cursor: 'pointer' }}>
-          ← Hari Ini
-        </button>
+    <div className="att-app">
+      <div className="att-shell" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <PageHeader title="Pengajuan Izin / Cuti" onBack={() => navigate('/attendance/today')} />
+
+        <form onSubmit={handleSubmit} className="att-card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span className="att-label">Tipe pengajuan</span>
+            <select
+              className="att-input"
+              value={leaveType}
+              onChange={(e) => setLeaveType(e.target.value as typeof leaveType)}
+            >
+              <option value="SICK">Sakit</option>
+              <option value="ANNUAL_LEAVE">Cuti tahunan</option>
+              <option value="PERMISSION">Izin keperluan</option>
+              <option value="BUSINESS_TRIP">Dinas luar</option>
+            </select>
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span className="att-label">Mulai</span>
+              <input className="att-input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span className="att-label">Selesai</span>
+              <input
+                className="att-input"
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </label>
+          </div>
+
+          {invalidRange && (
+            <p className="att-small" style={{ color: 'var(--att-danger)', fontWeight: 600 }}>
+              Tanggal selesai tidak boleh lebih awal dari tanggal mulai.
+            </p>
+          )}
+
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span className="att-label">Alasan / keterangan</span>
+            <textarea
+              className="att-input"
+              style={{ minHeight: 90, padding: '10px 14px', resize: 'vertical', lineHeight: 1.5 }}
+              placeholder="Jelaskan alasan pengajuan…"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </label>
+
+          {feedback && (
+            <p
+              className="att-small"
+              style={{
+                fontWeight: 600,
+                color: feedback.tone === 'ok' ? 'var(--att-success)' : 'var(--att-danger)',
+              }}
+            >
+              {feedback.text}
+            </p>
+          )}
+
+          <button type="submit" className="att-btn att-btn-primary att-btn-action" disabled={!canSubmit}>
+            {submitting ? 'Mengirim…' : 'Kirim pengajuan'}
+          </button>
+        </form>
       </div>
-
-      <form onSubmit={handleSubmit} style={{ backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 14, padding: '18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <label style={{ fontSize: 12, color: '#667085' }}>Tipe Izin</label>
-        <select value={leaveType} onChange={e => setLeaveType(e.target.value as any)} style={{ padding: '8px 12px', backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 7, color: '#E4E7EC', fontSize: 13 }}>
-          <option value="SICK">Sakit</option>
-          <option value="ANNUAL_LEAVE">Cuti Tahunan</option>
-          <option value="PERMISSION">Izin Keperluan</option>
-          <option value="BUSINESS_TRIP">Dinas Luar</option>
-        </select>
-
-        <label style={{ fontSize: 12, color: '#667085' }}>Tanggal Mulai</label>
-        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '8px 12px', backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 7, color: '#E4E7EC', fontSize: 13 }} />
-
-        <label style={{ fontSize: 12, color: '#667085' }}>Tanggal Selesai</label>
-        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 7, color: '#E4E7EC', fontSize: 13 }} />
-
-        <label style={{ fontSize: 12, color: '#667085' }}>Alasan / Keterangan</label>
-        <textarea placeholder="Tuliskan alasan..." value={reason} onChange={e => setReason(e.target.value)} rows={3} style={{ padding: '8px 12px', backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 7, color: '#E4E7EC', fontSize: 13 }} />
-
-        <button type="submit" disabled={submitting} style={{ marginTop: 6, padding: '10px', backgroundColor: '#3178C6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-          {submitting ? 'Kirim...' : 'Kirim Pengajuan'}
-        </button>
-      </form>
     </div>
   );
 }
@@ -203,44 +319,102 @@ export function ProfilePage() {
   const [emp, setEmp] = useState<Employee | null>(null);
 
   useEffect(() => {
-    async function initUser() {
+    let active = true;
+    (async () => {
       const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        const { data: profile } = await supabase.from('attendance_employees').select('*').eq('user_id', data.user.id).maybeSingle();
-        if (profile) setEmp(profile);
-      }
-    }
-    initUser();
+      if (!data.user || !active) return;
+      const { data: profile } = await supabase
+        .from('attendance_employees')
+        .select('*')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+      if (profile && active) setEmp(profile);
+    })();
+    return () => { active = false; };
   }, []);
 
+  const initials = (emp?.full_name ?? '?')
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+
   return (
-    <div style={{ maxWidth: 430, margin: '0 auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, color: '#E4E7EC', margin: 0 }}>Profil Pegawai</h1>
-        <button onClick={() => navigate('/attendance/today')} style={{ padding: '6px 12px', backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 7, color: '#667085', fontSize: 12, cursor: 'pointer' }}>
-          ← Hari Ini
-        </button>
-      </div>
+    <div className="att-app">
+      <div className="att-shell" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <PageHeader title="Profil Pegawai" onBack={() => navigate('/attendance/today')} />
 
-      <div style={{ backgroundColor: '#18212F', border: '1px solid #18212F', borderRadius: 14, padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
-        <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: '#E96A12', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 700, color: '#fff' }}>
-          {emp?.full_name?.charAt(0) ?? 'P'}
-        </div>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#E4E7EC' }}>{emp?.full_name ?? 'Kru Bakso Ujo'}</div>
-          <div style={{ fontSize: 12, color: '#E96A12', fontWeight: 600, marginTop: 2 }}>{emp?.employee_no ?? 'UJO-001'}</div>
-          <div style={{ fontSize: 12, color: '#667085', marginTop: 4 }}>Bakso Ujo • Outlet Utama</div>
-        </div>
+        {!emp ? (
+          <p className="att-small">Memuat profil…</p>
+        ) : (
+          <>
+            <div className="att-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: 'var(--att-primary)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 18,
+                  flex: '0 0 auto',
+                }}
+              >
+                {initials}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div className="att-h3" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {emp.full_name}
+                </div>
+                <div className="att-small">{emp.employee_no}</div>
+                <span className={`att-chip ${emp.is_active ? 'att-chip-success' : ''}`} style={{ marginTop: 6 }}>
+                  {emp.is_active ? 'Aktif' : 'Nonaktif'}
+                </span>
+              </div>
+            </div>
 
-        <button
-          onClick={async () => {
-            await supabase.auth.signOut();
-            navigate('/attendance/login');
-          }}
-          style={{ width: '100%', marginTop: 12, padding: '12px', backgroundColor: '#D53F3F22', border: '1px solid #D53F3F66', borderRadius: 10, color: '#D53F3F', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
-        >
-          🚪 Keluar (Sign Out)
-        </button>
+            <div className="att-card">
+              <div className="att-label" style={{ marginBottom: 4 }}>Kontak</div>
+              <div className="att-row">
+                <span className="att-small" style={{ flex: 1 }}>Email</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{emp.email || '—'}</span>
+              </div>
+              <div className="att-row">
+                <span className="att-small" style={{ flex: 1 }}>Telepon</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{emp.phone || '—'}</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="att-btn att-btn-secondary"
+              onClick={() => navigate('/attendance/leave')}
+            >
+              Ajukan izin / cuti
+            </button>
+
+            <button
+              type="button"
+              className="att-btn"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate('/attendance/login');
+              }}
+              style={{
+                background: 'rgba(213, 63, 63, .10)',
+                color: 'var(--att-danger)',
+                border: '1px solid rgba(213, 63, 63, .28)',
+              }}
+            >
+              Keluar
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

@@ -27,7 +27,69 @@ function mapError(error: unknown): AppError {
   return { code: 'UNKNOWN_ERROR', message: 'Terjadi kesalahan tidak dikenal' };
 }
 
+/** Scope organisasi/unit/lokasi milik seorang employee. */
+export interface EmployeeScope {
+  organization_id: string;
+  business_unit_id: string;
+  location_id: string;
+}
+
 export const attendanceRepository = {
+  /**
+   * Ambil scope dari assignment PRIMER employee (fallback: assignment aktif pertama).
+   *
+   * Sebelumnya beberapa layar memakai UUID nil sebagai fallback ketika unit tidak
+   * ketemu. Kolom organization_id/business_unit_id punya foreign key, sehingga
+   * insert pasti ditolak dan user hanya melihat error FK yang membingungkan.
+   * Lebih baik gagal lebih awal dengan pesan yang bisa ditindaklanjuti.
+   */
+  async resolveEmployeeScope(
+    employeeId: string,
+  ): Promise<{ data: EmployeeScope | null; error?: AppError }> {
+    try {
+      const { data, error } = await supabase
+        .from('attendance_employee_assignments')
+        .select('business_unit_id, location_id, is_primary, business_unit:attendance_business_units(organization_id)')
+        .eq('employee_id', employeeId)
+        .eq('is_active', true)
+        .order('is_primary', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) return { data: null, error: mapError(error) };
+      if (!data) {
+        return {
+          data: null,
+          error: {
+            code: 'NO_ASSIGNMENT',
+            message: 'Anda belum ditugaskan ke unit dan lokasi mana pun. Hubungi admin unit untuk pengaturan penempatan.',
+          },
+        };
+      }
+
+      const unit = data.business_unit as unknown as { organization_id?: string } | null;
+      if (!unit?.organization_id) {
+        return {
+          data: null,
+          error: {
+            code: 'NO_ORGANIZATION',
+            message: 'Unit penempatan Anda belum terhubung ke organisasi. Hubungi admin unit.',
+          },
+        };
+      }
+
+      return {
+        data: {
+          organization_id: unit.organization_id,
+          business_unit_id: data.business_unit_id,
+          location_id: data.location_id,
+        },
+      };
+    } catch (err) {
+      return { data: null, error: mapError(err) };
+    }
+  },
+
   // ===================================
   // 1. Single Login & Scope Context
   // ===================================

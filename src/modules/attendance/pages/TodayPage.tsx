@@ -64,6 +64,7 @@ export function TodayPage() {
   const [accuracyM, setAccuracyM] = useState<number | null>(null);
   const [geoError, setGeoError] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [scopeError, setScopeError] = useState<string | null>(null);
 
   useEffect(() => {
     if ('geolocation' in navigator) {
@@ -117,15 +118,45 @@ export function TodayPage() {
   }
 
   async function executePunch(eventType: 'CHECK_IN' | 'CHECK_OUT') {
+    if (!employeeId) return;
     setSubmitting(true);
 
+    // Scope wajib berasal dari jadwal atau assignment nyata. Sebelumnya dipakai
+    // UUID nil sebagai fallback; kolom-kolom ini punya foreign key sehingga
+    // absen pasti ditolak dan pegawai hanya melihat error teknis yang
+    // membingungkan. Lebih baik berhenti lebih awal dengan pesan jelas.
+    let orgId = sched?.location?.organization_id;
+    let unitId = sched?.business_unit_id;
+    let locId = sched?.location_id;
+    const assignmentId = sched?.assignment_id;
+
+    if (!orgId || !unitId || !locId) {
+      const scope = await attendanceRepository.resolveEmployeeScope(employeeId);
+      if (!scope.data) {
+        setSubmitting(false);
+        setScopeError(scope.error?.message ?? 'Unit penempatan Anda belum diatur. Hubungi admin unit.');
+        return;
+      }
+      orgId = orgId ?? scope.data.organization_id;
+      unitId = unitId ?? scope.data.business_unit_id;
+      locId = locId ?? scope.data.location_id;
+    }
+
+    if (!assignmentId) {
+      setSubmitting(false);
+      setScopeError('Penempatan (assignment) untuk shift ini belum tersedia. Hubungi admin unit sebelum melakukan absen.');
+      return;
+    }
+
+    setScopeError(null);
+
     const result = await recordEventMut.mutateAsync({
-      organization_id: sched?.location?.organization_id ?? '00000000-0000-0000-0000-000000000000',
-      business_unit_id: sched?.business_unit_id ?? '00000000-0000-0000-0000-000000000000',
-      location_id: sched?.location_id ?? '00000000-0000-0000-0000-000000000000',
+      organization_id: orgId,
+      business_unit_id: unitId,
+      location_id: locId,
       work_area_id: sched?.work_area_id ?? undefined,
-      employee_id: employeeId!,
-      assignment_id: sched?.assignment_id ?? '00000000-0000-0000-0000-000000000000',
+      employee_id: employeeId,
+      assignment_id: assignmentId,
       schedule_id: sched?.id,
       event_type: eventType,
       client_captured_at: new Date().toISOString(),
@@ -318,6 +349,24 @@ export function TodayPage() {
           </div>
 
           {!hasCheckedIn && (
+            <>
+            {scopeError && (
+              <div
+                role="alert"
+                style={{
+                  marginBottom: 10,
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  background: 'rgba(213, 63, 63, .10)',
+                  border: '1px solid rgba(213, 63, 63, .28)',
+                  color: '#D53F3F',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                {scopeError}
+              </div>
+            )}
             <button
               onClick={() => triggerPunchWithFaceScan('CHECK_IN')}
               disabled={submitting}
@@ -337,6 +386,7 @@ export function TodayPage() {
             >
               {submitting ? 'Memproses...' : '📷 SCAN FACE & ABSEN MASUK'}
             </button>
+            </>
           )}
 
           {hasCheckedIn && !hasCheckedOut && (
