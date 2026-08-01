@@ -30,6 +30,7 @@ import { uploadArticleMedia } from './services/media';
 import { compressImageForUpload } from './utils/cloudinary';
 import { deriveArticleIndicators } from './utils/calculations';
 import { useLocation, useNavigate } from '../../src/app/router/simpleRouter';
+import { signOut } from '../../src/core/auth/useAuth';
 import {
   Article,
   Supplier,
@@ -502,6 +503,11 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     setShowQuickCreateModal(true);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/launch/login');
+  };
+
   const pendingApprovals = approvals.filter((a) => a.status === 'Pending');
   const pendingApprovalsCount = pendingApprovals.length;
   const blockedTasksCount = blockers.length;
@@ -540,6 +546,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
         pendingApprovals={pendingApprovals}
         onOpenGlobalSearch={() => setShowGlobalSearchModal(true)}
         onSelectTab={(tab) => selectTab(tab as PatenTab)}
+        onSignOut={() => void handleSignOut()}
         activeTab={activeTab}
         currentUser={currentUser}
         canCreate={canCreate}
@@ -715,6 +722,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
           pendingApprovalsCount={pendingApprovalsCount}
           activeBusinessUnit={selectedUnit}
           onSelectBusinessUnit={setSelectedUnit}
+        onSignOut={() => void handleSignOut()}
           canCreate={canCreate}
         />
       </div>

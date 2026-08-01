@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Command,
+  LogOut,
 } from 'lucide-react';
 import { BusinessUnit, ApprovalGate } from '../../types';
 
@@ -21,6 +22,7 @@ interface NavbarProps {
   pendingApprovals: ApprovalGate[];
   onOpenGlobalSearch: () => void;
   onSelectTab: (tab: string) => void;
+  onSignOut: () => void;
   activeTab: string;
   currentUser?: {
     name: string;
@@ -38,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   pendingApprovals,
   onOpenGlobalSearch,
   onSelectTab,
+  onSignOut,
   activeTab: _activeTab,
   currentUser,
   canCreate = false,
@@ -45,6 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [showBuDropdown, setShowBuDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const businessUnits: BusinessUnit[] = [
     'Mainline Studio',
@@ -228,18 +232,46 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
 
         {/* User Profile Avatar */}
-        <div className="flex items-center gap-2 pl-1 border-l border-slate-200 ml-0.5">
-          {currentUser?.avatarUrl ? (
-            <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-full border border-white object-cover shadow-sm" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-[#DDF4F1] text-[#087E79] flex items-center justify-center font-mono font-bold text-xs border border-[#087E79]/20">
-              {(currentUser?.name || 'U').slice(0, 1).toUpperCase()}
+        <div className="relative flex items-center gap-2 pl-1 border-l border-slate-200 ml-0.5">
+          <button
+            type="button"
+            onClick={() => setShowProfileMenu(value => !value)}
+            className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-slate-100 transition-colors"
+            title="Menu profil"
+          >
+            {currentUser?.avatarUrl ? (
+              <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-full border border-white object-cover shadow-sm" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-[#DDF4F1] text-[#087E79] flex items-center justify-center font-mono font-bold text-xs border border-[#087E79]/20">
+                {(currentUser?.name || 'U').slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div className="hidden 2xl:block max-w-32 text-left">
+              <p className="truncate text-[11px] font-bold text-slate-900">{currentUser?.name || 'Pengguna'}</p>
+              <p className="truncate text-[9px] text-slate-400">{currentUser?.jobTitle || 'Studio team'}</p>
+            </div>
+            <ChevronDown className="hidden 2xl:block w-3.5 h-3.5 text-slate-400" />
+          </button>
+
+          {showProfileMenu && (
+            <div className="absolute top-full right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl z-50">
+              <div className="px-2.5 py-2 border-b border-slate-100">
+                <p className="truncate text-[11px] font-bold text-slate-900">{currentUser?.name || 'Pengguna'}</p>
+                <p className="truncate text-[10px] text-slate-400">{currentUser?.jobTitle || 'Studio team'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  onSignOut();
+                }}
+                className="mt-2 w-full flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Keluar</span>
+              </button>
             </div>
           )}
-          <div className="hidden 2xl:block max-w-32">
-            <p className="truncate text-[11px] font-bold text-slate-900">{currentUser?.name || 'Pengguna'}</p>
-            <p className="truncate text-[9px] text-slate-400">{currentUser?.jobTitle || 'Studio team'}</p>
-          </div>
         </div>
       </div>
     </header>

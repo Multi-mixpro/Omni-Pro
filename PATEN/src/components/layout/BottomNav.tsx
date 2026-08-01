@@ -17,6 +17,7 @@ import {
   Rocket,
   Calendar,
   Settings,
+  LogOut,
 } from 'lucide-react';
 import { BusinessUnit } from '../../types';
 
@@ -27,6 +28,7 @@ interface BottomNavProps {
   pendingApprovalsCount: number;
   activeBusinessUnit: BusinessUnit;
   onSelectBusinessUnit: (bu: BusinessUnit) => void;
+  onSignOut: () => void;
   canCreate?: boolean;
 }
 
@@ -37,6 +39,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   pendingApprovalsCount,
   activeBusinessUnit,
   onSelectBusinessUnit,
+  onSignOut,
   canCreate = false,
 }) => {
   const [showMoreSheet, setShowMoreSheet] = useState(false);
@@ -234,6 +237,18 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 <Settings className="w-4 h-4 text-slate-500" />
                 <span>Pengaturan & Akses</span>
               </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreSheet(false);
+                  onSignOut();
+                }}
+                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-left text-xs font-bold text-rose-700"
+              >
+                <LogOut className="w-4 h-4 text-rose-500" />
+                <span>Keluar</span>
+              </button>
 
             </div>
           </div>
