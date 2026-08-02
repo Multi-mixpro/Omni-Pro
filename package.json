@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
-    "typecheck:api": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --skipLibCheck api/cloudinary-sign.ts api/cloudinary-delete.ts api/team-user-create.ts api/team-user-delete.ts api/team-user-update.ts api/attendance-user-create.ts api/attendance-user-update.ts api/attendance-user-delete.ts api/attendance-schedules-ensure.ts api/attendance-pin-login.ts",
+    "typecheck:api": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --skipLibCheck api/cloudinary-sign.ts api/cloudinary-delete.ts api/team-user-create.ts api/team-user-delete.ts api/team-user-update.ts api/attendance-user-create.ts api/attendance-user-update.ts api/attendance-user-delete.ts api/attendance-schedules-ensure.ts api/attendance-pin-login.ts api/attendance-face-enroll.ts api/attendance-event-submit.ts",
     "build": "tsc -b && npm run typecheck:api && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -17,6 +17,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
     "@tanstack/react-query": "^5.66.0",
+    "@vladmandic/human": "^3.3.6",
     "lucide-react": "^0.475.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

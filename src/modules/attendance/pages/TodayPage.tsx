@@ -1,51 +1,62 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@/app/router/simpleRouter';
 import { supabase } from '@/integrations/supabase/client';
-import { attendanceRepository } from '../data/attendanceRepository';
-import { useTodaySchedule, useTodayAttendanceDay, useRecordAttendanceEvent } from '../hooks/useAttendance';
+import { attendanceKeys, useTodaySchedule, useTodayAttendanceDay, useRecordAttendanceEvent } from '../hooks/useAttendance';
 import { evaluateGeofence } from '../domain/geofenceCalculator';
+import { attendanceDateInJakarta } from '../domain/attendanceDate';
 import { LoadingState } from '../components/AttendanceStateComponents';
-import type { Employee } from '../domain/types';
+import { FaceCaptureModal, type FaceCaptureResult } from '../components/FaceCaptureModal';
 import '../attendance.css';
+
+const DEVICE_STORAGE_KEY = 'central-attendance-device-id-v1';
+
+function attendanceDeviceId(): string {
+  const existing = window.localStorage.getItem(DEVICE_STORAGE_KEY);
+  if (existing) return existing;
+  const created = `att-${window.crypto.randomUUID()}`;
+  window.localStorage.setItem(DEVICE_STORAGE_KEY, created);
+  return created;
+}
 
 export function TodayPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [empName, setEmpName] = useState<string>('Pegawai');
-  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [faceEnrolled, setFaceEnrolled] = useState(false);
 
-  // Face Scan State
-  const [faceScanning, setFaceScanning] = useState(false);
-  const [faceVerified, setFaceVerified] = useState(false);
+  // Face verification state
+  const [faceModalOpen, setFaceModalOpen] = useState(false);
   const [pendingEventType, setPendingEventType] = useState<'CHECK_IN' | 'CHECK_OUT' | null>(null);
+  const [attendanceNotice, setAttendanceNotice] = useState<string | null>(null);
+  const [currentLat, setCurrentLat] = useState<number | null>(null);
+  const [currentLon, setCurrentLon] = useState<number | null>(null);
+  const [accuracyM, setAccuracyM] = useState<number | null>(null);
+  const [geoError, setGeoError] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+  const [scopeError, setScopeError] = useState<string | null>(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = attendanceDateInJakarta();
 
   useEffect(() => {
     async function initUser() {
-      const { data: empList } = await attendanceRepository.listEmployees();
-      if (empList && empList.length > 0) {
-        setAllEmployees(empList);
-      }
-
       const { data } = await supabase.auth.getUser();
       if (data.user) {
         const { data: emp } = await supabase
           .from('attendance_employees')
-          .select('id, full_name')
+          .select('id, full_name, face_enrolled')
           .eq('user_id', data.user.id)
+          .eq('is_active', true)
           .maybeSingle();
 
         if (emp) {
           setEmployeeId(emp.id);
           setEmpName(emp.full_name);
-        } else if (empList && empList.length > 0) {
-          setEmployeeId(empList[0].id);
-          setEmpName(empList[0].full_name);
+          setFaceEnrolled(emp.face_enrolled === true);
+        } else {
+          setScopeError('Akun ini tidak terhubung ke profil karyawan aktif. Masuk menggunakan PIN kru yang sesuai.');
         }
-      } else if (empList && empList.length > 0) {
-        setEmployeeId(empList[0].id);
-        setEmpName(empList[0].full_name);
       }
     }
     initUser();
@@ -58,26 +69,53 @@ export function TodayPage() {
   const sched = schedRes?.data;
   const day = dayRes?.data;
 
-  // Geolocation & Capture State
-  const [currentLat, setCurrentLat] = useState<number | null>(null);
-  const [currentLon, setCurrentLon] = useState<number | null>(null);
-  const [accuracyM, setAccuracyM] = useState<number | null>(null);
-  const [geoError, setGeoError] = useState<string>('');
-  const [submitting, setSubmitting] = useState(false);
-  const [scopeError, setScopeError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!employeeId) return undefined;
+
+    let refreshTimer: number | undefined;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: attendanceKeys.todayDay(employeeId, todayStr) });
+        void queryClient.invalidateQueries({ queryKey: attendanceKeys.todaySchedule(employeeId, todayStr) });
+        void queryClient.invalidateQueries({ queryKey: attendanceKeys.history(employeeId) });
+      }, 150);
+    };
+
+    const channel = supabase
+      .channel(`attendance-employee-realtime-${employeeId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_days', filter: `employee_id=eq.${employeeId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_events', filter: `employee_id=eq.${employeeId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_schedules', filter: `employee_id=eq.${employeeId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'attendance_employees', filter: `id=eq.${employeeId}` }, payload => {
+        const updated = payload.new as { face_enrolled?: boolean };
+        setFaceEnrolled(updated.face_enrolled === true);
+        scheduleRefresh();
+      })
+      .subscribe();
+
+    return () => {
+      window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [employeeId, queryClient, todayStr]);
 
   useEffect(() => {
     if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
+      const watchId = navigator.geolocation.watchPosition(
         pos => {
           setCurrentLat(pos.coords.latitude);
           setCurrentLon(pos.coords.longitude);
           setAccuracyM(pos.coords.accuracy);
+          setGeoError('');
         },
         err => setGeoError(err.message),
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 },
       );
+      return () => navigator.geolocation.clearWatch(watchId);
     }
+    setGeoError('Browser ini tidak mendukung lokasi GPS.');
+    return undefined;
   }, []);
 
   if (schedLoading || dayLoading) {
@@ -89,100 +127,63 @@ export function TodayPage() {
   const targetLon = sched?.location?.longitude ?? 107.6191;
   const targetRadius = sched?.location?.geofence_radius_m ?? 150;
 
-  const effectiveLat = currentLat ?? Number(targetLat);
-  const effectiveLon = currentLon ?? Number(targetLon);
-  const effectiveAcc = accuracyM ?? 10;
-
-  const geoEval = evaluateGeofence(effectiveLat, effectiveLon, effectiveAcc, Number(targetLat), Number(targetLon), Number(targetRadius));
+  const geoEval = currentLat !== null && currentLon !== null && accuracyM !== null
+    ? evaluateGeofence(currentLat, currentLon, accuracyM, Number(targetLat), Number(targetLon), Number(targetRadius))
+    : null;
 
   const hasCheckedIn = !!day?.check_in_time || day?.status === 'PRESENT';
   const hasCheckedOut = !!day?.check_out_time;
 
   function triggerPunchWithFaceScan(eventType: 'CHECK_IN' | 'CHECK_OUT') {
     if (!employeeId) {
-      alert('Pilih pegawai terlebih dahulu.');
+      setScopeError('Profil karyawan belum tersedia. Masuk kembali memakai PIN kru.');
       return;
     }
+    if (!faceEnrolled) {
+      setScopeError('Wajah Anda belum didaftarkan. Hubungi admin untuk melakukan pendaftaran wajah terlebih dahulu.');
+      return;
+    }
+    if (!geoEval || currentLat === null || currentLon === null || accuracyM === null) {
+      setScopeError(geoError || 'Lokasi GPS belum siap. Izinkan lokasi lalu tunggu akurasi terkunci.');
+      return;
+    }
+    if (geoEval.geofence_status !== 'WITHIN_GEOFENCE') {
+      setScopeError(`Anda berada ${geoEval.distance_m} m dari lokasi kerja dan belum dapat melakukan absen.`);
+      return;
+    }
+    setScopeError(null);
+    setAttendanceNotice(null);
     setPendingEventType(eventType);
-    setFaceScanning(true);
-    setFaceVerified(false);
-
-    // Simulate Biometric Landmark Recognition Scan
-    setTimeout(() => {
-      setFaceVerified(true);
-      setTimeout(() => {
-        setFaceScanning(false);
-        executePunch(eventType);
-      }, 800);
-    }, 1200);
+    setFaceModalOpen(true);
   }
 
-  async function executePunch(eventType: 'CHECK_IN' | 'CHECK_OUT') {
-    if (!employeeId) return;
+  async function executePunch(eventType: 'CHECK_IN' | 'CHECK_OUT', capture: FaceCaptureResult) {
+    if (!employeeId || currentLat === null || currentLon === null || accuracyM === null) return;
     setSubmitting(true);
-
-    // Scope wajib berasal dari jadwal atau assignment nyata. Sebelumnya dipakai
-    // UUID nil sebagai fallback; kolom-kolom ini punya foreign key sehingga
-    // absen pasti ditolak dan pegawai hanya melihat error teknis yang
-    // membingungkan. Lebih baik berhenti lebih awal dengan pesan jelas.
-    let orgId = sched?.location?.organization_id;
-    let unitId = sched?.business_unit_id;
-    let locId = sched?.location_id;
-    const assignmentId = sched?.assignment_id;
-
-    if (!orgId || !unitId || !locId) {
-      const scope = await attendanceRepository.resolveEmployeeScope(employeeId);
-      if (!scope.data) {
-        setSubmitting(false);
-        setScopeError(scope.error?.message ?? 'Unit penempatan Anda belum diatur. Hubungi admin unit.');
-        return;
-      }
-      orgId = orgId ?? scope.data.organization_id;
-      unitId = unitId ?? scope.data.business_unit_id;
-      locId = locId ?? scope.data.location_id;
-    }
-
-    if (!assignmentId) {
-      setSubmitting(false);
-      setScopeError('Penempatan (assignment) untuk shift ini belum tersedia. Hubungi admin unit sebelum melakukan absen.');
-      return;
-    }
-
     setScopeError(null);
 
     const result = await recordEventMut.mutateAsync({
-      organization_id: orgId,
-      business_unit_id: unitId,
-      location_id: locId,
-      work_area_id: sched?.work_area_id ?? undefined,
       employee_id: employeeId,
-      assignment_id: assignmentId,
-      schedule_id: sched?.id,
       event_type: eventType,
       client_captured_at: new Date().toISOString(),
-      latitude: effectiveLat,
-      longitude: effectiveLon,
-      accuracy_m: effectiveAcc,
-      target_latitude: Number(targetLat),
-      target_longitude: Number(targetLon),
-      geofence_radius_m: Number(targetRadius),
+      latitude: currentLat,
+      longitude: currentLon,
+      accuracy_m: accuracyM,
+      device_id: attendanceDeviceId(),
+      idempotency_key: `${employeeId}:${eventType}:${window.crypto.randomUUID()}`,
+      ...capture,
     });
 
     setSubmitting(false);
+    setFaceModalOpen(false);
+    setPendingEventType(null);
 
     if (result.data) {
-      alert(`✅ Verifikasi Wajah & GPS Berhasil! Presensi ${eventType === 'CHECK_IN' ? 'Masuk' : 'Pulang'} dicatat untuk ${empName}!`);
+      const time = new Date(result.data.occurred_at_server).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      setAttendanceNotice(`Presensi ${eventType === 'CHECK_IN' ? 'masuk' : 'pulang'} ${empName} tercatat pada ${time} WIB.`);
     } else if (result.error) {
-      alert(`Gagal: ${result.error.message}`);
-    }
-  }
-
-  function handleEmployeeChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const selectedEmpId = e.target.value;
-    const emp = allEmployees.find(x => x.id === selectedEmpId);
-    if (emp) {
-      setEmployeeId(emp.id);
-      setEmpName(emp.full_name);
+      setScopeError(result.error.message);
+      throw new Error(result.error.message);
     }
   }
 
@@ -196,41 +197,6 @@ export function TodayPage() {
     }}>
       <div style={{ maxWidth: 420, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
         
-        {/* Employee Selector (Demo Mode Pill) */}
-        {allEmployees.length > 0 && (
-          <div style={{
-            backgroundColor: '#ffffff',
-            padding: '10px 16px',
-            borderRadius: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            border: '1px solid #E4E7EC',
-            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.02)',
-          }}>
-            <span style={{ fontSize: 12, color: '#667085', fontWeight: 700 }}>👤 Kru Aktif:</span>
-            <select
-              value={employeeId ?? ''}
-              onChange={handleEmployeeChange}
-              style={{
-                backgroundColor: '#F6F7F9',
-                color: '#18212F',
-                border: '1px solid #E4E7EC',
-                borderRadius: 9999,
-                padding: '4px 12px',
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              {allEmployees.map(e => (
-                <option key={e.id} value={e.id}>
-                  {e.employee_no} — {e.full_name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
         {/* iOS Clean Employee Card */}
         <div style={{
           backgroundColor: '#ffffff',
@@ -311,20 +277,27 @@ export function TodayPage() {
           gap: 6,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: '#667085', fontWeight: 700 }}>Status Lokasi GPS & Face ID</span>
+            <span style={{ fontSize: 12, color: '#667085', fontWeight: 700 }}>Status GPS & Verifikasi Wajah</span>
             <span style={{
               fontSize: 11,
               fontWeight: 700,
-              color: geoEval.geofence_status === 'WITHIN_GEOFENCE' ? '#16865B' : '#D53F3F',
-              backgroundColor: geoEval.geofence_status === 'WITHIN_GEOFENCE' ? '#EEF1F4' : '#EEF1F4',
+              color: geoEval?.geofence_status === 'WITHIN_GEOFENCE' ? '#16865B' : '#D53F3F',
+              backgroundColor: '#EEF1F4',
               padding: '3px 10px',
               borderRadius: 9999,
             }}>
-              {geoEval.geofence_status === 'WITHIN_GEOFENCE' ? '📍 Dalam Radius' : '⚠️ Di Luar Area'}
+              {!geoEval ? '⌛ Mengunci GPS' : geoEval.geofence_status === 'WITHIN_GEOFENCE' ? '📍 Dalam Radius' : '⚠️ Di Luar Area'}
             </span>
           </div>
           <div style={{ fontSize: 11, color: '#667085', fontWeight: 600 }}>
-            Jarak: <strong style={{ color: '#18212F' }}>{geoEval.distance_m} m</strong> dari outlet (Maks: {targetRadius} m)
+            {geoEval ? (
+              <>Jarak: <strong style={{ color: '#18212F' }}>{geoEval.distance_m} m</strong> dari outlet (maks. {targetRadius} m) · akurasi {Math.round(accuracyM ?? 0)} m</>
+            ) : (
+              <>{geoError || 'Menunggu izin dan koordinat GPS asli. Koordinat outlet tidak dipakai sebagai fallback.'}</>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: faceEnrolled ? '#16865B' : '#D8890B', fontWeight: 700 }}>
+            {faceEnrolled ? '✓ Wajah telah terdaftar' : '⚠ Wajah belum didaftarkan admin'}
           </div>
         </div>
 
@@ -348,32 +321,25 @@ export function TodayPage() {
             </strong>
           </div>
 
+          {attendanceNotice && (
+            <div role="status" style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: '#ECF8F3', border: '1px solid #A7D8C5', color: '#126B4B', fontSize: 12, fontWeight: 700 }}>
+              {attendanceNotice}
+            </div>
+          )}
+          {scopeError && (
+            <div role="alert" style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: 'rgba(213, 63, 63, .10)', border: '1px solid rgba(213, 63, 63, .28)', color: '#D53F3F', fontSize: 12, fontWeight: 600 }}>
+              {scopeError}
+            </div>
+          )}
+
           {!hasCheckedIn && (
-            <>
-            {scopeError && (
-              <div
-                role="alert"
-                style={{
-                  marginBottom: 10,
-                  padding: '10px 14px',
-                  borderRadius: 12,
-                  background: 'rgba(213, 63, 63, .10)',
-                  border: '1px solid rgba(213, 63, 63, .28)',
-                  color: '#D53F3F',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                {scopeError}
-              </div>
-            )}
             <button
               onClick={() => triggerPunchWithFaceScan('CHECK_IN')}
-              disabled={submitting}
+              disabled={submitting || !employeeId || !faceEnrolled || !geoEval}
               style={{
                 width: '100%',
                 padding: '18px',
-                backgroundColor: submitting ? '#667085' : '#16865B',
+                backgroundColor: (submitting || !employeeId || !faceEnrolled || !geoEval) ? '#98A2B3' : '#16865B',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: 18,
@@ -386,13 +352,12 @@ export function TodayPage() {
             >
               {submitting ? 'Memproses...' : '📷 SCAN FACE & ABSEN MASUK'}
             </button>
-            </>
           )}
 
           {hasCheckedIn && !hasCheckedOut && (
             <button
               onClick={() => triggerPunchWithFaceScan('CHECK_OUT')}
-              disabled={submitting}
+              disabled={submitting || !faceEnrolled || !geoEval}
               style={{
                 width: '100%',
                 padding: '18px',
@@ -437,64 +402,21 @@ export function TodayPage() {
 
       </div>
 
-      {/* FACE SCANNING OVERLAY MODAL */}
-      {faceScanning && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: 20,
-          color: '#ffffff',
-        }}>
-          <div style={{
-            backgroundColor: '#18212F',
-            border: '2px solid #3178C6',
-            borderRadius: 24,
-            padding: '30px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 20,
-            boxShadow: '0 20px 50px rgba(59, 130, 246, 0.4)',
-            maxWidth: 360,
-            width: '100%',
-            textAlign: 'center',
-          }}>
-            <div style={{
-              width: 140,
-              height: 140,
-              borderRadius: '50%',
-              border: `4px dashed ${faceVerified ? '#16865B' : '#3178C6'}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 54,
-              backgroundColor: '#18212F',
-              transition: 'all 0.3s ease',
-            }}>
-              {faceVerified ? '🟢' : '👤'}
-            </div>
-
-            <div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: faceVerified ? '#16865B' : '#ffffff' }}>
-                {faceVerified ? 'Verifikasi Wajah Berhasil! ✅' : 'Memindai Landmark Wajah...'}
-              </h3>
-              <p style={{ fontSize: 12, color: '#667085', margin: '6px 0 0' }}>
-                {faceVerified ? `Identitas biometrik ${empName} cocok.` : 'Posisikan wajah Anda tegak di depan kamera.'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <FaceCaptureModal
+        open={faceModalOpen && pendingEventType !== null}
+        title={pendingEventType === 'CHECK_OUT' ? 'Verifikasi Absen Pulang' : 'Verifikasi Absen Masuk'}
+        instruction="Hadapkan wajah ke kamera, pastikan pencahayaan cukup, dan jangan gunakan foto atau layar lain."
+        confirmLabel="Verifikasi & Catat Presensi"
+        onCancel={() => {
+          if (submitting) return;
+          setFaceModalOpen(false);
+          setPendingEventType(null);
+        }}
+        onCaptured={async capture => {
+          if (!pendingEventType) return;
+          await executePunch(pendingEventType, capture);
+        }}
+      />
 
     </div>
   );

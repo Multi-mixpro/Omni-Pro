@@ -522,3 +522,64 @@
   .att-login-heading h2 { font-size: 21px; }
   .att-login-segment button { padding: 0 6px; font-size: 11px; }
 }
+
+/* Camera-based face enrollment and attendance verification */
+.att-face-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, .72);
+  backdrop-filter: blur(10px);
+}
+
+.att-face-card {
+  width: min(100%, 460px);
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, .68);
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, .34);
+}
+
+.att-face-heading,
+.att-face-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.att-face-heading h2 { margin: 2px 0 0; color: #18212f; font-size: 19px; }
+.att-face-eyebrow { margin: 0; color: #138a80; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.att-face-close { width: 38px; height: 38px; border: 0; border-radius: 50%; color: #526174; background: #eef1f4; cursor: pointer; font-size: 24px; }
+
+.att-face-preview {
+  position: relative;
+  min-height: 360px;
+  margin-top: 16px;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #111827;
+}
+
+.att-face-preview video { width: 100%; height: 100%; min-height: 360px; display: block; object-fit: cover; transform: scaleX(-1); }
+.att-face-oval { position: absolute; inset: 11% 18%; border: 3px solid rgba(255, 255, 255, .9); border-radius: 50%; box-shadow: 0 0 0 999px rgba(15, 23, 42, .18); }
+.att-face-loading { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; color: #fff; background: rgba(15, 23, 42, .72); font-size: 13px; font-weight: 800; text-align: center; }
+.att-face-instruction { margin: 14px 0 8px; color: #526174; font-size: 12px; line-height: 1.55; }
+.att-face-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.att-face-checks span { padding: 5px 8px; border-radius: 999px; color: #126b4b; background: #ecf8f3; font-size: 9px; font-weight: 800; }
+.att-face-error { margin-top: 10px; padding: 10px 12px; border: 1px solid #f0b8b8; border-radius: 12px; color: #a62e2e; background: #fff1f1; font-size: 11px; font-weight: 700; line-height: 1.5; }
+.att-face-actions { margin-top: 14px; }
+.att-face-actions .att-btn { flex: 1; min-height: 44px; }
+.att-face-disclaimer { margin: 10px 2px 0; color: #89919d; font-size: 9px; line-height: 1.45; }
+
+@media (max-width: 520px) {
+  .att-face-modal { padding: 0; align-items: end; }
+  .att-face-card { max-height: 94dvh; border-radius: 28px 28px 0 0; }
+  .att-face-preview, .att-face-preview video { min-height: 330px; }
+}

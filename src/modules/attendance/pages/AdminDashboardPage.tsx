@@ -1,16 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from '@/app/router/simpleRouter';
+import { supabase } from '@/integrations/supabase/client';
 import { useAttendanceUnits, useLiveMonitorStats } from '../hooks/useAttendance';
 import {
   attendanceRepository,
   createAttendanceUser,
+  enrollAttendanceFace,
   updateAttendanceUser,
 } from '../data/attendanceRepository';
 import { useQueryClient } from '@tanstack/react-query';
 import { LoadingState } from '../components/AttendanceStateComponents';
+import { FaceCaptureModal, type FaceCaptureResult } from '../components/FaceCaptureModal';
 import '../attendance.css';
 
 type AdminTab = 'dashboard' | 'employees' | 'shifts' | 'reports';
+
+function compactAuditLogs(logs: any[]) {
+  const compacted: Array<any & { occurrence_count: number }> = [];
+  for (const log of logs) {
+    const timeBucket = Math.floor(new Date(log.created_at).getTime() / (5 * 60 * 1000));
+    const key = `${timeBucket}|${log.entity_type}|${log.entity_id}|${log.action}|${JSON.stringify(log.after_data ?? {})}`;
+    const existing = compacted.find(item => item._compact_key === key);
+    if (existing) {
+      existing.occurrence_count += 1;
+      continue;
+    }
+    compacted.push({ ...log, _compact_key: key, occurrence_count: 1 });
+  }
+  return compacted;
+}
+
+function auditActionLabel(action?: string) {
+  const labels: Record<string, string> = {
+    CREATE: 'data dibuat',
+    UPDATE: 'data diperbarui',
+    DEACTIVATE: 'karyawan dinonaktifkan',
+    ENROLL: 'wajah didaftarkan',
+    REENROLL: 'wajah didaftarkan ulang',
+    FACE_MISMATCH: 'verifikasi wajah ditolak',
+    CHECK_IN: 'presensi masuk',
+    CHECK_OUT: 'presensi pulang',
+  };
+  return labels[action ?? ''] ?? action?.toLocaleLowerCase('id-ID') ?? 'aktivitas sistem';
+}
+
+function attendanceStatusLabel(day: any) {
+  if (day.check_out_time) return 'Selesai';
+  if (day.check_in_time) return day.status === 'LATE' ? 'Hadir terlambat' : 'Sedang bekerja';
+  if (day.status === 'ON_LEAVE') return 'Izin/cuti';
+  return 'Belum hadir';
+}
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
@@ -31,6 +70,8 @@ export function AdminDashboardPage() {
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [editingEmp, setEditingEmp] = useState<any | null>(null);
   const [editingShift, setEditingShift] = useState<any | null>(null);
+  const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState<{ employee: any; days: any[] } | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Employee Form State
   const [newEmpName, setNewEmpName] = useState('');
@@ -40,6 +81,9 @@ export function AdminDashboardPage() {
   const [newEmpUnitId, setNewEmpUnitId] = useState<string>('');
   const [faceEnrolled, setFaceEnrolled] = useState(false);
   const [faceScanning, setFaceScanning] = useState(false);
+  const [biometricConsent, setBiometricConsent] = useState(false);
+  const [pendingFaceCapture, setPendingFaceCapture] = useState<FaceCaptureResult | null>(null);
+  const [biometricFormError, setBiometricFormError] = useState('');
 
   // Shift Form State
   const [shiftName, setShiftName] = useState('');
@@ -56,7 +100,7 @@ export function AdminDashboardPage() {
   const days = stats?.days ?? [];
 
   // Load Real-time Data from Supabase
-  const fetchRealtimeData = async () => {
+  const fetchRealtimeData = useCallback(async () => {
     setLoadingData(true);
     const [empRes, shiftRes, logRes] = await Promise.all([
       attendanceRepository.listEmployeesWithAssignments(),
@@ -68,25 +112,42 @@ export function AdminDashboardPage() {
     if (shiftRes.data) setDbShifts(shiftRes.data);
     if (logRes.data) setDbLogs(logRes.data);
     setLoadingData(false);
-  };
+  }, [selectedUnitId]);
 
   useEffect(() => {
-    fetchRealtimeData();
-  }, [activeTab, selectedUnitId]);
+    void fetchRealtimeData();
+  }, [activeTab, fetchRealtimeData]);
 
-  async function handleQuickPunch(employeeId: string, eventType: 'CHECK_IN' | 'CHECK_OUT') {
-    setActionLoadingId(`${employeeId}_${eventType}`);
-    const res = await attendanceRepository.quickPunch(employeeId, eventType);
-    setActionLoadingId(null);
+  useEffect(() => {
+    let refreshTimer: number | undefined;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        void fetchRealtimeData();
+        void refetch();
+        void queryClient.invalidateQueries({ queryKey: ['attendance-monitor'] });
+      }, 180);
+    };
 
-    if (res.data) {
-      queryClient.invalidateQueries({ queryKey: ['attendance-monitor'] });
-      refetch();
-      fetchRealtimeData();
-    } else if (res.error) {
-      alert(`Gagal: ${res.error.message}`);
+    let channel = supabase.channel(`attendance-admin-realtime-${selectedUnitId ?? 'all'}`);
+    for (const table of [
+      'attendance_employees',
+      'attendance_employee_assignments',
+      'attendance_shift_templates',
+      'attendance_schedules',
+      'attendance_events',
+      'attendance_days',
+      'attendance_audit_logs',
+    ]) {
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, scheduleRefresh);
     }
-  }
+    channel.subscribe();
+
+    return () => {
+      window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchRealtimeData, queryClient, refetch, selectedUnitId]);
 
   async function handleAutoSchedule() {
     setActionLoadingId('auto_sched');
@@ -116,12 +177,27 @@ export function AdminDashboardPage() {
           pin: newEmpPin || undefined,
           job_title: newEmpRole,
         });
-        alert(`Pegawai ${newEmpName} berhasil diperbarui di Supabase!`);
+        let biometricWarning = '';
+        if (pendingFaceCapture) {
+          try {
+            await enrollAttendanceFace(editingEmp.id, pendingFaceCapture);
+          } catch (reason) {
+            biometricWarning = reason instanceof Error ? reason.message : 'Pendaftaran wajah gagal.';
+          }
+        }
+        setEmployeeNotice({
+          type: biometricWarning ? 'error' : 'success',
+          message: biometricWarning
+            ? `Data ${newEmpName} tersimpan, tetapi wajah belum terdaftar: ${biometricWarning}`
+            : `Pegawai ${newEmpName} berhasil diperbarui${pendingFaceCapture ? ' dan wajah tersimpan secara privat' : ''}.`,
+        });
         setShowEmployeeModal(false);
         setEditingEmp(null);
-        fetchRealtimeData();
+        setPendingFaceCapture(null);
+        setBiometricConsent(false);
+        await fetchRealtimeData();
       } catch (reason) {
-        alert(`Gagal: ${reason instanceof Error ? reason.message : 'Pegawai gagal diperbarui.'}`);
+        setEmployeeNotice({ type: 'error', message: reason instanceof Error ? reason.message : 'Pegawai gagal diperbarui.' });
       }
     } else {
       // CREATE — membuat akun login Attendance sekaligus data karyawan.
@@ -158,21 +234,32 @@ export function AdminDashboardPage() {
           job_title: newEmpRole,
         });
 
-        alert(
-          `Pegawai ${newEmpName} berhasil dibuat.\n\n`
-          + `Nomor pegawai: ${created.employee_no}\n`
-          + 'PIN kios sudah disimpan sebagai hash. Akun ini hanya berlaku untuk sistem Attendance.',
-        );
+        let biometricWarning = '';
+        if (pendingFaceCapture) {
+          try {
+            await enrollAttendanceFace(created.employee_id, pendingFaceCapture);
+          } catch (reason) {
+            biometricWarning = reason instanceof Error ? reason.message : 'Pendaftaran wajah gagal.';
+          }
+        }
+        setEmployeeNotice({
+          type: biometricWarning ? 'error' : 'success',
+          message: biometricWarning
+            ? `Pegawai ${newEmpName} berhasil dibuat, tetapi wajah belum terdaftar: ${biometricWarning}`
+            : `Pegawai ${newEmpName} (${created.employee_no}) berhasil dibuat${pendingFaceCapture ? ' dan wajah sudah terdaftar' : ''}.`,
+        });
         setShowEmployeeModal(false);
         setNewEmpName('');
         setNewEmpNo('');
         setNewEmpPin('');
         setFaceEnrolled(false);
+        setPendingFaceCapture(null);
+        setBiometricConsent(false);
         await attendanceRepository.ensureDailySchedules();
-        fetchRealtimeData();
-        refetch();
+        await fetchRealtimeData();
+        await refetch();
       } catch (reason) {
-        alert(`Gagal: ${reason instanceof Error ? reason.message : 'Pegawai gagal dibuat.'}`);
+        setEmployeeNotice({ type: 'error', message: reason instanceof Error ? reason.message : 'Pegawai gagal dibuat.' });
       }
     }
 
@@ -284,6 +371,11 @@ export function AdminDashboardPage() {
     setNewEmpNo(emp.employee_no);
     setNewEmpPin('');
     setNewEmpRole(emp.assignments?.[0]?.job_title ?? 'Staf Operasional');
+    setNewEmpUnitId(emp.assignments?.[0]?.business_unit_id ?? '');
+    setFaceEnrolled(emp.face_enrolled === true);
+    setPendingFaceCapture(null);
+    setBiometricConsent(false);
+    setBiometricFormError('');
     setShowEmployeeModal(true);
   }
 
@@ -298,11 +390,28 @@ export function AdminDashboardPage() {
   }
 
   function handleScanFace() {
+    if (!biometricConsent) {
+      setBiometricFormError('Konfirmasi persetujuan karyawan sebelum membuka kamera.');
+      return;
+    }
+    setBiometricFormError('');
     setFaceScanning(true);
-    setTimeout(() => {
-      setFaceScanning(false);
-      setFaceEnrolled(true);
-    }, 1200);
+  }
+
+  async function handleOpenEmployeeHistory(employee: any) {
+    setHistoryLoading(true);
+    setSelectedEmployeeHistory({ employee, days: [] });
+    const history = await attendanceRepository.getEmployeeHistory(employee.id);
+    setSelectedEmployeeHistory({ employee, days: history.data ?? [] });
+    setHistoryLoading(false);
+  }
+
+  function closeEmployeeModal() {
+    setShowEmployeeModal(false);
+    setFaceScanning(false);
+    setPendingFaceCapture(null);
+    setBiometricConsent(false);
+    setBiometricFormError('');
   }
 
   if (unitsLoading || statsLoading) {
@@ -571,13 +680,12 @@ export function AdminDashboardPage() {
                     <th style={{ padding: '6px 16px', fontWeight: 700 }}>Check-In</th>
                     <th style={{ padding: '6px 16px', fontWeight: 700 }}>Check-Out</th>
                     <th style={{ padding: '6px 16px', fontWeight: 700 }}>Status Presensi</th>
-                    <th style={{ padding: '6px 16px', textAlign: 'right', fontWeight: 700 }}>Aksi Quick Punch</th>
                   </tr>
                 </thead>
                 <tbody>
                   {days.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: '#667085', fontWeight: 500 }}>
+                      <td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: '#667085', fontWeight: 500 }}>
                         Belum ada data presensi hari ini. Tekan "Sync Realtime Schedule" di atas.
                       </td>
                     </tr>
@@ -631,42 +739,6 @@ export function AdminDashboardPage() {
                               {isCheckedOut ? 'SUDAH PULANG' : isCheckedIn ? 'HADIR' : 'BELUM HADIR'}
                             </span>
                           </td>
-                          <td style={{ padding: '6px 16px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                              <button
-                                onClick={() => handleQuickPunch(d.employee_id, 'CHECK_IN')}
-                                disabled={isCheckedIn || actionLoadingId === `${d.employee_id}_CHECK_IN`}
-                                style={{
-                                  padding: '4px 10px',
-                                  fontSize: 11,
-                                  borderRadius: 9999,
-                                  border: 'none',
-                                  backgroundColor: isCheckedIn ? '#EEF1F4' : '#16865B',
-                                  color: isCheckedIn ? '#667085' : '#ffffff',
-                                  cursor: isCheckedIn ? 'not-allowed' : 'pointer',
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {actionLoadingId === `${d.employee_id}_CHECK_IN` ? '...' : 'Check-In'}
-                              </button>
-                              <button
-                                onClick={() => handleQuickPunch(d.employee_id, 'CHECK_OUT')}
-                                disabled={!isCheckedIn || isCheckedOut || actionLoadingId === `${d.employee_id}_CHECK_OUT`}
-                                style={{
-                                  padding: '4px 10px',
-                                  fontSize: 11,
-                                  borderRadius: 9999,
-                                  border: 'none',
-                                  backgroundColor: (!isCheckedIn || isCheckedOut) ? '#EEF1F4' : '#D53F3F',
-                                  color: (!isCheckedIn || isCheckedOut) ? '#667085' : '#ffffff',
-                                  cursor: (!isCheckedIn || isCheckedOut) ? 'not-allowed' : 'pointer',
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {actionLoadingId === `${d.employee_id}_CHECK_OUT` ? '...' : 'Check-Out'}
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       );
                     })
@@ -702,6 +774,11 @@ export function AdminDashboardPage() {
                   setNewEmpName('');
                   setNewEmpNo('');
                   setNewEmpPin('');
+                  setNewEmpUnitId(units[0]?.id ?? '');
+                  setFaceEnrolled(false);
+                  setPendingFaceCapture(null);
+                  setBiometricConsent(false);
+                  setBiometricFormError('');
                   setShowEmployeeModal(true);
                 }}
                 style={{
@@ -749,18 +826,21 @@ export function AdminDashboardPage() {
                     <th style={{ padding: '6px 12px', fontWeight: 700 }}>Nama Lengkap</th>
                     <th style={{ padding: '6px 12px', fontWeight: 700 }}>Email / Username & PIN</th>
                     <th style={{ padding: '6px 12px', fontWeight: 700 }}>Unit & Jabatan</th>
-                    <th style={{ padding: '6px 12px', fontWeight: 700 }}>Face ID</th>
+                    <th style={{ padding: '6px 12px', fontWeight: 700 }}>Verifikasi Wajah</th>
+                    <th style={{ padding: '6px 12px', fontWeight: 700 }}>Presensi Hari Ini</th>
                     <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 700 }}>Aksi (CRUD)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {dbEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#667085' }}>Belum ada data pegawai di Supabase. Tekan Tambah Karyawan Baru.</td>
+                      <td colSpan={7} style={{ padding: 20, textAlign: 'center', color: '#667085' }}>Belum ada data pegawai di Supabase. Tekan Tambah Karyawan Baru.</td>
                     </tr>
                   ) : (
-                    dbEmployees.map(emp => (
-                      <tr key={emp.id} style={{ borderBottom: '1px solid #EEF1F4', height: 40 }}>
+                    dbEmployees.map(emp => {
+                      const employeeDay = days.find(day => day.employee_id === emp.id);
+                      return (
+                      <tr key={emp.id} style={{ borderBottom: '1px solid #EEF1F4', height: 44 }}>
                         <td style={{ padding: '6px 12px', color: '#E96A12', fontWeight: 700 }}>{emp.employee_no}</td>
                         <td style={{ padding: '6px 12px', color: '#18212F', fontWeight: 700 }}>{emp.full_name}</td>
                         <td style={{ padding: '6px 12px', color: '#667085', fontWeight: 500 }}>
@@ -772,12 +852,30 @@ export function AdminDashboardPage() {
                           {emp.assignments?.[0]?.business_unit?.name ?? 'Bakso Ujo'} — <strong style={{ color: '#18212F' }}>{emp.assignments?.[0]?.job_title ?? 'Staf Operasional'}</strong>
                         </td>
                         <td style={{ padding: '6px 12px' }}>
-                          <span style={{ fontSize: 10, backgroundColor: '#EEF1F4', color: '#16865B', padding: '2px 8px', borderRadius: 9999, fontWeight: 700, border: '1px solid #EEF1F4' }}>
-                            📷 Face ID Enrolled ✅
+                          <span style={{ fontSize: 10, backgroundColor: emp.face_enrolled ? '#ECF8F3' : '#FFF7E8', color: emp.face_enrolled ? '#16865B' : '#B56A00', padding: '2px 8px', borderRadius: 9999, fontWeight: 700, border: `1px solid ${emp.face_enrolled ? '#A7D8C5' : '#F1D19A'}` }}>
+                            {emp.face_enrolled ? '✓ Wajah terdaftar' : 'Belum terdaftar'}
                           </span>
+                        </td>
+                        <td style={{ padding: '6px 12px', color: '#667085', fontWeight: 600 }}>
+                          {employeeDay ? (
+                            <button type="button" onClick={() => void handleOpenEmployeeHistory(emp)} style={{ border: 0, padding: 0, background: 'transparent', color: employeeDay.check_in_time ? '#16865B' : '#D53F3F', fontSize: 10, fontWeight: 800, cursor: 'pointer', textAlign: 'left' }}>
+                              {employeeDay.check_in_time
+                                ? `${new Date(employeeDay.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} ${employeeDay.check_out_time ? `– ${new Date(employeeDay.check_out_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}` : '– aktif'}`
+                                : 'Belum hadir'}
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => void handleOpenEmployeeHistory(emp)} style={{ border: 0, padding: 0, background: 'transparent', color: '#667085', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>Lihat riwayat</button>
+                          )}
                         </td>
                         <td style={{ padding: '6px 12px', textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenEmployeeHistory(emp)}
+                              style={{ padding: '3px 10px', fontSize: 11, borderRadius: 6, border: '1px solid #D8E6E3', backgroundColor: '#F4FAF8', color: '#138A80', fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              Presensi
+                            </button>
                             <button
                               onClick={() => handleOpenEditEmployee(emp)}
                               style={{
@@ -812,7 +910,8 @@ export function AdminDashboardPage() {
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -959,10 +1058,16 @@ export function AdminDashboardPage() {
                   Belum ada log aktivitas tersimpan di database.
                 </div>
               ) : (
-                dbLogs.map((log, idx) => (
+                compactAuditLogs(dbLogs).map((log, idx) => (
                   <div key={log.id ?? idx} style={{ backgroundColor: '#F6F7F9', padding: '10px 14px', borderRadius: 12, fontSize: 11, color: '#667085', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #E4E7EC' }}>
                     <div>
-                      <strong style={{ color: '#16865B' }}>[{log.entity_type ?? 'SYSTEM'}]</strong> {log.action ?? 'EVENT'} — {JSON.stringify(log.after_data ?? {})}
+                      <strong style={{ color: '#16865B' }}>[{log.entity_type ?? 'SYSTEM'}]</strong>{' '}
+                      {auditActionLabel(log.action)}
+                      {log.occurrence_count > 1 && (
+                        <span style={{ marginLeft: 8, padding: '2px 7px', borderRadius: 9999, background: '#FFF2DB', color: '#A85D00', fontSize: 9, fontWeight: 800 }}>
+                          {log.occurrence_count} percobaan serupa
+                        </span>
+                      )}
                     </div>
                     <span style={{ fontSize: 10, color: '#667085', fontWeight: 600 }}>{new Date(log.created_at).toLocaleTimeString('id-ID')}</span>
                   </div>
@@ -1081,11 +1186,23 @@ export function AdminDashboardPage() {
               {/* Face ID Biometric Enrollment Section */}
               <div style={{ backgroundColor: '#F6F7F9', border: '1px solid #E4E7EC', borderRadius: 14, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#18212F' }}>📷 Biometric Face ID Enrollment</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#18212F' }}>📷 Pendaftaran Verifikasi Wajah</span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: faceEnrolled ? '#16865B' : '#D8890B', backgroundColor: faceEnrolled ? '#EEF1F4' : '#EEF1F4', padding: '2px 8px', borderRadius: 9999 }}>
-                    {faceEnrolled ? 'Enrolled ✅' : 'Belum Pindai'}
+                    {pendingFaceCapture ? 'Siap disimpan ✓' : faceEnrolled ? 'Terdaftar ✓' : 'Belum terdaftar'}
                   </span>
                 </div>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, color: '#667085', fontSize: 10, lineHeight: 1.45, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={biometricConsent}
+                    onChange={event => {
+                      setBiometricConsent(event.target.checked);
+                      setBiometricFormError('');
+                    }}
+                    style={{ marginTop: 2 }}
+                  />
+                  Karyawan menyetujui pengambilan foto referensi dan descriptor wajah terenkripsi untuk keperluan presensi.
+                </label>
                 <button
                   type="button"
                   onClick={handleScanFace}
@@ -1101,15 +1218,81 @@ export function AdminDashboardPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  {faceScanning ? '📷 Memindai Wajah Landmark...' : faceEnrolled ? '✅ Biometrik Wajah Tersimpan' : '📷 Pindai & Daftarkan Wajah Biometrik'}
+                  {faceScanning ? 'Membuka kamera…' : faceEnrolled ? '↻ Daftarkan Ulang Wajah' : '📷 Buka Kamera & Daftarkan Wajah'}
                 </button>
+                {biometricFormError && <div role="alert" style={{ color: '#A62E2E', fontSize: 10, fontWeight: 700 }}>{biometricFormError}</div>}
+                <p style={{ margin: 0, color: '#89919D', fontSize: 9, lineHeight: 1.45 }}>
+                  Foto disimpan pada bucket privat. Descriptor dienkripsi di server dan tidak dapat dibaca dari browser.
+                </p>
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="button" onClick={() => setShowEmployeeModal(false)} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #E4E7EC', backgroundColor: '#ffffff', color: '#667085', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Batal</button>
+                <button type="button" onClick={closeEmployeeModal} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #E4E7EC', backgroundColor: '#ffffff', color: '#667085', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Batal</button>
                 <button type="submit" disabled={actionLoadingId === 'save_emp'} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', backgroundColor: '#3178C6', color: '#ffffff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>Simpan Ke Supabase</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      <FaceCaptureModal
+        open={faceScanning}
+        title={faceEnrolled ? 'Daftarkan Ulang Wajah' : 'Daftarkan Wajah Karyawan'}
+        instruction="Hadapkan wajah karyawan ke kamera, pastikan wajah tunggal terlihat jelas, lalu ikuti pemeriksaan keaktifan wajah."
+        confirmLabel="Gunakan Hasil Pindai"
+        onCancel={() => setFaceScanning(false)}
+        onCaptured={capture => {
+          setPendingFaceCapture(capture);
+          setFaceEnrolled(true);
+          setFaceScanning(false);
+          setBiometricFormError('');
+        }}
+      />
+
+      {selectedEmployeeHistory && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10005, padding: 16,
+          backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div role="dialog" aria-modal="true" aria-label={`Riwayat presensi ${selectedEmployeeHistory.employee.full_name}`} style={{
+            width: '100%', maxWidth: 620, maxHeight: '82vh', overflow: 'auto',
+            background: '#fff', border: '1px solid #E4E7EC', borderRadius: 22,
+            padding: 22, boxShadow: '0 24px 60px rgba(15, 23, 42, .2)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <div style={{ color: '#667085', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px' }}>Riwayat presensi tersimpan</div>
+                <h3 style={{ margin: '3px 0 0', color: '#18212F', fontSize: 18 }}>{selectedEmployeeHistory.employee.full_name}</h3>
+                <div style={{ color: '#667085', fontSize: 11, marginTop: 3 }}>{selectedEmployeeHistory.employee.employee_no}</div>
+              </div>
+              <button type="button" onClick={() => setSelectedEmployeeHistory(null)} aria-label="Tutup riwayat" style={{ border: 0, background: '#F1F3F5', borderRadius: 9999, width: 34, height: 34, cursor: 'pointer', color: '#667085', fontSize: 16 }}>✕</button>
+            </div>
+
+            {historyLoading ? (
+              <div style={{ padding: 24, textAlign: 'center', color: '#667085', fontSize: 12 }}>Memuat riwayat dari database…</div>
+            ) : selectedEmployeeHistory.days.length === 0 ? (
+              <div style={{ padding: 18, borderRadius: 14, background: '#F6F7F9', color: '#667085', fontSize: 12 }}>Belum ada rekaman presensi untuk karyawan ini.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedEmployeeHistory.days.map(day => (
+                  <div key={day.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(105px, .8fr) minmax(160px, 1.2fr) minmax(105px, .8fr)', gap: 12, alignItems: 'center', border: '1px solid #E4E7EC', borderRadius: 14, padding: '11px 13px', background: '#FBFCFD' }}>
+                    <div>
+                      <div style={{ color: '#18212F', fontSize: 12, fontWeight: 800 }}>{new Date(`${day.work_date}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                      <div style={{ color: '#667085', fontSize: 9, marginTop: 2 }}>{day.status}</div>
+                    </div>
+                    <div style={{ color: '#667085', fontSize: 11, fontWeight: 700 }}>
+                      {day.check_in_time ? new Date(day.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                      {' — '}
+                      {day.check_out_time ? new Date(day.check_out_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'} WIB
+                    </div>
+                    <span style={{ justifySelf: 'start', borderRadius: 9999, padding: '3px 8px', background: day.check_in_time ? '#ECF8F3' : '#FFF2F2', color: day.check_in_time ? '#16865B' : '#B23A3A', fontSize: 9, fontWeight: 800 }}>
+                      {attendanceStatusLabel(day)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

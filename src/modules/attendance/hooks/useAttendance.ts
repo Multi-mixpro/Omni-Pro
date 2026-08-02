@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { attendanceRepository } from '../data/attendanceRepository';
+import { attendanceDateInJakarta } from '../domain/attendanceDate';
 
 export const attendanceKeys = {
   memberships: (userId: string) => ['attendance-memberships', userId] as const,
@@ -54,6 +55,7 @@ export function useTodaySchedule(employeeId: string | null, dateStr: string) {
     queryFn: () => attendanceRepository.getTodaySchedule(employeeId!, dateStr),
     enabled: !!employeeId,
     staleTime: 1000 * 30,
+    refetchInterval: 1000 * 60,
   });
 }
 
@@ -63,6 +65,7 @@ export function useTodayAttendanceDay(employeeId: string | null, dateStr: string
     queryFn: () => attendanceRepository.getTodayAttendanceDay(employeeId!, dateStr),
     enabled: !!employeeId,
     staleTime: 1000 * 15,
+    refetchInterval: 1000 * 30,
   });
 }
 
@@ -72,7 +75,7 @@ export function useRecordAttendanceEvent() {
     mutationFn: (vars: Parameters<typeof attendanceRepository.recordAttendanceEvent>[0]) =>
       attendanceRepository.recordAttendanceEvent(vars),
     onSuccess: (_data, vars) => {
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateStr = attendanceDateInJakarta();
       queryClient.invalidateQueries({ queryKey: attendanceKeys.todayDay(vars.employee_id, dateStr) });
       queryClient.invalidateQueries({ queryKey: attendanceKeys.history(vars.employee_id) });
       queryClient.invalidateQueries({ queryKey: ['attendance-monitor'] });

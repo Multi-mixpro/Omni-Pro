@@ -2,7 +2,6 @@
 // Interaksi Supabase terpusat untuk Single-Login, Employee Today, Event Capture, History & Admin Monitor
 
 import { supabase } from '@/integrations/supabase/client';
-import { evaluateGeofence } from '../domain/geofenceCalculator';
 import type {
   BusinessUnit,
   WorkLocation,
@@ -13,6 +12,7 @@ import type {
   AttendanceDay,
   LeaveRequest,
 } from '../domain/types';
+import { attendanceDateInJakarta } from '../domain/attendanceDate';
 
 export interface AppError {
   code: string;
@@ -111,6 +111,35 @@ export async function updateAttendanceUser(input: UpdateAttendanceUserInput): Pr
     }
     throw new Error(payload.error ?? 'Pengguna Attendance gagal diperbarui.');
   }
+}
+
+export interface AttendanceFaceCapture {
+  image_data_url: string;
+  descriptor: number[];
+  face_score: number;
+  antispoof_score: number;
+  liveness_score: number;
+}
+
+export async function enrollAttendanceFace(
+  employeeId: string,
+  capture: AttendanceFaceCapture,
+): Promise<{ face_enrolled_at: string }> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('Sesi tidak tersedia. Silakan masuk kembali.');
+
+  const response = await fetch('/api/attendance-face-enroll', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ employee_id: employeeId, consent_confirmed: true, ...capture }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error ?? 'Pendaftaran wajah gagal.');
+  if (payload.face_enrolled !== true || payload.employee_id !== employeeId) {
+    throw new Error('Server belum mengonfirmasi pendaftaran wajah.');
+  }
+  return { face_enrolled_at: String(payload.face_enrolled_at) };
 }
 
 /** Scope organisasi/unit/lokasi milik seorang employee. */
@@ -399,7 +428,7 @@ export const attendanceRepository = {
   // ===================================
   // 2. Schedule Auto-Provisioning & Today
   // ===================================
-  async ensureDailySchedules(dateStr = new Date().toISOString().split('T')[0]): Promise<void> {
+  async ensureDailySchedules(dateStr = attendanceDateInJakarta()): Promise<void> {
     const existing = scheduleEnsureInflight.get(dateStr);
     if (existing) return existing;
 
@@ -430,7 +459,7 @@ export const attendanceRepository = {
     return task;
   },
 
-  async getTodaySchedule(employeeId: string, dateStr = new Date().toISOString().split('T')[0]): Promise<{ data: EmployeeSchedule | null; error?: AppError }> {
+  async getTodaySchedule(employeeId: string, dateStr = attendanceDateInJakarta()): Promise<{ data: EmployeeSchedule | null; error?: AppError }> {
     try {
       await this.ensureDailySchedules(dateStr);
 
@@ -453,7 +482,7 @@ export const attendanceRepository = {
     }
   },
 
-  async getTodayAttendanceDay(employeeId: string, dateStr = new Date().toISOString().split('T')[0]): Promise<{ data: AttendanceDay | null; error?: AppError }> {
+  async getTodayAttendanceDay(employeeId: string, dateStr = attendanceDateInJakarta()): Promise<{ data: AttendanceDay | null; error?: AppError }> {
     try {
       const { data, error } = await supabase
         .from('attendance_days')
@@ -477,151 +506,37 @@ export const attendanceRepository = {
   // 3. Capture & Process Attendance Event
   // ===================================
   async recordAttendanceEvent(input: {
-    organization_id: string;
-    business_unit_id: string;
-    location_id: string;
-    work_area_id?: string;
     employee_id: string;
-    assignment_id: string;
-    schedule_id?: string;
     event_type: 'CHECK_IN' | 'CHECK_OUT';
     client_captured_at: string;
     latitude: number;
     longitude: number;
     accuracy_m: number;
-    target_latitude: number;
-    target_longitude: number;
-    geofence_radius_m: number;
-    photo_url?: string;
+    image_data_url: string;
+    descriptor: number[];
+    face_score: number;
+    antispoof_score: number;
+    liveness_score: number;
+    device_id: string;
+    idempotency_key: string;
   }): Promise<{ data: AttendanceEvent | null; error?: AppError }> {
     try {
-      const geo = evaluateGeofence(
-        input.latitude,
-        input.longitude,
-        input.accuracy_m,
-        input.target_latitude,
-        input.target_longitude,
-        input.geofence_radius_m
-      );
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return { data: null, error: { code: 'NO_SESSION', message: 'Sesi tidak tersedia. Silakan masuk kembali.' } };
 
-      const dateStr = new Date().toISOString().split('T')[0];
-      const idempotencyKey = `${input.employee_id}_${input.event_type}_${dateStr}_${Date.now()}`;
-
-      const { data, error } = await supabase
-        .from('attendance_events')
-        .insert({
-          organization_id: input.organization_id,
-          business_unit_id: input.business_unit_id,
-          location_id: input.location_id,
-          work_area_id: input.work_area_id ?? null,
-          employee_id: input.employee_id,
-          assignment_id: input.assignment_id,
-          schedule_id: input.schedule_id ?? null,
-          event_type: input.event_type,
-          client_captured_at: input.client_captured_at,
-          latitude: input.latitude,
-          longitude: input.longitude,
-          accuracy_m: input.accuracy_m,
-          distance_m: geo.distance_m,
-          geofence_status: geo.geofence_status,
-          photo_url: input.photo_url ?? null,
-          source: 'MOBILE_PWA',
-          idempotency_key: idempotencyKey,
-        })
-        .select('*')
-        .single();
-
-      if (error) return { data: null, error: mapError(error) };
-
-      // Update / Upsert AttendanceDay summary
-      const todayDay = await this.getTodayAttendanceDay(input.employee_id, dateStr);
-
-      if (!todayDay.data) {
-        await supabase.from('attendance_days').insert({
-          organization_id: input.organization_id,
-          business_unit_id: input.business_unit_id,
-          location_id: input.location_id,
-          employee_id: input.employee_id,
-          schedule_id: input.schedule_id ?? null,
-          work_date: dateStr,
-          check_in_event_id: input.event_type === 'CHECK_IN' ? data.id : null,
-          check_in_time: input.event_type === 'CHECK_IN' ? data.occurred_at_server : null,
-          status: 'PRESENT',
-        });
-      } else {
-        const updatePayload: Record<string, unknown> = {
-          status: 'PRESENT',
-        };
-        if (input.event_type === 'CHECK_IN') {
-          updatePayload.check_in_event_id = data.id;
-          updatePayload.check_in_time = data.occurred_at_server;
-        } else if (input.event_type === 'CHECK_OUT') {
-          updatePayload.check_out_event_id = data.id;
-          updatePayload.check_out_time = data.occurred_at_server;
-        }
-        await supabase.from('attendance_days').update(updatePayload).eq('id', todayDay.data.id);
+      const response = await fetch('/api/attendance-event-submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(input),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return { data: null, error: { code: String(response.status), message: payload.error ?? 'Presensi gagal diproses.' } };
       }
-
-      return { data: data as AttendanceEvent };
+      return { data: payload.event as AttendanceEvent };
     } catch (err) {
       return { data: null, error: mapError(err) };
-    }
-  },
-
-  // Simulasi / Quick Punch untuk Testing & Demo langsung dari UI Admin
-  async quickPunch(employeeId: string, eventType: 'CHECK_IN' | 'CHECK_OUT'): Promise<{ data: boolean; error?: AppError }> {
-    try {
-      const dateStr = new Date().toISOString().split('T')[0];
-      await this.ensureDailySchedules(dateStr);
-
-      // Cari assignment & schedule pegawai
-      const { data: assign } = await supabase
-        .from('attendance_employee_assignments')
-        .select('*')
-        .eq('employee_id', employeeId)
-        .eq('is_active', true)
-        .limit(1)
-        .single();
-
-      if (!assign) return { data: false, error: { code: 'NO_ASSIGNMENT', message: 'Pegawai tidak memiliki assignment aktif' } };
-
-      const { data: loc } = await supabase
-        .from('attendance_locations')
-        .select('*')
-        .eq('id', assign.location_id)
-        .single();
-
-      const { data: sched } = await supabase
-        .from('attendance_schedules')
-        .select('id')
-        .eq('employee_id', employeeId)
-        .eq('schedule_date', dateStr)
-        .maybeSingle();
-
-      const { data: org } = await supabase.from('attendance_organizations').select('id').limit(1).single();
-
-      const result = await this.recordAttendanceEvent({
-        organization_id: org?.id ?? '00000000-0000-0000-0000-000000000000',
-        business_unit_id: assign.business_unit_id,
-        location_id: assign.location_id,
-        work_area_id: assign.primary_work_area_id ?? undefined,
-        employee_id: employeeId,
-        assignment_id: assign.id,
-        schedule_id: sched?.id,
-        event_type: eventType,
-        client_captured_at: new Date().toISOString(),
-        latitude: loc?.latitude ?? -6.9175,
-        longitude: loc?.longitude ?? 107.6191,
-        accuracy_m: 10,
-        target_latitude: loc?.latitude ?? -6.9175,
-        target_longitude: loc?.longitude ?? 107.6191,
-        geofence_radius_m: loc?.geofence_radius_m ?? 150,
-      });
-
-      if (result.error) return { data: false, error: result.error };
-      return { data: true };
-    } catch (err) {
-      return { data: false, error: mapError(err) };
     }
   },
 
@@ -686,7 +601,7 @@ export const attendanceRepository = {
   // ===================================
   // 5. Admin Monitoring & Multi-Unit Live Stats
   // ===================================
-  async getLiveMonitorStats(unitId?: string, dateStr = new Date().toISOString().split('T')[0]): Promise<{
+  async getLiveMonitorStats(unitId?: string, dateStr = attendanceDateInJakarta()): Promise<{
     data: {
       scheduled: number;
       present: number;
