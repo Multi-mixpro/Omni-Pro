@@ -91,7 +91,7 @@ BEGIN
     FROM public.attendance_login_pins
     WHERE is_active = true AND user_id <> p_user_id
   LOOP
-    IF v_existing.pin_hash = public.crypt(v_pin, v_existing.pin_hash) THEN
+    IF v_existing.pin_hash = extensions.crypt(v_pin, v_existing.pin_hash) THEN
       RAISE EXCEPTION USING
         ERRCODE = '23505',
         MESSAGE = 'PIN tersebut sudah digunakan. Pilih PIN lain.';
@@ -101,7 +101,7 @@ BEGIN
   INSERT INTO public.attendance_login_pins (user_id, pin_hash, label, is_active)
   VALUES (
     p_user_id,
-    public.crypt(v_pin, public.gen_salt('bf', 12)),
+    extensions.crypt(v_pin, extensions.gen_salt('bf', 12)),
     NULLIF(pg_catalog.btrim(p_label), ''),
     true
   )
@@ -248,7 +248,7 @@ BEGIN
     ORDER BY p.id
   LOOP
     IF v_row.role IS NOT NULL
-      AND v_row.pin_hash = public.crypt(v_pin, v_row.pin_hash)
+      AND v_row.pin_hash = extensions.crypt(v_pin, v_row.pin_hash)
     THEN
       v_match_user := v_row.user_id;
       v_match_email := v_row.email;

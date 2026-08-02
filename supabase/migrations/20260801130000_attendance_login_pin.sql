@@ -80,7 +80,7 @@ begin
   for v_row in
     select * from public.attendance_login_pins where is_active
   loop
-    if v_row.pin_hash = public.crypt(trim(p_pin), v_row.pin_hash) then
+    if v_row.pin_hash = extensions.crypt(trim(p_pin), v_row.pin_hash) then
       select email into v_email from auth.users where id = v_row.user_id;
 
       update public.attendance_login_pins
@@ -118,7 +118,7 @@ begin
   end if;
 
   insert into public.attendance_login_pins (user_id, pin_hash, label)
-  values (p_user_id, public.crypt(trim(p_pin), public.gen_salt('bf')), p_label)
+  values (p_user_id, extensions.crypt(trim(p_pin), extensions.gen_salt('bf')), p_label)
   on conflict (user_id) do update
     set pin_hash = excluded.pin_hash,
         label = coalesce(excluded.label, public.attendance_login_pins.label),
