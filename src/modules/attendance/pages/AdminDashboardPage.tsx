@@ -18,6 +18,7 @@ export function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [selectedUnitId, setSelectedUnitId] = useState<string | undefined>(undefined);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [employeeNotice, setEmployeeNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Real-time Supabase Data States
   const [dbEmployees, setDbEmployees] = useState<any[]>([]);
@@ -182,17 +183,27 @@ export function AdminDashboardPage() {
   async function handleDeleteEmployee(empId: string, empNameStr: string) {
     if (!confirm(`Hapus ${empNameStr} dari daftar karyawan aktif? Riwayat presensi tetap disimpan.`)) return;
 
+    setEmployeeNotice(null);
     setActionLoadingId(`del_${empId}`);
     const res = await attendanceRepository.deleteEmployee(empId);
     setActionLoadingId(null);
 
     if (res.data) {
-      alert(`Pegawai ${empNameStr} telah dinonaktifkan dan dihapus dari daftar aktif.`);
       setDbEmployees(prev => prev.filter(e => e.id !== empId));
-      fetchRealtimeData();
-      refetch();
+      setEmployeeNotice({
+        type: 'success',
+        message: `Pegawai ${empNameStr} telah dinonaktifkan. Riwayat presensi tetap tersimpan.`,
+      });
+      await Promise.all([
+        fetchRealtimeData(),
+        refetch(),
+        queryClient.invalidateQueries({ queryKey: ['attendance-monitor'] }),
+      ]);
     } else {
-      alert(`Gagal menghapus: ${res.error?.message ?? 'Terjadi kesalahan'}`);
+      setEmployeeNotice({
+        type: 'error',
+        message: `Gagal menghapus ${empNameStr}: ${res.error?.message ?? 'Terjadi kesalahan'}`,
+      });
     }
   }
 
@@ -708,6 +719,25 @@ export function AdminDashboardPage() {
                 + Tambah Karyawan Baru
               </button>
             </div>
+
+            {employeeNotice && (
+              <div
+                role="status"
+                aria-live="polite"
+                style={{
+                  marginBottom: 14,
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  border: `1px solid ${employeeNotice.type === 'success' ? '#A7D8C5' : '#F0B8B8'}`,
+                  backgroundColor: employeeNotice.type === 'success' ? '#ECF8F3' : '#FFF1F1',
+                  color: employeeNotice.type === 'success' ? '#126B4B' : '#A62E2E',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {employeeNotice.message}
+              </div>
+            )}
 
             {loadingData ? (
               <div style={{ padding: 20, textAlign: 'center', color: '#667085', fontSize: 12 }}>Memuat data pegawai dari Supabase...</div>

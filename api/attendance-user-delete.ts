@@ -72,11 +72,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   );
   if (!authorized) return res.status(403).json({ error: 'Karyawan berada di luar unit yang Anda kelola.' });
 
-  const { error: employeeError } = await admin
+  const { data: deactivatedEmployee, error: employeeError } = await admin
     .from('attendance_employees')
     .update({ is_active: false })
-    .eq('id', employeeId);
+    .eq('id', employeeId)
+    .select('id, is_active')
+    .maybeSingle();
   if (employeeError) return res.status(400).json({ error: employeeError.message });
+  if (!deactivatedEmployee || deactivatedEmployee.is_active) {
+    return res.status(409).json({ error: 'Status karyawan tidak berubah. Muat ulang lalu coba lagi.' });
+  }
 
   const { error: assignmentError } = await admin
     .from('attendance_employee_assignments')

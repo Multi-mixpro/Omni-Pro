@@ -269,6 +269,9 @@ export const attendanceRepository = {
       if (!response.ok) {
         return { data: false, error: { code: String(response.status), message: payload.error ?? 'Karyawan gagal dihapus.' } };
       }
+      if (payload.deactivated !== true || payload.id !== id) {
+        return { data: false, error: { code: 'DELETE_NOT_CONFIRMED', message: 'Server belum mengonfirmasi perubahan status karyawan.' } };
+      }
       return { data: true };
     } catch (err) {
       return { data: false, error: mapError(err) };
