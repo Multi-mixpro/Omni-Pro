@@ -4,6 +4,17 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // Vite tidak menjalankan Vercel Functions. Proxy ini membuat CRUD admin
+    // lokal memakai endpoint server yang sama dengan deployment produksi.
+    proxy: {
+      '/api': {
+        target: 'https://mix-pro-roan.vercel.app',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

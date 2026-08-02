@@ -180,14 +180,14 @@ export function AdminDashboardPage() {
 
   // DELETE EMPLOYEE REALTIME
   async function handleDeleteEmployee(empId: string, empNameStr: string) {
-    if (!confirm(`Hapus pegawai ${empNameStr} dari Supabase?`)) return;
+    if (!confirm(`Hapus ${empNameStr} dari daftar karyawan aktif? Riwayat presensi tetap disimpan.`)) return;
 
     setActionLoadingId(`del_${empId}`);
     const res = await attendanceRepository.deleteEmployee(empId);
     setActionLoadingId(null);
 
     if (res.data) {
-      alert(`Pegawai ${empNameStr} telah berhasil dihapus!`);
+      alert(`Pegawai ${empNameStr} telah dinonaktifkan dan dihapus dari daftar aktif.`);
       setDbEmployees(prev => prev.filter(e => e.id !== empId));
       fetchRealtimeData();
       refetch();

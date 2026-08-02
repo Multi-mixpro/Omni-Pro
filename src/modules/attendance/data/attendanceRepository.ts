@@ -19,6 +19,8 @@ export interface AppError {
   message: string;
 }
 
+const scheduleEnsureInflight = new Map<string, Promise<void>>();
+
 function mapError(error: unknown): AppError {
   if (error && typeof error === 'object' && 'message' in error) {
     const e = error as { message: string; code?: string };
@@ -239,6 +241,7 @@ export const attendanceRepository = {
             location:attendance_locations(*)
           )
         `)
+        .eq('is_active', true)
         .order('employee_no');
 
       if (error) return { data: [], error: mapError(error) };
@@ -250,17 +253,21 @@ export const attendanceRepository = {
 
   async deleteEmployee(id: string): Promise<{ data: boolean; error?: AppError }> {
     try {
-      // Clean up dependent foreign keys first to prevent PostgreSQL 23503 error
-      await supabase.from('attendance_employee_assignments').delete().eq('employee_id', id);
-      await supabase.from('attendance_schedules').delete().eq('employee_id', id);
-      await supabase.from('attendance_days').delete().eq('employee_id', id);
-      await supabase.from('attendance_events').delete().eq('employee_id', id);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return { data: false, error: { code: 'NO_SESSION', message: 'Sesi tidak tersedia. Silakan masuk kembali.' } };
 
-      const { error } = await supabase.from('attendance_employees').delete().eq('id', id);
-      if (error) {
-        // Fallback: Soft-delete setting is_active = false
-        const { error: softErr } = await supabase.from('attendance_employees').update({ is_active: false }).eq('id', id);
-        if (softErr) return { data: false, error: mapError(softErr) };
+      const response = await fetch('/api/attendance-user-delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ employee_id: id }),
+      });
+      if (!response.headers.get('content-type')?.includes('application/json')) {
+        return { data: false, error: { code: 'SERVER_REQUIRED', message: 'Penghapusan karyawan membutuhkan server aplikasi.' } };
+      }
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return { data: false, error: { code: String(response.status), message: payload.error ?? 'Karyawan gagal dihapus.' } };
       }
       return { data: true };
     } catch (err) {
@@ -390,96 +397,34 @@ export const attendanceRepository = {
   // 2. Schedule Auto-Provisioning & Today
   // ===================================
   async ensureDailySchedules(dateStr = new Date().toISOString().split('T')[0]): Promise<void> {
-    try {
-      // 1. Ambil seluruh pegawai aktif beserta assignment & unit-nya
-      const { data: assignments } = await supabase
-        .from('attendance_employee_assignments')
-        .select(`
-          *,
-          employee:attendance_employees(*),
-          business_unit:attendance_business_units(*),
-          location:attendance_locations(*)
-        `)
-        .eq('is_active', true);
+    const existing = scheduleEnsureInflight.get(dateStr);
+    if (existing) return existing;
 
-      if (!assignments || assignments.length === 0) return;
+    const task = (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return;
 
-      // 2. Ambil shift templates yang ada
-      const { data: templates } = await supabase
-        .from('attendance_shift_templates')
-        .select('*')
-        .eq('is_active', true);
-
-      // 3. Cek jadwal yang sudah ada untuk hari ini
-      const { data: existingSchedules } = await supabase
-        .from('attendance_schedules')
-        .select('employee_id')
-        .eq('schedule_date', dateStr);
-
-      const scheduledEmpIds = new Set((existingSchedules ?? []).map(s => s.employee_id));
-
-      // 4. Generate schedule untuk pegawai yang belum punya jadwal hari ini
-      for (const assign of assignments) {
-        if (scheduledEmpIds.has(assign.employee_id)) continue;
-
-        // Pilih template shift yang sesuai
-        const unitTemplates = (templates ?? []).filter(t => t.business_unit_id === assign.business_unit_id);
-        let selectedTemplate = unitTemplates[0];
-
-        const empNo = assign.employee?.employee_no;
-        if (empNo === 'UJO-001') {
-          selectedTemplate = unitTemplates.find(t => t.code === 'SHIFT_PROD_DINI') ?? selectedTemplate;
-        } else if (empNo === 'UJO-002') {
-          selectedTemplate = unitTemplates.find(t => t.code === 'SHIFT_PROD_PAGI_A') ?? selectedTemplate;
-        } else if (empNo === 'UJO-003') {
-          selectedTemplate = unitTemplates.find(t => t.code === 'SHIFT_PREP_SERVICE') ?? selectedTemplate;
-        } else if (empNo === 'UJO-004' || empNo === 'UJO-005') {
-          selectedTemplate = unitTemplates.find(t => t.code === 'SHIFT_OUTLET_CLOSE') ?? selectedTemplate;
-        }
-
-        if (!selectedTemplate) continue;
-
-        // Insert schedule
-        const { data: newSched } = await supabase
-          .from('attendance_schedules')
-          .insert({
-            employee_id: assign.employee_id,
-            assignment_id: assign.id,
-            business_unit_id: assign.business_unit_id,
-            location_id: assign.location_id,
-            work_area_id: assign.primary_work_area_id,
-            shift_template_id: selectedTemplate.id,
-            schedule_date: dateStr,
-            is_off: false,
-          })
-          .select('id')
-          .single();
-
-        // Insert initial attendance_days record (status ABSENT)
-        const { data: existingDay } = await supabase
-          .from('attendance_days')
-          .select('id')
-          .eq('employee_id', assign.employee_id)
-          .eq('work_date', dateStr)
-          .maybeSingle();
-
-        if (!existingDay) {
-          const { data: org } = await supabase.from('attendance_organizations').select('id').limit(1).single();
-
-          await supabase.from('attendance_days').insert({
-            organization_id: org?.id ?? assign.employee?.organization_id,
-            business_unit_id: assign.business_unit_id,
-            location_id: assign.location_id,
-            employee_id: assign.employee_id,
-            schedule_id: newSched?.id ?? null,
-            work_date: dateStr,
-            status: 'ABSENT',
-          });
-        }
+      const response = await fetch('/api/attendance-schedules-ensure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ date: dateStr }),
+      });
+      if (!response.headers.get('content-type')?.includes('application/json')) {
+        throw new Error('Penyiapan jadwal membutuhkan server aplikasi.');
       }
-    } catch (err) {
-      console.warn('Gagal men-generate schedule otomatis:', err);
-    }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error ?? 'Jadwal harian gagal disiapkan.');
+      }
+    })().catch((err) => {
+      console.warn('Gagal menyiapkan jadwal otomatis:', err);
+    }).finally(() => {
+      scheduleEnsureInflight.delete(dateStr);
+    });
+
+    scheduleEnsureInflight.set(dateStr, task);
+    return task;
   },
 
   async getTodaySchedule(employeeId: string, dateStr = new Date().toISOString().split('T')[0]): Promise<{ data: EmployeeSchedule | null; error?: AppError }> {
