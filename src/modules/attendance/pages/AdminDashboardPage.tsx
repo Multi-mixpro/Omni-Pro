@@ -102,15 +102,23 @@ export function AdminDashboardPage() {
   // Load Real-time Data from Supabase
   const fetchRealtimeData = useCallback(async () => {
     setLoadingData(true);
-    const [empRes, shiftRes, logRes] = await Promise.all([
-      attendanceRepository.listEmployeesWithAssignments(),
-      attendanceRepository.listShiftTemplates(selectedUnitId),
-      attendanceRepository.listAuditLogs(),
-    ]);
+    try {
+      const [empRes, shiftRes, logRes] = await Promise.all([
+        attendanceRepository.listEmployeesWithAssignments(),
+        attendanceRepository.listShiftTemplates(selectedUnitId),
+        attendanceRepository.listAuditLogs(),
+      ]);
 
-    if (empRes.data) setDbEmployees(empRes.data);
-    if (shiftRes.data) setDbShifts(shiftRes.data);
-    if (logRes.data) setDbLogs(logRes.data);
+      if (empRes.error) console.warn('[AdminDashboard] Employee load error:', empRes.error);
+      if (shiftRes.error) console.warn('[AdminDashboard] Shift load error:', shiftRes.error);
+      if (logRes.error) console.warn('[AdminDashboard] Audit log load error:', logRes.error);
+
+      setDbEmployees(empRes.data ?? []);
+      setDbShifts(shiftRes.data ?? []);
+      setDbLogs(logRes.data ?? []);
+    } catch (err) {
+      console.error('[AdminDashboard] fetchRealtimeData exception:', err);
+    }
     setLoadingData(false);
   }, [selectedUnitId]);
 

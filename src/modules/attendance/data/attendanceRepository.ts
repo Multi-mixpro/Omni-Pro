@@ -273,9 +273,16 @@ export const attendanceRepository = {
         .eq('is_active', true)
         .order('employee_no');
 
-      if (error) return { data: [], error: mapError(error) };
+      if (error) {
+        console.warn('[Attendance] listEmployeesWithAssignments error:', error);
+        return { data: [], error: mapError(error) };
+      }
+      if (!data || data.length === 0) {
+        console.warn('[Attendance] listEmployeesWithAssignments returned 0 rows — check RLS policies or data state.');
+      }
       return { data: data ?? [] };
     } catch (err) {
+      console.warn('[Attendance] listEmployeesWithAssignments exception:', err);
       return { data: [], error: mapError(err) };
     }
   },
@@ -369,11 +376,58 @@ export const attendanceRepository = {
 
   async deleteShiftTemplate(id: string): Promise<{ data: boolean; error?: AppError }> {
     try {
-      await supabase.from('attendance_schedules').delete().eq('shift_template_id', id);
+      // 1. Find all schedules that reference this shift template
+      const { data: schedules } = await supabase
+        .from('attendance_schedules')
+        .select('id')
+        .eq('shift_template_id', id);
 
+      if (schedules && schedules.length > 0) {
+        const scheduleIds = schedules.map(s => s.id);
+
+        // 2. Delete attendance_days that reference these schedules
+        //    (attendance_days.schedule_id → attendance_schedules.id)
+        for (const sid of scheduleIds) {
+          // First delete events linked through days
+          const { data: daysForSchedule } = await supabase
+            .from('attendance_days')
+            .select('id, check_in_event_id, check_out_event_id')
+            .eq('schedule_id', sid);
+
+          if (daysForSchedule && daysForSchedule.length > 0) {
+            // Collect event IDs to delete
+            const eventIds = daysForSchedule
+              .flatMap(d => [d.check_in_event_id, d.check_out_event_id])
+              .filter(Boolean) as string[];
+
+            // Nullify FK references in days before deleting events
+            await supabase
+              .from('attendance_days')
+              .update({ check_in_event_id: null, check_out_event_id: null })
+              .eq('schedule_id', sid);
+
+            // Delete the days
+            await supabase.from('attendance_days').delete().eq('schedule_id', sid);
+
+            // Delete orphan events
+            if (eventIds.length > 0) {
+              await supabase.from('attendance_events').delete().in('id', eventIds);
+            }
+          }
+        }
+
+        // 3. Delete the schedules
+        await supabase.from('attendance_schedules').delete().eq('shift_template_id', id);
+      }
+
+      // 4. Delete the shift template
       const { error } = await supabase.from('attendance_shift_templates').delete().eq('id', id);
       if (error) {
-        const { error: softErr } = await supabase.from('attendance_shift_templates').update({ is_active: false }).eq('id', id);
+        // Fallback to soft-delete if hard delete still fails
+        const { error: softErr } = await supabase
+          .from('attendance_shift_templates')
+          .update({ is_active: false })
+          .eq('id', id);
         if (softErr) return { data: false, error: mapError(softErr) };
       }
       return { data: true };
