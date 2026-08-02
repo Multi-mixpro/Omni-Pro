@@ -716,7 +716,10 @@ export const attendanceRepository = {
       const { data, error } = await query;
       if (error) return { data: { scheduled: 0, present: 0, late: 0, absent: 0, on_leave: 0, days: [] }, error: mapError(error) };
 
-      const days = (data ?? []) as unknown as AttendanceDay[];
+      // Jadwal lama tetap disimpan sebagai histori, tetapi karyawan yang sudah
+      // dinonaktifkan tidak boleh lagi dihitung atau muncul di monitor aktif.
+      const days = ((data ?? []) as unknown as AttendanceDay[])
+        .filter(day => day.employee?.is_active === true);
       const present = days.filter(d => d.check_in_time || d.status === 'PRESENT').length;
       const late = days.filter(d => d.status === 'LATE').length;
       const on_leave = days.filter(d => d.status === 'ON_LEAVE').length;
