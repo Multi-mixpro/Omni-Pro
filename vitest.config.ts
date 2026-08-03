@@ -11,7 +11,6 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/**/*.{test,spec}.{ts,tsx}',
-      'PATEN/src/**/*.{test,spec}.{ts,tsx}',
       'api/**/*.{test,spec}.{ts,tsx}',
     ],
     coverage: {

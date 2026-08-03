@@ -29,8 +29,8 @@ import { StorageService } from './services/storage';
 import { uploadArticleMedia } from './services/media';
 import { compressImageForUpload } from './utils/cloudinary';
 import { deriveArticleIndicators } from './utils/calculations';
-import { useLocation, useNavigate } from '../../src/app/router/simpleRouter';
-import { signOut } from '../../src/core/auth/useAuth';
+import { useLocation, useNavigate } from '@/app/router/simpleRouter';
+import { signOut } from '@/core/auth/useAuth';
 import {
   Article,
   Supplier,

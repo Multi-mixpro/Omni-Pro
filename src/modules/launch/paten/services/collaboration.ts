@@ -1,4 +1,4 @@
-import { supabase } from '../../../src/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { ArticleComment } from '../types';
 
 const PROJECT_ID_PATTERN =

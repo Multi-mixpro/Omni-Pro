@@ -6,7 +6,7 @@
  * realtime records in public.paten_records.
  */
 
-import { supabase } from '../../../src/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import {
   ApprovalGate,
   Article,
@@ -720,7 +720,7 @@ async function ensureProjects(articles: Article[], newIds: Set<string>) {
 
   for (const article of candidates) {
     const unitCode = article.businessUnit === 'Streetwear Co' ? 'GUDSKUY' : 'GG_SUPPLY';
-    const unit = businessUnits.find((item) => item.code === unitCode) || businessUnits[0];
+    const unit = businessUnits.find((item: any) => item.code === unitCode) || businessUnits[0];
     if (!unit) throw new Error('Business unit belum tersedia di database.');
     const { error } = await supabase.from('launch_projects').upsert({
       id: article.id,
@@ -779,7 +779,7 @@ async function syncArticleColumns(
       })
       .eq('id', article.id);
     if (error) throw error;
-    await syncArticleOperations(article, userId, previous);
+    await syncArticleOperations(article, userId ?? '', previous);
   }
 }
 

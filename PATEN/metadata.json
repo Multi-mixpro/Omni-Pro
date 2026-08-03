@@ -1,6 +1,0 @@
-{
-  "name": "Product Launch OS",
-  "description": "Super-app operasional pengembangan artikel fashion dari prospek hingga rilis massal dengan Article Workspace, Size Chart, HPP, Matriks Stok, dan Master Data.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

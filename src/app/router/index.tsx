@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthGate } from '@/core/auth/AuthGate';
 import { useAuth } from '@/core/auth/useAuth';
-import PatenApp from '../../../PATEN/src/App';
+import PatenApp from '@/modules/launch/paten/App';
 import { SettingsPage } from '@/modules/launch/settings/SettingsPage';
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
 
