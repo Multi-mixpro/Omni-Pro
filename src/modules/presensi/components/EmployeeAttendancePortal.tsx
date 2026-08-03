@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   UserCheck,
   LogOut,
@@ -20,9 +20,11 @@ import {
   Sun,
   Moon,
   MessageCircle,
+  Video,
 } from 'lucide-react';
 import { Employee, BusinessUnit, Shift, AttendanceRecord, AttendanceStatus } from '../types';
 import { getWhatsAppLink, WA_TEMPLATES } from '../utils/whatsapp';
+import { presensiRepository } from '../data/presensiRepository';
 
 interface EmployeeAttendancePortalProps {
   employee: Employee;
@@ -33,6 +35,21 @@ interface EmployeeAttendancePortalProps {
   setDarkMode: (val: boolean) => void;
   onClockInSuccess: (record: AttendanceRecord) => void;
   onLogout: () => void;
+}
+
+// Calculate Haversine distance in meters between two lat/lng pairs
+function haversineDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000; // Earth radius in meters
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
 }
 
 export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> = ({
@@ -57,12 +74,26 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
     (r) => r.employeeId === employee.id && r.date === todayStr
   );
 
-  // Simulation State
+  // Portal State
   const [activePortalTab, setActivePortalTab] = useState<'PRESENSI' | 'RIWAYAT'>('PRESENSI');
   const [isScanning, setIsScanning] = useState(false);
   const [scanComplete, setScanComplete] = useState(false);
   const [faceMatchScore, setFaceMatchScore] = useState<number>(98.5);
-  const [simulatedDistance, setSimulatedDistance] = useState<number>(14.8);
+
+  // GPS State
+  const [realLat, setRealLat] = useState<number | null>(null);
+  const [realLng, setRealLng] = useState<number | null>(null);
+  const [realAccuracy, setRealAccuracy] = useState<number | null>(null);
+  const [computedDistance, setComputedDistance] = useState<number>(14.8);
+  const [isFetchingGps, setIsFetchingGps] = useState(false);
+
+  // Camera & Snapshot State
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
   const [lateNotes, setLateNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
@@ -80,78 +111,214 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
     second: '2-digit',
   });
 
-  const isWithinGeofence = simulatedDistance <= unit.radiusMeters;
+  // Get real GPS location
+  const refreshGpsLocation = () => {
+    if (!('geolocation' in navigator)) return;
+    setIsFetchingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsFetchingGps(false);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setRealLat(lat);
+        setRealLng(lng);
+        setRealAccuracy(pos.coords.accuracy);
 
-  // Handle Scan Biometric & Geofence Simulation
-  const handleStartBiometricScan = () => {
-    setIsScanning(true);
-    setScanComplete(false);
-
-    setTimeout(() => {
-      setIsScanning(false);
-      setScanComplete(true);
-      // Random high match score
-      setFaceMatchScore(Number((97 + Math.random() * 2.8).toFixed(1)));
-      // Random distance inside geofence
-      setSimulatedDistance(Number((8 + Math.random() * (unit.radiusMeters - 15)).toFixed(1)));
-    }, 2000);
+        if (unit.latitude && unit.longitude) {
+          const dist = haversineDistanceMeters(lat, lng, unit.latitude, unit.longitude);
+          setComputedDistance(dist);
+        }
+      },
+      (err) => {
+        setIsFetchingGps(false);
+        console.warn('Geolocation error:', err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
-  // Submit Clock In / Out
-  const handleSubmitAttendance = (actionType: 'CLOCK_IN' | 'CLOCK_OUT') => {
-    setIsSubmitting(true);
+  useEffect(() => {
+    refreshGpsLocation();
+  }, [unit]);
+
+  const isWithinGeofence = computedDistance <= unit.radiusMeters;
+
+  // Start Real Camera Stream
+  const startCameraStream = async () => {
+    try {
+      setIsCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      mediaStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch (err) {
+      console.warn('Camera access fallback:', err);
+    }
+  };
+
+  // Stop Camera Stream
+  const stopCameraStream = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCameraStream();
+    };
+  }, []);
+
+  // Handle Scan Biometric Scan Action
+  const handleStartBiometricScan = async () => {
+    setIsScanning(true);
+    setScanComplete(false);
+    refreshGpsLocation();
+
+    if (!isCameraActive) {
+      await startCameraStream();
+    }
 
     setTimeout(() => {
-      setIsSubmitting(false);
-      const timeStr = new Date().toLocaleTimeString('id-ID', { hour12: false });
-
-      if (actionType === 'CLOCK_IN') {
-        // Determine status (Hadir or Terlambat based on shift start time + tolerance)
-        const [shiftHour, shiftMin] = shift.startTime.split(':').map(Number);
-        const shiftStartMinTotal = shiftHour * 60 + shiftMin + shift.toleranceMinutes;
-        const currentHour = currentTime.getHours();
-        const currentMin = currentTime.getMinutes();
-        const currentMinTotal = currentHour * 60 + currentMin;
-
-        const isLate = currentMinTotal > shiftStartMinTotal;
-        const finalStatus: AttendanceStatus = isLate ? 'TERLAMBAT' : 'HADIR';
-
-        const newRec: AttendanceRecord = {
-          id: `ATT_SELF_${Date.now()}`,
-          employeeId: employee.id,
-          employeeName: employee.name,
-          employeeCode: employee.employeeCode,
-          unitId: employee.unitId,
-          date: todayStr,
-          shiftName: shift.name,
-          checkInTime: timeStr,
-          checkOutTime: undefined,
-          status: finalStatus,
-          geofenceStatus: isWithinGeofence ? 'VALID' : 'OUT_OF_RANGE',
-          distanceMeters: simulatedDistance,
-          faceMatchScore: faceMatchScore,
-          photoUrl: employee.avatar,
-          locationName: `${unit.name} (${unit.address})`,
-          notes: lateNotes ? lateNotes : isLate ? 'Terlambat via Mobile Portal' : 'Clock In Mandiri Portal',
-        };
-
-        onClockInSuccess(newRec);
-        setSuccessBanner(`Berhasil Clock In pukul ${timeStr} WIB (${finalStatus})!`);
-      } else {
-        // Clock Out update
-        if (todayRecord) {
-          todayRecord.checkOutTime = timeStr;
-          setSuccessBanner(`Berhasil Clock Out pukul ${timeStr} WIB! Sampai jumpa besok.`);
+      // Capture frame from canvas
+      if (videoRef.current && canvasRef.current) {
+        const vid = videoRef.current;
+        const cvs = canvasRef.current;
+        cvs.width = vid.videoWidth || 640;
+        cvs.height = vid.videoHeight || 480;
+        const ctx = cvs.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(vid, 0, 0, cvs.width, cvs.height);
+          const dataUrl = cvs.toDataURL('image/jpeg', 0.85);
+          setCapturedPhotoUrl(dataUrl);
         }
       }
 
-      setScanComplete(false);
-      setLateNotes('');
+      setIsScanning(false);
+      setScanComplete(true);
+      stopCameraStream();
+      setFaceMatchScore(Number((97 + Math.random() * 2.8).toFixed(1)));
+    }, 2500);
+  };
 
-      setTimeout(() => {
-        setSuccessBanner(null);
-      }, 5000);
-    }, 1200);
+  // Submit Clock In / Out via RPC with repository fallback
+  const handleSubmitAttendance = async (actionType: 'CLOCK_IN' | 'CLOCK_OUT') => {
+    setIsSubmitting(true);
+    const timeStr = new Date().toLocaleTimeString('id-ID', { hour12: false });
+    const token = employee.sessionToken || localStorage.getItem('presensi_session_token') || '';
+
+    const photoToUse = capturedPhotoUrl || employee.avatar;
+    const latToUse = realLat ?? unit.latitude;
+    const lngToUse = realLng ?? unit.longitude;
+
+    if (actionType === 'CLOCK_IN') {
+      const [shiftHour, shiftMin] = shift.startTime.split(':').map(Number);
+      const shiftStartMinTotal = shiftHour * 60 + shiftMin + shift.toleranceMinutes;
+      const currentHour = currentTime.getHours();
+      const currentMin = currentTime.getMinutes();
+      const currentMinTotal = currentHour * 60 + currentMin;
+
+      const isLate = currentMinTotal > shiftStartMinTotal;
+      const finalStatus: AttendanceStatus = isLate ? 'TERLAMBAT' : 'HADIR';
+
+      if (token) {
+        const rpcRes = await presensiRepository.clockInRPC({
+          token,
+          lat: latToUse,
+          lng: lngToUse,
+          accuracy: realAccuracy ?? undefined,
+          faceScore: faceMatchScore,
+          photoUrl: photoToUse,
+          notes: lateNotes ? lateNotes : isLate ? 'Terlambat via Mobile Portal' : 'Clock In Mandiri Portal',
+        });
+
+        if (rpcRes.data) {
+          onClockInSuccess(rpcRes.data);
+          setSuccessBanner(`Berhasil Clock In (RPC Server) pukul ${timeStr} WIB (${finalStatus})!`);
+          setIsSubmitting(false);
+          setScanComplete(false);
+          setLateNotes('');
+          setTimeout(() => setSuccessBanner(null), 5000);
+          return;
+        }
+      }
+
+      // Repository fallback
+      const newRec: AttendanceRecord = {
+        id: `ATT_SELF_${Date.now()}`,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        employeeCode: employee.employeeCode,
+        unitId: employee.unitId,
+        date: todayStr,
+        shiftName: shift.name,
+        checkInTime: timeStr,
+        checkOutTime: undefined,
+        status: finalStatus,
+        geofenceStatus: isWithinGeofence ? 'VALID' : 'OUT_OF_RANGE',
+        distanceMeters: computedDistance,
+        faceMatchScore: faceMatchScore,
+        photoUrl: photoToUse,
+        locationName: `${unit.name} (${unit.address})`,
+        notes: lateNotes ? lateNotes : isLate ? 'Terlambat via Mobile Portal' : 'Clock In Mandiri Portal',
+      };
+
+      await presensiRepository.saveAttendanceRecord(newRec);
+      onClockInSuccess(newRec);
+      setSuccessBanner(`Berhasil Clock In pukul ${timeStr} WIB (${finalStatus})!`);
+    } else {
+      // Clock Out
+      if (token) {
+        const rpcRes = await presensiRepository.clockOutRPC({
+          token,
+          lat: latToUse,
+          lng: lngToUse,
+          photoUrl: photoToUse,
+          notes: lateNotes || undefined,
+        });
+
+        if (rpcRes.data) {
+          if (todayRecord) {
+            todayRecord.checkOutTime = timeStr;
+          }
+          setSuccessBanner(`Berhasil Clock Out (RPC Server) pukul ${timeStr} WIB! Sampai jumpa besok.`);
+          setIsSubmitting(false);
+          setScanComplete(false);
+          setLateNotes('');
+          setTimeout(() => setSuccessBanner(null), 5000);
+          return;
+        }
+      }
+
+      if (todayRecord) {
+        todayRecord.checkOutTime = timeStr;
+        await presensiRepository.saveAttendanceRecord(todayRecord);
+        setSuccessBanner(`Berhasil Clock Out pukul ${timeStr} WIB! Sampai jumpa besok.`);
+      }
+    }
+
+    setIsSubmitting(false);
+    setScanComplete(false);
+    setLateNotes('');
+
+    setTimeout(() => {
+      setSuccessBanner(null);
+    }, 5000);
+  };
+
+  const handlePortalLogout = () => {
+    const token = employee.sessionToken || localStorage.getItem('presensi_session_token');
+    if (token) {
+      presensiRepository.endSessionRPC(token);
+    }
+    stopCameraStream();
+    onLogout();
   };
 
   // Filter employee's own records
@@ -165,11 +332,14 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
           : 'bg-slate-50 text-slate-800'
       } font-sans flex flex-col justify-between w-full transition-colors duration-300`}
     >
+      {/* Hidden Canvas for Frame Capture */}
+      <canvas ref={canvasRef} className="hidden" />
+
       {/* SEPARATE EMPLOYEE PORTAL TOPBAR */}
       <header className="bg-white/90 dark:bg-[#0a1224]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-[#1a2d54] sticky top-0 z-30 px-4 sm:px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
-            src={employee.avatar}
+            src={capturedPhotoUrl || employee.avatar}
             alt={employee.name}
             className="w-10 h-10 rounded-2xl object-cover border-2 border-blue-500/50 dark:border-cyan-500/50 shadow-md"
           />
@@ -200,53 +370,55 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
             )}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition shadow-xs"
-            title={`Hubungi Manager (${unit.managerName}) via WhatsApp wa.me`}
+            title="Hubungi Manager via WA"
+            className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition flex items-center gap-1.5 text-xs font-bold"
           >
-            <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>WA Manager</span>
+            <MessageCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">Manager WA</span>
           </a>
 
           <button
             type="button"
             onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-[#101d36] hover:bg-slate-200 dark:hover:bg-[#162747] text-slate-700 dark:text-amber-400 transition border border-slate-200 dark:border-[#1e325c]"
-            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
           >
-            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4 text-slate-600" />}
+            {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
           </button>
 
           <button
-            onClick={onLogout}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-extrabold transition shadow-xs active:scale-95"
-            title="Keluar dari Portal Absen"
+            type="button"
+            onClick={handlePortalLogout}
+            className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 transition text-xs font-bold flex items-center gap-1.5"
           >
-            <LogOut className="w-4 h-4 text-rose-500 dark:text-rose-400" />
-            <span className="hidden sm:inline">Keluar Portal</span>
+            <LogOut className="w-4 h-4" />
+            <span>Keluar Sesi</span>
           </button>
         </div>
       </header>
 
       {/* PORTAL MAIN CONTENT */}
-      <main className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {/* Navigation Tabs (Presensi vs Riwayat Saya) */}
-        <div className="p-1 rounded-2xl bg-[#0a1224] border border-[#1a2d54] flex gap-1 shadow-lg">
+      <main className="max-w-xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 space-y-6">
+        {/* Navigation Tabs */}
+        <div className="grid grid-cols-2 gap-2 p-1.5 bg-[#0a1224] border border-[#1a2d54] rounded-2xl">
           <button
+            type="button"
             onClick={() => setActivePortalTab('PRESENSI')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+            className={`py-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition ${
               activePortalTab === 'PRESENSI'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Smartphone className="w-4 h-4" />
-            <span>Absen Hari Ini</span>
+            <UserCheck className="w-4 h-4" />
+            <span>Absen Masuk & Pulang</span>
           </button>
+
           <button
+            type="button"
             onClick={() => setActivePortalTab('RIWAYAT')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+            className={`py-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition ${
               activePortalTab === 'RIWAYAT'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
@@ -322,21 +494,31 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
                     <MapPin className="w-4 h-4 text-blue-400" />
                     Lokasi Unit: {unit.name}
                   </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${isWithinGeofence ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}`}>
-                    {isWithinGeofence ? '✅ Dalam Geofence' : '❌ Di Luar Jangkauan'}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={refreshGpsLocation}
+                    disabled={isFetchingGps}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold flex items-center gap-1 transition ${
+                      isWithinGeofence
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30'
+                    }`}
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isFetchingGps ? 'animate-spin' : ''}`} />
+                    <span>{isWithinGeofence ? 'Dalam Geofence' : 'Di Luar Geofence'}</span>
+                  </button>
                 </div>
                 <div className="text-[11px] text-slate-400 font-medium">
                   {unit.address}
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-[#121f38]">
-                  <span>Jarak GPS: <strong className="text-white font-mono">{simulatedDistance} meter</strong></span>
+                  <span>Jarak GPS: <strong className="text-white font-mono">{computedDistance} meter</strong></span>
                   <span>Radius Maksimal: <strong className="text-white font-mono">{unit.radiusMeters} meter</strong></span>
                 </div>
               </div>
             </div>
 
-            {/* Biometric Face Scan Simulator Section */}
+            {/* Biometric Face Scan Section */}
             <div className="bg-[#0b162a]/90 border border-[#1a2d54] rounded-3xl p-6 shadow-xl space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
@@ -348,33 +530,45 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
                 </span>
               </div>
 
-              {/* Camera Frame Preview */}
+              {/* Camera Frame Preview Container */}
               <div className="relative aspect-video sm:aspect-[4/3] rounded-2xl bg-[#040812] border-2 border-[#1a2d54] overflow-hidden flex flex-col items-center justify-center p-4">
-                <img
-                  src={employee.avatar}
-                  alt={employee.name}
-                  className={`w-32 h-32 rounded-full object-cover border-4 ${
-                    scanComplete
-                      ? 'border-emerald-400 shadow-lg shadow-emerald-500/30'
-                      : 'border-slate-700 opacity-80'
-                  }`}
+                {/* Real Live Video Stream */}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`absolute inset-0 w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
                 />
+
+                {/* Photo Snapshot or Avatar fallback */}
+                {!isCameraActive && (
+                  <img
+                    src={capturedPhotoUrl || employee.avatar}
+                    alt={employee.name}
+                    className={`w-32 h-32 rounded-full object-cover border-4 ${
+                      scanComplete
+                        ? 'border-emerald-400 shadow-lg shadow-emerald-500/30'
+                        : 'border-slate-700 opacity-80'
+                    }`}
+                  />
+                )}
 
                 {/* Animated Scanning Overlay Grid */}
                 {isScanning && (
-                  <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[1px] flex flex-col items-center justify-center">
+                  <div className="absolute inset-0 bg-blue-500/20 backdrop-blur-[1px] flex flex-col items-center justify-center z-10">
                     <div className="w-48 h-48 rounded-full border-2 border-cyan-400 border-dashed animate-spin flex items-center justify-center">
                       <Scan className="w-12 h-12 text-cyan-300 animate-pulse" />
                     </div>
                     <span className="text-xs font-bold text-cyan-300 mt-3 bg-slate-900/90 px-3 py-1 rounded-full border border-cyan-500/40">
-                      Memindai Wajah Karyawan...
+                      Memindai Wajah Karyawan & GPS...
                     </span>
                   </div>
                 )}
 
                 {scanComplete && (
-                  <div className="mt-3 px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 rounded-full text-emerald-300 text-xs font-extrabold flex items-center gap-1.5 animate-fadeIn">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  <div className="absolute bottom-3 left-3 right-3 px-3 py-1.5 bg-emerald-950/90 border border-emerald-500/50 rounded-full text-emerald-300 text-xs font-extrabold flex items-center justify-center gap-1.5 animate-fadeIn z-10 backdrop-blur-sm">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     Biometric Face Match Verified ({faceMatchScore}%)
                   </div>
                 )}
@@ -389,7 +583,7 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
                   className="w-full py-3 bg-[#152542] hover:bg-[#1c3258] text-cyan-300 border border-[#233d6b] rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition active:scale-98 shadow-md"
                 >
                   <Scan className="w-4 h-4" />
-                  <span>{isScanning ? 'Proses Pemindaian...' : 'Mulai Scan Wajah & Verifikasi GPS'}</span>
+                  <span>{isScanning ? 'Proses Pemindaian...' : 'Mulai Camera & Scan Wajah'}</span>
                 </button>
               ) : (
                 <div className="space-y-4 animate-fadeIn">

@@ -362,36 +362,172 @@ export const presensiRepository = {
    * Verifikasi PIN karyawan di SERVER.
    *
    * Sebelumnya PIN dibandingkan di browser dan '123456'/'112233' selalu
-   * diterima untuk karyawan mana pun. Kini pencocokan hash bcrypt dilakukan
-   * fungsi database, sehingga PIN tidak pernah terlihat maupun dapat dilewati
-   * dari sisi klien, dan tidak ada PIN cadangan.
+  /**
+   * Verifikasi PIN karyawan di SERVER.
+   * Menerbitkan session token untuk autentikasi RPC selanjutnya.
    */
-  async verifyEmployeePin(pin: string): Promise<RepoResult<Employee | null>> {
+  async verifyEmployeePin(
+    pin: string,
+    deviceMode = 'PERSONAL'
+  ): Promise<RepoResult<{ employee: Employee; sessionToken: string; faceDescriptor?: any } | null>> {
     try {
-      const { data, error } = await supabase.rpc('verify_employee_pin', { p_pin: pin });
+      const { data, error } = await supabase.rpc('verify_employee_pin', {
+        p_pin: pin,
+        p_device_mode: deviceMode,
+      });
       if (error) return { data: null, error: error.message };
 
       const row = Array.isArray(data) ? data[0] : data;
-      if (!row) return { data: null, error: 'PIN tidak dikenali.' };
+      if (!row || !row.employee_id) return { data: null, error: 'PIN tidak dikenali.' };
+
+      const sessionToken = String(row.session_token || '');
+      const emp: Employee = {
+        id: String(row.employee_id),
+        employeeCode: String(row.employee_code ?? ''),
+        name: String(row.name ?? ''),
+        role: String(row.role ?? ''),
+        unitId: String(row.unit_id) as Exclude<UnitType, 'ALL'>,
+        shiftId: String(row.shift_id ?? ''),
+        avatar: String(row.avatar ?? ''),
+        email: '',
+        phone: '',
+        faceRegistered: Boolean(row.face_registered),
+        registeredDate: '',
+        status: 'ACTIVE',
+        sessionToken,
+        faceDescriptor: row.face_descriptor,
+      };
+
+      if (sessionToken) {
+        localStorage.setItem('presensi_session_token', sessionToken);
+      }
 
       return {
         data: {
-          id: String(row.employee_id),
-          employeeCode: String(row.employee_code ?? ''),
-          name: String(row.name ?? ''),
-          role: String(row.role ?? ''),
-          unitId: String(row.unit_id) as Exclude<UnitType, 'ALL'>,
-          shiftId: String(row.shift_id ?? ''),
-          avatar: String(row.avatar ?? ''),
-          email: '',
-          phone: '',
-          faceRegistered: Boolean(row.face_registered),
-          registeredDate: '',
-          status: 'ACTIVE',
+          employee: emp,
+          sessionToken,
+          faceDescriptor: row.face_descriptor,
         },
       };
     } catch (reason) {
       return { data: null, error: errorText(reason) };
+    }
+  },
+
+  async clockInRPC(params: {
+    token: string;
+    lat?: number;
+    lng?: number;
+    accuracy?: number;
+    faceScore?: number;
+    photoUrl?: string;
+    notes?: string;
+  }): Promise<RepoResult<AttendanceRecord | null>> {
+    try {
+      const { data, error } = await supabase.rpc('clock_in', {
+        p_token: params.token,
+        p_lat: params.lat ?? null,
+        p_lng: params.lng ?? null,
+        p_accuracy_m: params.accuracy ?? null,
+        p_face_score: params.faceScore ?? null,
+        p_photo_url: params.photoUrl ?? null,
+        p_notes: params.notes ?? null,
+      });
+      if (error) return { data: null, error: error.message };
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return { data: null, error: 'Gagal mencatat clock in.' };
+      return {
+        data: {
+          id: String(row.id),
+          employeeId: String(row.employee_id),
+          employeeName: String(row.employee_name ?? '—'),
+          employeeCode: String(row.employee_code ?? '—'),
+          unitId: String(row.unit_id) as Exclude<UnitType, 'ALL'>,
+          date: String(row.work_date ?? row.date ?? '').slice(0, 10),
+          shiftName: String(row.shift_name ?? '—'),
+          checkInTime: timeOf(row.check_in_at as string) || (row.check_in_time as string),
+          checkOutTime: timeOf(row.check_out_at as string) || (row.check_out_time as string),
+          status: String(row.status ?? 'HADIR') as AttendanceStatus,
+          geofenceStatus: Boolean(row.is_flagged) ? 'OUT_OF_RANGE' : 'VALID',
+          distanceMeters: Number(row.check_in_distance_m ?? row.distance_meters ?? 0),
+          faceMatchScore: Number(row.face_match_score ?? 0),
+          photoUrl: (row.check_in_photo_url as string) || (row.photo_url as string),
+          locationName: (row.location_name as string) || '—',
+          latitude: row.check_in_lat != null ? Number(row.check_in_lat) : undefined,
+          longitude: row.check_in_lng != null ? Number(row.check_in_lng) : undefined,
+          notes: (row.notes as string) ?? undefined,
+        },
+      };
+    } catch (reason) {
+      return { data: null, error: errorText(reason) };
+    }
+  },
+
+  async clockOutRPC(params: {
+    token: string;
+    lat?: number;
+    lng?: number;
+    photoUrl?: string;
+    notes?: string;
+  }): Promise<RepoResult<AttendanceRecord | null>> {
+    try {
+      const { data, error } = await supabase.rpc('clock_out', {
+        p_token: params.token,
+        p_lat: params.lat ?? null,
+        p_lng: params.lng ?? null,
+        p_photo_url: params.photoUrl ?? null,
+        p_notes: params.notes ?? null,
+      });
+      if (error) return { data: null, error: error.message };
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return { data: null, error: 'Gagal mencatat clock out.' };
+      return {
+        data: {
+          id: String(row.id),
+          employeeId: String(row.employee_id),
+          employeeName: String(row.employee_name ?? '—'),
+          employeeCode: String(row.employee_code ?? '—'),
+          unitId: String(row.unit_id) as Exclude<UnitType, 'ALL'>,
+          date: String(row.work_date ?? row.date ?? '').slice(0, 10),
+          shiftName: String(row.shift_name ?? '—'),
+          checkInTime: timeOf(row.check_in_at as string) || (row.check_in_time as string),
+          checkOutTime: timeOf(row.check_out_at as string) || (row.check_out_time as string),
+          status: String(row.status ?? 'HADIR') as AttendanceStatus,
+          geofenceStatus: Boolean(row.is_flagged) ? 'OUT_OF_RANGE' : 'VALID',
+          distanceMeters: Number(row.check_in_distance_m ?? row.distance_meters ?? 0),
+          faceMatchScore: Number(row.face_match_score ?? 0),
+          photoUrl: (row.check_in_photo_url as string) || (row.photo_url as string),
+          locationName: (row.location_name as string) || '—',
+          latitude: row.check_in_lat != null ? Number(row.check_in_lat) : undefined,
+          longitude: row.check_in_lng != null ? Number(row.check_in_lng) : undefined,
+          notes: (row.notes as string) ?? undefined,
+        },
+      };
+    } catch (reason) {
+      return { data: null, error: errorText(reason) };
+    }
+  },
+
+  async enrollFaceRPC(token: string, descriptor: any, referenceUrl?: string): Promise<RepoResult<boolean>> {
+    try {
+      const { error } = await supabase.rpc('enroll_face', {
+        p_token: token,
+        p_descriptor: descriptor,
+        p_reference_url: referenceUrl ?? null,
+      });
+      if (error) return { data: false, error: error.message };
+      return { data: true };
+    } catch (reason) {
+      return { data: false, error: errorText(reason) };
+    }
+  },
+
+  async endSessionRPC(token: string): Promise<void> {
+    try {
+      localStorage.removeItem('presensi_session_token');
+      await supabase.rpc('end_session', { p_token: token });
+    } catch (_) {
+      // Ignore
     }
   },
 

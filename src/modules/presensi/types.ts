@@ -56,6 +56,8 @@ export interface Employee {
   username?: string;
   password?: string;
   pinCode?: string;
+  sessionToken?: string;
+  faceDescriptor?: any;
   portalAccessEnabled?: boolean;
 }
 

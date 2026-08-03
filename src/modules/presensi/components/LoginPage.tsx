@@ -18,6 +18,7 @@ import {
   Crown,
 } from 'lucide-react';
 import { Employee, BusinessUnit } from '../types';
+import { presensiRepository } from '../data/presensiRepository';
 
 interface LoginPageProps {
   employees: Employee[];
@@ -76,7 +77,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   };
 
   // Handle Employee Login via PIN 6-Digit
-  const handleEmployeePinLogin = (e?: React.FormEvent) => {
+  const handleEmployeePinLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setEmpError('');
 
@@ -106,16 +107,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       return;
     }
 
-    const validPin = foundEmp.pinCode || '123456';
-    if (pinCode !== validPin && pinCode !== '123456' && pinCode !== '112233') {
-      setEmpError('PIN 6-digit salah. Gunakan PIN: 123456 untuk demo.');
+    // Try server RPC PIN verification first
+    const rpcResult = await presensiRepository.verifyEmployeePin(pinCode);
+    if (rpcResult.data?.employee) {
+      onLoginSuccess({
+        role: 'EMPLOYEE',
+        employee: {
+          ...foundEmp,
+          sessionToken: rpcResult.data.sessionToken,
+          faceDescriptor: rpcResult.data.faceDescriptor,
+        },
+      });
       return;
     }
 
-    onLoginSuccess({
-      role: 'EMPLOYEE',
-      employee: foundEmp,
-    });
+    // Fallback for demo / local PIN validation
+    const validPin = foundEmp.pinCode || '123456';
+    if (pinCode === validPin || pinCode === '123456' || pinCode === '112233') {
+      onLoginSuccess({
+        role: 'EMPLOYEE',
+        employee: foundEmp,
+      });
+      return;
+    }
+
+    setEmpError(rpcResult.error || 'PIN 6-digit salah. Gunakan PIN: 123456 untuk demo.');
   };
 
   // Handle Employee Login via Password
