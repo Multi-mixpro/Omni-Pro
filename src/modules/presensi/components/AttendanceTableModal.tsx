@@ -156,7 +156,7 @@ export const AttendanceTableModal: React.FC<AttendanceTableModalProps> = ({
             >
               <option value="ALL">Semua Unit Usaha</option>
               <option value="GG_SUPPLY">GG Supply</option>
-              <option value="GDSKUY">Gdskuy</option>
+              <option value="GUDSKUY">Gudskuy</option>
               <option value="BAKSO_UJO">Bakso Ujo</option>
             </select>
 

@@ -28,7 +28,7 @@ import {
   Legend,
 } from 'recharts';
 import { AttendanceRecord, UnitType } from '../types';
-import { BUSINESS_UNITS } from '../data/mockData';
+import { useBusinessUnits } from '../data/PresensiDataContext';
 
 interface AnalyticsDashboardViewProps {
   records: AttendanceRecord[];
@@ -39,6 +39,8 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
   records,
   selectedUnit,
 }) => {
+  // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
+  const BUSINESS_UNITS = useBusinessUnits();
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState<boolean>(false);
 
@@ -55,7 +57,7 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
 
   const unitComparisonData = [
     { name: 'GG Supply', Hadir: 88, Terlambat: 12, Alpha: 0 },
-    { name: 'Gdskuy', Hadir: 92, Terlambat: 5, Alpha: 3 },
+    { name: 'Gudskuy', Hadir: 92, Terlambat: 5, Alpha: 3 },
     { name: 'Bakso Ujo', Hadir: 95, Terlambat: 3, Alpha: 2 },
   ];
 

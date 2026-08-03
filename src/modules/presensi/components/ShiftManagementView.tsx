@@ -305,7 +305,7 @@ export const ShiftManagementView: React.FC<ShiftManagementViewProps> = ({
                   className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
                 >
                   <option value="GG_SUPPLY">GG Supply (Logistik)</option>
-                  <option value="GDSKUY">Gdskuy (Warehouse)</option>
+                  <option value="GUDSKUY">Gudskuy (Warehouse)</option>
                   <option value="BAKSO_UJO">Bakso Ujo (F&B / Outlet)</option>
                 </select>
               </div>

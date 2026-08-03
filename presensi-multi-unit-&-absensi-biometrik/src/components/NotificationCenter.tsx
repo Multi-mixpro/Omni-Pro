@@ -46,7 +46,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     },
     {
       id: 'EML_02',
-      recipient: 'manager.gdskuy@gdskuy.id',
+      recipient: 'manager.gudskuy@gudskuy.id',
       subject: 'ℹ️ Pengajuan Surat Dokter Sakit - Maya Indah',
       sentAt: '08:15 WIB',
       status: 'DELIVERED',

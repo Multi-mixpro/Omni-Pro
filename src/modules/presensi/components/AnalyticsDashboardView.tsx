@@ -57,7 +57,7 @@ export const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
 
   const unitComparisonData = [
     { name: 'GG Supply', Hadir: 88, Terlambat: 12, Alpha: 0 },
-    { name: 'Gdskuy', Hadir: 92, Terlambat: 5, Alpha: 3 },
+    { name: 'Gudskuy', Hadir: 92, Terlambat: 5, Alpha: 3 },
     { name: 'Bakso Ujo', Hadir: 95, Terlambat: 3, Alpha: 2 },
   ];
 

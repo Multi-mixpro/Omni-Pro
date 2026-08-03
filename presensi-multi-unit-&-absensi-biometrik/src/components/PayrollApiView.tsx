@@ -31,7 +31,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { AttendanceRecord, UnitType, Employee } from '../types';
-import { EMPLOYEES, BUSINESS_UNITS } from '../data/mockData';
+import { useBusinessUnits, useEmployees } from '../data/PresensiDataContext';
 
 interface PayrollApiViewProps {
   records: AttendanceRecord[];
@@ -58,6 +58,10 @@ interface PayrollItem {
 }
 
 export const PayrollApiView: React.FC<PayrollApiViewProps> = ({ records }) => {
+  // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
+  const BUSINESS_UNITS = useBusinessUnits();
+  // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
+  const EMPLOYEES = useEmployees();
   // Navigation inside Payroll Center
   const [activePayrollTab, setActivePayrollTab] = useState<'CALCULATOR' | 'API_INTEGRATION' | 'HISTORY'>('CALCULATOR');
 
@@ -249,7 +253,7 @@ export const PayrollApiView: React.FC<PayrollApiViewProps> = ({ records }) => {
           code: 200,
           timestamp: new Date().toISOString(),
           payroll_period: 'August 2026',
-          business_units: ['GG_SUPPLY', 'GDSKUY', 'BAKSO_UJO'],
+          business_units: ['GG_SUPPLY', 'GUDSKUY', 'BAKSO_UJO'],
           total_employees_processed: EMPLOYEES.length,
           payroll_summary: EMPLOYEES.slice(0, 4).map((emp) => ({
             employee_code: emp.employeeCode,
@@ -938,7 +942,7 @@ print(response.json())`;
               {
                 batchId: 'BATCH_SYNC_849201',
                 period: 'Agustus 2026',
-                unitName: 'Semua Unit (GG Supply, Gdskuy, Bakso Ujo)',
+                unitName: 'Semua Unit (GG Supply, Gudskuy, Bakso Ujo)',
                 records: 12,
                 totalAmount: 'Rp 87.250.000',
                 date: '2026-08-01 10:15 WIB',

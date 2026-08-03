@@ -18,7 +18,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { AttendanceRecord, AttendanceStatus, UnitType, BusinessUnit } from '../types';
-import { BUSINESS_UNITS } from '../data/mockData';
+import { useBusinessUnits } from '../data/PresensiDataContext';
 import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportHelpers';
 
 interface AttendanceTableModalProps {
@@ -42,6 +42,8 @@ export const AttendanceTableModal: React.FC<AttendanceTableModalProps> = ({
   onUpdateRecordStatus,
   onSelectEmployeeForDetail,
 }) => {
+  // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
+  const BUSINESS_UNITS = useBusinessUnits();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [unitFilter, setUnitFilter] = useState<string>(selectedUnit);
@@ -154,7 +156,7 @@ export const AttendanceTableModal: React.FC<AttendanceTableModalProps> = ({
             >
               <option value="ALL">Semua Unit Usaha</option>
               <option value="GG_SUPPLY">GG Supply</option>
-              <option value="GDSKUY">Gdskuy</option>
+              <option value="GUDSKUY">Gudskuy</option>
               <option value="BAKSO_UJO">Bakso Ujo</option>
             </select>
 

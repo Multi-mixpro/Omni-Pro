@@ -28,7 +28,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { Employee, Shift, UnitType } from '../types';
-import { BUSINESS_UNITS } from '../data/mockData';
+import { useBusinessUnits } from '../data/PresensiDataContext';
 import { getWhatsAppLink, WA_TEMPLATES } from '../utils/whatsapp';
 
 interface EmployeeManagementViewProps {
@@ -50,6 +50,8 @@ export const EmployeeManagementView: React.FC<EmployeeManagementViewProps> = ({
   onSelectEmployeeForDetail,
   selectedUnit,
 }) => {
+  // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
+  const BUSINESS_UNITS = useBusinessUnits();
   const [searchTerm, setSearchTerm] = useState('');
   const [unitFilter, setUnitFilter] = useState<UnitType>(selectedUnit);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
@@ -342,7 +344,7 @@ export const EmployeeManagementView: React.FC<EmployeeManagementViewProps> = ({
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
                       emp.unitId === 'GG_SUPPLY'
                         ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                        : emp.unitId === 'GDSKUY'
+                        : emp.unitId === 'GUDSKUY'
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                         : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                     }`}
@@ -552,7 +554,7 @@ export const EmployeeManagementView: React.FC<EmployeeManagementViewProps> = ({
                     className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
                   >
                     <option value="GG_SUPPLY">GG Supply</option>
-                    <option value="GDSKUY">Gdskuy</option>
+                    <option value="GUDSKUY">Gudskuy</option>
                     <option value="BAKSO_UJO">Bakso Ujo</option>
                   </select>
                 </div>

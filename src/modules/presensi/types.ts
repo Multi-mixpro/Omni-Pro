@@ -1,4 +1,4 @@
-export type UnitType = 'GG_SUPPLY' | 'GDSKUY' | 'BAKSO_UJO' | 'ALL';
+export type UnitType = 'GG_SUPPLY' | 'GUDSKUY' | 'BAKSO_UJO' | 'ALL';
 
 export interface BusinessUnit {
   id: UnitType;

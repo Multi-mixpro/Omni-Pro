@@ -13,7 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { Shift, UnitType, Employee } from '../types';
-import { SHIFTS, BUSINESS_UNITS, EMPLOYEES } from '../data/mockData';
+import { useBusinessUnits, useEmployees, useShifts } from '../data/PresensiDataContext';
 
 interface ShiftManagementViewProps {
   shifts: Shift[];
@@ -32,6 +32,12 @@ export const ShiftManagementView: React.FC<ShiftManagementViewProps> = ({
   employees,
   onAssignShiftToEmployee,
 }) => {
+  // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
+  const BUSINESS_UNITS = useBusinessUnits();
+  // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
+  const EMPLOYEES = useEmployees();
+  // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
+  const SHIFTS = useShifts();
   const [selectedUnit, setSelectedUnit] = useState<UnitType>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
@@ -299,7 +305,7 @@ export const ShiftManagementView: React.FC<ShiftManagementViewProps> = ({
                   className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
                 >
                   <option value="GG_SUPPLY">GG Supply (Logistik)</option>
-                  <option value="GDSKUY">Gdskuy (Warehouse)</option>
+                  <option value="GUDSKUY">Gudskuy (Warehouse)</option>
                   <option value="BAKSO_UJO">Bakso Ujo (F&B / Outlet)</option>
                 </select>
               </div>

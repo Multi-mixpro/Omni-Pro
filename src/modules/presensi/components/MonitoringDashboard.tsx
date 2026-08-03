@@ -108,7 +108,7 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
               Unit Usaha:{' '}
               <span className="font-bold text-slate-800 dark:text-slate-200">
                 {selectedUnit === 'ALL'
-                  ? 'Semua Divisi (GG Supply, Gdskuy, Bakso Ujo)'
+                  ? 'Semua Divisi (GG Supply, Gudskuy, Bakso Ujo)'
                   : BUSINESS_UNITS.find((u) => u.id === selectedUnit)?.name}
               </span>
             </p>
