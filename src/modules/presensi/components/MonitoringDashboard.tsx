@@ -360,9 +360,29 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
           </button>
         </div>
 
-        {/* Employee Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-          {filteredRecords.map((r) => (
+        {/* Employee Cards Grid or Realtime Empty State */}
+        {filteredRecords.length === 0 ? (
+          <div className="p-8 text-center bg-slate-50/50 dark:bg-[#070e1c]/50 rounded-2xl border border-dashed border-slate-200 dark:border-[#1a2847] space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-cyan-400 mx-auto flex items-center justify-center">
+              <Users className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              Belum Ada Record Presensi Hari Ini
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto font-medium">
+              Karyawan belum melakukan clock-in untuk tanggal {selectedDate}. Anda dapat mencoba fitur presensi mandiri via Kios/Mobile.
+            </p>
+            <button
+              onClick={onOpenMobilePresensi}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-md shadow-blue-500/20 transition"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Simulasi Presensi Biometrik</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+            {filteredRecords.map((r) => (
             <div
               key={r.id}
               className="p-4 rounded-2xl border border-slate-200/90 dark:border-[#1a2847] bg-white/80 dark:bg-[#0c162c]/80 hover:border-blue-500/50 hover:shadow-md transition-all flex flex-col justify-between group"
@@ -452,6 +472,7 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
             </div>
           ))}
         </div>
+      )}
       </div>
 
       {/* Unit Breakdown Summary */}
