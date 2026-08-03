@@ -15,6 +15,7 @@ import {
   Lock,
   LogOut,
 } from 'lucide-react';
+import { useEmployees } from '../data/PresensiDataContext';
 
 interface TopbarProps {
   activeTab: string;
@@ -63,9 +64,10 @@ export const Topbar: React.FC<TopbarProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  const EMPLOYEES = useEmployees();
   const navItems = [
     { id: 'dashboard', label: 'Dashboard Monitor', icon: LayoutDashboard },
-    { id: 'karyawan', label: 'Kelola Karyawan', icon: Users, badge: '44 Team' },
+    { id: 'karyawan', label: 'Kelola Karyawan', icon: Users, badge: `${EMPLOYEES.length} Team` },
     { id: 'shifts', label: 'Kelola Shift', icon: CalendarDays },
     { id: 'mobile_presensi', label: 'Presensi Mobile', icon: Smartphone, badge: 'Face ID' },
     { id: 'analytics', label: 'Analitik Performa', icon: TrendingUp },

@@ -125,7 +125,7 @@ export const UnitTabNavigation: React.FC<UnitTabNavigationProps> = ({
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="font-medium text-slate-600 dark:text-slate-300">
               {selectedUnit === 'ALL'
-                ? 'Monitoring gabungan 3 divisi (44 Karyawan Total)'
+                ? `Monitoring gabungan ${units.length} divisi (${units.reduce((s, u) => s + (u.totalEmployees || 0), 0)} Karyawan Total)`
                 : units.find((u) => u.id === selectedUnit)?.tagline}
             </span>
           </div>

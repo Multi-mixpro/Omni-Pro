@@ -21,7 +21,7 @@ import {
   AttendanceRecord,
   SuddenAbsenceAlert,
 } from '../types';
-import { useBusinessUnits } from '../data/PresensiDataContext';
+import { useBusinessUnits, useEmployees } from '../data/PresensiDataContext';
 import { getWhatsAppLink, WA_TEMPLATES } from '../utils/whatsapp';
 
 interface MonitoringDashboardProps {
@@ -63,11 +63,13 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
       ? alerts
       : alerts.filter((a) => a.unitId === selectedUnit);
 
+  const ALL_EMPLOYEES = useEmployees();
+
   // Compute metrics
   const totalEmployees =
     selectedUnit === 'ALL'
-      ? 44
-      : BUSINESS_UNITS.find((u) => u.id === selectedUnit)?.totalEmployees || 0;
+      ? ALL_EMPLOYEES.length
+      : ALL_EMPLOYEES.filter((e) => e.unitId === selectedUnit).length;
 
   const hadirCount = filteredRecords.filter((r) => r.status === 'HADIR').length;
   const terlambatCount = filteredRecords.filter((r) => r.status === 'TERLAMBAT').length;

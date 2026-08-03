@@ -34,7 +34,7 @@ export const MobileAttendanceSimulator: React.FC<MobileAttendanceSimulatorProps>
   const units = unitsProp ?? BUSINESS_UNITS;
   // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
   const EMPLOYEES = useEmployees();
-  const [selectedEmpId, setSelectedEmpId] = useState<string>(EMPLOYEES[0].id);
+  const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [simulatedDistance, setSimulatedDistance] = useState<number>(18); // 18 meters
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scanProgress, setScanProgress] = useState<number>(0);
@@ -48,15 +48,12 @@ export const MobileAttendanceSimulator: React.FC<MobileAttendanceSimulatorProps>
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const selectedEmployee =
-    EMPLOYEES.find((e) => e.id === selectedEmpId) || EMPLOYEES[0];
-
-  const targetUnit =
-    units.find((u) => u.id === selectedEmployee.unitId) ||
-    units[0] ||
-    BUSINESS_UNITS[0];
-
-  const isGeofenceValid = simulatedDistance <= targetUnit.radiusMeters;
+  // Auto-select first employee when EMPLOYEES data loads
+  useEffect(() => {
+    if (EMPLOYEES.length > 0 && !selectedEmpId) {
+      setSelectedEmpId(EMPLOYEES[0].id);
+    }
+  }, [EMPLOYEES, selectedEmpId]);
 
   // Toggle Live Webcam
   useEffect(() => {
@@ -90,6 +87,29 @@ export const MobileAttendanceSimulator: React.FC<MobileAttendanceSimulatorProps>
       }
     };
   }, [useLiveCamera]);
+
+  // Guard: wait for data (all hooks MUST be above this line)
+  if (!EMPLOYEES.length || !units.length) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Memuat data karyawan & unit...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedEmployee =
+    EMPLOYEES.find((e) => e.id === selectedEmpId) || EMPLOYEES[0];
+
+  const targetUnit =
+    units.find((u) => u.id === selectedEmployee.unitId) ||
+    units[0] ||
+    BUSINESS_UNITS[0];
+
+  const isGeofenceValid = simulatedDistance <= (targetUnit?.radiusMeters ?? 100);
+
 
   const handleStartBiometricScan = () => {
     setIsScanning(true);
