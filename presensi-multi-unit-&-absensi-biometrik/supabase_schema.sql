@@ -130,14 +130,12 @@ ALTER TABLE public.attendance_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sudden_absence_alerts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Public Read Access" ON public.business_units FOR SELECT USING (true);
-CREATE POLICY "Public Read Access" ON public.shifts FOR SELECT USING (true);
-CREATE POLICY "Public Read Access" ON public.employees FOR SELECT USING (true);
-CREATE POLICY "Public Read Access" ON public.attendance_records FOR SELECT USING (true);
+CREATE POLICY "Public All Access" ON public.business_units FOR ALL USING (true);
+CREATE POLICY "Public All Access" ON public.shifts FOR ALL USING (true);
+CREATE POLICY "Public All Access" ON public.employees FOR ALL USING (true);
 CREATE POLICY "Public All Access" ON public.attendance_records FOR ALL USING (true);
-CREATE POLICY "Public Read Access" ON public.audit_logs FOR SELECT USING (true);
 CREATE POLICY "Public All Access" ON public.audit_logs FOR ALL USING (true);
-CREATE POLICY "Public Read Access" ON public.sudden_absence_alerts FOR SELECT USING (true);
+CREATE POLICY "Public All Access" ON public.sudden_absence_alerts FOR ALL USING (true);
 
 -- SEED DATA: BUSINESS UNITS
 INSERT INTO public.business_units (id, name, tagline, category, icon_name, color, address, province, city, postal_code, landmark, latitude, longitude, radius_meters, total_employees, wifi_ssid, wifi_bssid, allow_outside_geofence, require_biometric, operating_hours, time_zone, manager_name, manager_phone, manager_email)
