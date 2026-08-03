@@ -6,8 +6,16 @@
 -- Enable UUID Extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- 0. DROP OLD CONFLICTING TABLES IF ANY
+DROP TABLE IF EXISTS public.sudden_absence_alerts CASCADE;
+DROP TABLE IF EXISTS public.attendance_records CASCADE;
+DROP TABLE IF EXISTS public.employees CASCADE;
+DROP TABLE IF EXISTS public.shifts CASCADE;
+DROP TABLE IF EXISTS public.business_units CASCADE;
+DROP TABLE IF EXISTS public.audit_logs CASCADE;
+
 -- 1. BUSINESS UNITS TABLE
-CREATE TABLE IF NOT EXISTS public.business_units (
+CREATE TABLE public.business_units (
   id VARCHAR(50) PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   tagline VARCHAR(255),
