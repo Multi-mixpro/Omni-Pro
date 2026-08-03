@@ -399,7 +399,7 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
       {/* PORTAL MAIN CONTENT */}
       <main className="max-w-xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 space-y-6">
         {/* Navigation Tabs */}
-        <div className="grid grid-cols-2 gap-2 p-1.5 bg-[#0a1224] border border-[#1a2d54] rounded-2xl">
+        <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-200/80 dark:bg-[#0a1224] border border-slate-300/80 dark:border-[#1a2d54] rounded-2xl">
           <button
             type="button"
             onClick={() => setActivePortalTab('PRESENSI')}
@@ -438,14 +438,14 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
         {activePortalTab === 'PRESENSI' && (
           <div className="space-y-6">
             {/* Real-time Clock & Geofence Status Card */}
-            <div className="bg-[#0b162a]/90 border border-[#1a2d54] rounded-3xl p-6 shadow-xl space-y-5">
-              <div className="flex items-center justify-between border-b border-[#1a2d54] pb-4">
+            <div className="bg-white dark:bg-[#0b162a]/90 border border-slate-200 dark:border-[#1a2d54] rounded-3xl p-6 shadow-xs dark:shadow-xl space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1a2d54] pb-4">
                 <div>
-                  <span className="text-[10px] font-extrabold text-cyan-400 uppercase tracking-widest block">
+                  <span className="text-[10px] font-extrabold text-blue-600 dark:text-cyan-400 uppercase tracking-widest block">
                     {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </span>
-                  <div className="text-3xl font-black text-white font-mono tracking-tight mt-1">
-                    {timeString} <span className="text-xs text-slate-400 font-sans">WIB</span>
+                  <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tracking-tight mt-1">
+                    {timeString} <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">WIB</span>
                   </div>
                 </div>
 
@@ -457,12 +457,12 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
               </div>
 
               {/* Today's Current Status Badge */}
-              <div className="p-4 rounded-2xl bg-[#060c18] border border-[#182848] flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#060c18] border border-slate-200 dark:border-[#182848] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${todayRecord ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
+                  <div className={`w-3 h-3 rounded-full ${todayRecord ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-ping'}`} />
                   <div>
-                    <div className="text-xs font-bold text-white">Status Hari Ini:</div>
-                    <div className="text-xs font-extrabold text-cyan-300">
+                    <div className="text-xs font-bold text-slate-800 dark:text-white">Status Hari Ini:</div>
+                    <div className="text-xs font-extrabold text-blue-600 dark:text-cyan-300">
                       {todayRecord
                         ? todayRecord.checkOutTime
                           ? `Sudah Clock-Out (${todayRecord.checkOutTime})`
@@ -488,9 +488,9 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
               </div>
 
               {/* Location Geofence Check */}
-              <div className="p-4 rounded-2xl bg-[#060c18] border border-[#182848] space-y-2">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#060c18] border border-slate-200 dark:border-[#182848] space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-300 flex items-center gap-1.5">
+                  <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <MapPin className="w-4 h-4 text-blue-400" />
                     Lokasi Unit: {unit.name}
                   </span>
@@ -519,9 +519,9 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
             </div>
 
             {/* Biometric Face Scan Section */}
-            <div className="bg-[#0b162a]/90 border border-[#1a2d54] rounded-3xl p-6 shadow-xl space-y-5">
+            <div className="bg-white dark:bg-[#0b162a]/90 border border-slate-200 dark:border-[#1a2d54] rounded-3xl p-6 shadow-xs dark:shadow-xl space-y-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
+                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                   <Camera className="w-4 h-4 text-cyan-400" />
                   Pemindai Wajah (Biometric Face ID)
                 </h2>
@@ -531,7 +531,7 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
               </div>
 
               {/* Camera Frame Preview Container */}
-              <div className="relative aspect-video sm:aspect-[4/3] rounded-2xl bg-[#040812] border-2 border-[#1a2d54] overflow-hidden flex flex-col items-center justify-center p-4">
+              <div className="relative aspect-video sm:aspect-[4/3] rounded-2xl bg-slate-900 dark:bg-[#040812] border-2 border-slate-300 dark:border-[#1a2d54] overflow-hidden flex flex-col items-center justify-center p-4">
                 {/* Real Live Video Stream */}
                 <video
                   ref={videoRef}
@@ -637,26 +637,26 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
 
         {/* PERSONAL ATTENDANCE HISTORY TAB */}
         {activePortalTab === 'RIWAYAT' && (
-          <div className="bg-[#0b162a]/90 border border-[#1a2d54] rounded-3xl p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1a2d54] pb-4">
+          <div className="bg-white dark:bg-[#0b162a]/90 border border-slate-200 dark:border-[#1a2d54] rounded-3xl p-6 shadow-xs dark:shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1a2d54] pb-4">
               <div>
-                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <History className="w-4 h-4 text-cyan-400" />
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <History className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
                   Riwayat Absensi Saya
                 </h2>
-                <p className="text-xs text-slate-400 font-medium">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   Catatan kehadiran personal {employee.name}
                 </p>
               </div>
 
-              <span className="px-3 py-1 bg-cyan-950/80 text-cyan-300 border border-cyan-800 rounded-full text-xs font-bold font-mono">
+              <span className="px-3 py-1 bg-blue-50 dark:bg-cyan-950/80 text-blue-700 dark:text-cyan-300 border border-blue-200/60 dark:border-cyan-800 rounded-full text-xs font-bold font-mono">
                 Total: {myRecords.length} Record
               </span>
             </div>
 
             {myRecords.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-xs font-medium space-y-2">
-                <FileText className="w-8 h-8 text-slate-600 mx-auto" />
+                <FileText className="w-8 h-8 text-slate-400 mx-auto" />
                 <p>Belum ada riwayat absensi tercatat untuk akun ini.</p>
               </div>
             ) : (
@@ -664,12 +664,12 @@ export const EmployeeAttendancePortal: React.FC<EmployeeAttendancePortalProps> =
                 {myRecords.map((rec) => (
                   <div
                     key={rec.id}
-                    className="p-4 rounded-2xl bg-[#060c18] border border-[#182848] hover:border-cyan-500/40 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                    className="p-4 rounded-2xl bg-slate-50 dark:bg-[#060c18] border border-slate-200 dark:border-[#182848] hover:border-blue-400 dark:hover:border-cyan-500/40 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-extrabold text-white font-mono">{rec.date}</span>
-                        <span className="text-xs text-slate-400">• {rec.shiftName}</span>
+                        <span className="text-xs font-extrabold text-slate-900 dark:text-white font-mono">{rec.date}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">• {rec.shiftName}</span>
                       </div>
                       <div className="text-xs text-slate-300 font-medium flex items-center gap-3">
                         <span>

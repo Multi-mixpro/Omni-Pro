@@ -146,11 +146,11 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        {/* Total Employees (Hero Card with Executive Deep Navy Accent) */}
-        <div className="bg-gradient-to-br from-[#0c1938] via-[#0f1a30] to-[#172554] dark:from-[#0b1329] dark:via-[#0f1a30] dark:to-[#1a2d52] p-4 sm:p-5 rounded-3xl border border-blue-900/40 shadow-md flex flex-col justify-between transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.02] hover:shadow-xl hover:shadow-blue-900/30 cursor-pointer text-white">
+        {/* Total Employees (Hero Card with Executive Vibrant Blue Accent) */}
+        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 dark:from-[#0b1329] dark:via-[#0f1a30] dark:to-[#1a2d52] p-4 sm:p-5 rounded-3xl border border-blue-500/30 dark:border-blue-900/40 shadow-md shadow-blue-500/20 flex flex-col justify-between transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.02] hover:shadow-xl hover:shadow-blue-500/30 cursor-pointer text-white">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-300">Total Tim</span>
-            <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-cyan-300">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-200 dark:text-cyan-300">Total Tim</span>
+            <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center text-white dark:text-cyan-300">
               <Users className="w-4 h-4" />
             </div>
           </div>
@@ -158,7 +158,7 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
             {totalEmployees}
           </div>
           <div className="mt-2">
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-200 border border-cyan-500/30">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white dark:bg-cyan-500/20 dark:text-cyan-200 border border-white/20 dark:border-cyan-500/30">
               Terdaftar Sistem
             </span>
           </div>
