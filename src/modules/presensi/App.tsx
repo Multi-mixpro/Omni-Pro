@@ -12,7 +12,7 @@ import { SecurityAudit2FAView } from './components/SecurityAudit2FAView';
 import { PayrollApiView } from './components/PayrollApiView';
 import { NotificationCenter } from './components/NotificationCenter';
 import { UnitConfigurationModal } from './components/UnitConfigurationModal';
-import { LoginPage } from './components/LoginPage';
+import { UnifiedLoginPage } from './components/UnifiedLoginPage';
 import { EmployeeAttendancePortal } from './components/EmployeeAttendancePortal';
 
 import {
@@ -350,8 +350,7 @@ export default function App() {
   // 1. Unauthenticated View -> Show Login Page
   if (!currentUser) {
     return (
-      <LoginPage
-        employees={employees}
+      <UnifiedLoginPage
         businessUnits={businessUnits}
         darkMode={darkMode}
         setDarkMode={setDarkMode}

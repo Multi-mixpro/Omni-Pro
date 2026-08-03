@@ -357,4 +357,66 @@ export const presensiRepository = {
       return { data: [], error: errorText(reason) };
     }
   },
+
+  /**
+   * Verifikasi PIN karyawan di SERVER.
+   *
+   * Sebelumnya PIN dibandingkan di browser dan '123456'/'112233' selalu
+   * diterima untuk karyawan mana pun. Kini pencocokan hash bcrypt dilakukan
+   * fungsi database, sehingga PIN tidak pernah terlihat maupun dapat dilewati
+   * dari sisi klien, dan tidak ada PIN cadangan.
+   */
+  async verifyEmployeePin(pin: string): Promise<RepoResult<Employee | null>> {
+    try {
+      const { data, error } = await supabase.rpc('verify_employee_pin', { p_pin: pin });
+      if (error) return { data: null, error: error.message };
+
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return { data: null, error: 'PIN tidak dikenali.' };
+
+      return {
+        data: {
+          id: String(row.employee_id),
+          employeeCode: String(row.employee_code ?? ''),
+          name: String(row.name ?? ''),
+          role: String(row.role ?? ''),
+          unitId: String(row.unit_id) as Exclude<UnitType, 'ALL'>,
+          shiftId: String(row.shift_id ?? ''),
+          avatar: String(row.avatar ?? ''),
+          email: '',
+          phone: '',
+          faceRegistered: Boolean(row.face_registered),
+          registeredDate: '',
+          status: 'ACTIVE',
+        },
+      };
+    } catch (reason) {
+      return { data: null, error: errorText(reason) };
+    }
+  },
+
+  /** Peran pengelola milik sesi yang sedang aktif; null bila bukan pengelola. */
+  async myManagerRole(): Promise<RepoResult<string | null>> {
+    try {
+      const { data, error } = await supabase.rpc('my_manager_role');
+      if (error) return { data: null, error: error.message };
+      return { data: (data as string) ?? null };
+    } catch (reason) {
+      return { data: null, error: errorText(reason) };
+    }
+  },
+
+  /** Tetapkan PIN karyawan (disimpan sebagai hash bcrypt di server). */
+  async setEmployeePin(employeeId: string, pin: string): Promise<RepoResult<boolean>> {
+    try {
+      const { error } = await supabase.rpc('set_employee_pin', {
+        p_employee_id: employeeId,
+        p_pin: pin,
+      });
+      if (error) return { data: false, error: error.message };
+      return { data: true };
+    } catch (reason) {
+      return { data: false, error: errorText(reason) };
+    }
+  },
 };
