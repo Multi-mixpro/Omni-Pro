@@ -12,7 +12,7 @@ import { SecurityAudit2FAView } from './components/SecurityAudit2FAView';
 import { PayrollApiView } from './components/PayrollApiView';
 import { NotificationCenter } from './components/NotificationCenter';
 import { UnitConfigurationModal } from './components/UnitConfigurationModal';
-import { LoginPage } from './components/LoginPage';
+import { UnifiedLoginPage } from './components/UnifiedLoginPage';
 import { EmployeeAttendancePortal } from './components/EmployeeAttendancePortal';
 
 import {
@@ -140,27 +140,67 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Load Real-time Data from Supabase
+  // Load Real-time Data from Supabase with LocalStorage Fail-Safe Backup
   const loadSupabaseData = async () => {
     setIsLoadingData(true);
     setDataError(null);
 
-    const [unitRes, shiftRes, employeeRes, recordRes] = await Promise.all([
-      presensiRepository.listUnits(),
-      presensiRepository.listShifts(),
-      presensiRepository.listEmployees(),
-      presensiRepository.listAttendance(),
-    ]);
+    try {
+      const [unitRes, shiftRes, employeeRes, recordRes] = await Promise.all([
+        presensiRepository.listUnits(),
+        presensiRepository.listShifts(),
+        presensiRepository.listEmployees(),
+        presensiRepository.listAttendance(),
+      ]);
 
-    const firstError =
-      unitRes.error || shiftRes.error || employeeRes.error || recordRes.error;
-    if (firstError) setDataError(firstError);
+      const firstError =
+        unitRes.error || shiftRes.error || employeeRes.error || recordRes.error;
+      if (firstError) setDataError(firstError);
 
-    setBusinessUnits(unitRes.data);
-    setShifts(shiftRes.data);
-    setEmployees(employeeRes.data);
-    setRecords(recordRes.data);
-    setIsLoadingData(false);
+      // 1. Business Units Persistence
+      if (unitRes.data && unitRes.data.length > 0) {
+        setBusinessUnits(unitRes.data);
+        localStorage.setItem('presensi_units', JSON.stringify(unitRes.data));
+      } else {
+        const cached = localStorage.getItem('presensi_units');
+        if (cached) setBusinessUnits(JSON.parse(cached));
+      }
+
+      // 2. Shifts Persistence
+      if (shiftRes.data && shiftRes.data.length > 0) {
+        setShifts(shiftRes.data);
+        localStorage.setItem('presensi_shifts', JSON.stringify(shiftRes.data));
+      } else {
+        const cached = localStorage.getItem('presensi_shifts');
+        if (cached) setShifts(JSON.parse(cached));
+      }
+
+      // 3. Employees Persistence
+      if (employeeRes.data && employeeRes.data.length > 0) {
+        setEmployees(employeeRes.data);
+        localStorage.setItem('presensi_employees', JSON.stringify(employeeRes.data));
+      } else {
+        const cached = localStorage.getItem('presensi_employees');
+        if (cached) setEmployees(JSON.parse(cached));
+      }
+
+      // 4. Attendance Records Persistence
+      if (recordRes.data && recordRes.data.length > 0) {
+        setRecords(recordRes.data);
+        localStorage.setItem('presensi_records', JSON.stringify(recordRes.data));
+      } else {
+        const cached = localStorage.getItem('presensi_records');
+        if (cached) setRecords(JSON.parse(cached));
+      }
+    } catch (err) {
+      console.warn('Network error loading Supabase data, utilizing local cache:', err);
+      const cachedEmps = localStorage.getItem('presensi_employees');
+      if (cachedEmps) setEmployees(JSON.parse(cachedEmps));
+      const cachedRecs = localStorage.getItem('presensi_records');
+      if (cachedRecs) setRecords(JSON.parse(cachedRecs));
+    } finally {
+      setIsLoadingData(false);
+    }
   };
 
   useEffect(() => {
@@ -178,7 +218,7 @@ export default function App() {
     }
   };
 
-  // Record Update Handler (Persistent to Supabase)
+  // Record Update Handler (Persistent to Supabase & LocalStorage)
   const handleUpdateRecordStatus = async (
     recordId: string,
     newStatus: AttendanceStatus,
@@ -188,9 +228,11 @@ export default function App() {
     if (!targetRecord) return;
     const updated = { ...targetRecord, status: newStatus, notes: notes || targetRecord.notes };
 
-    setRecords((prev) =>
-      prev.map((r) => (r.id === recordId ? updated : r))
-    );
+    setRecords((prev) => {
+      const next = prev.map((r) => (r.id === recordId ? updated : r));
+      localStorage.setItem('presensi_records', JSON.stringify(next));
+      return next;
+    });
 
     await presensiRepository.saveAttendanceRecord(updated);
 
@@ -214,9 +256,13 @@ export default function App() {
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
-  // Clock In Success Handler from Mobile Simulator (Persistent to Supabase)
+  // Clock In Success Handler from Mobile Simulator (Persistent to Supabase & LocalStorage)
   const handleClockInSuccess = async (newRecord: AttendanceRecord) => {
-    setRecords((prev) => [newRecord, ...prev]);
+    setRecords((prev) => {
+      const next = [newRecord, ...prev];
+      localStorage.setItem('presensi_records', JSON.stringify(next));
+      return next;
+    });
     await presensiRepository.saveAttendanceRecord(newRecord);
 
     const newLog: AuditLog = {
@@ -266,9 +312,13 @@ export default function App() {
     await presensiRepository.deleteShift(shiftId);
   };
 
-  // Employee Management Handlers (Persistent to Supabase)
+  // Employee Management Handlers (Persistent to Supabase & LocalStorage)
   const handleAddEmployee = async (newEmp: Employee) => {
-    setEmployees((prev) => [newEmp, ...prev]);
+    setEmployees((prev) => {
+      const next = [newEmp, ...prev];
+      localStorage.setItem('presensi_employees', JSON.stringify(next));
+      return next;
+    });
     const res = await presensiRepository.saveEmployee(newEmp);
     if (res.error) {
       console.error('Gagal menyimpan karyawan ke Supabase:', res.error);
@@ -278,7 +328,11 @@ export default function App() {
   };
 
   const handleUpdateEmployee = async (updatedEmp: Employee) => {
-    setEmployees((prev) => prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e)));
+    setEmployees((prev) => {
+      const next = prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e));
+      localStorage.setItem('presensi_employees', JSON.stringify(next));
+      return next;
+    });
     const res = await presensiRepository.saveEmployee(updatedEmp);
     if (res.error) {
       console.error('Gagal memperbarui karyawan ke Supabase:', res.error);
@@ -288,7 +342,11 @@ export default function App() {
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
-    setEmployees((prev) => prev.filter((e) => e.id !== employeeId));
+    setEmployees((prev) => {
+      const next = prev.filter((e) => e.id !== employeeId);
+      localStorage.setItem('presensi_employees', JSON.stringify(next));
+      return next;
+    });
     const res = await presensiRepository.deleteEmployee(employeeId);
     if (res.error) {
       console.error('Gagal menghapus karyawan dari Supabase:', res.error);
@@ -350,8 +408,7 @@ export default function App() {
   // 1. Unauthenticated View -> Show Login Page
   if (!currentUser) {
     return (
-      <LoginPage
-        employees={employees}
+      <UnifiedLoginPage
         businessUnits={businessUnits}
         darkMode={darkMode}
         setDarkMode={setDarkMode}
