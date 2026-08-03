@@ -134,8 +134,6 @@ function mapRecord(
   };
 }
 
-import { BUSINESS_UNITS, SHIFTS, EMPLOYEES, INITIAL_ATTENDANCE } from './mockData';
-
 export const presensiRepository = {
   async listUnits(): Promise<RepoResult<BusinessUnit[]>> {
     try {
@@ -143,9 +141,7 @@ export const presensiRepository = {
         supabase.from('business_units').select('*').order('name'),
         supabase.from('employees').select('unit_id').eq('status', 'ACTIVE'),
       ]);
-      if (error || !data || data.length === 0) {
-        return { data: BUSINESS_UNITS };
-      }
+      if (error) return { data: [], error: error.message };
 
       const perUnit = new Map<string, number>();
       (counts ?? []).forEach((row: { unit_id: string }) => {
@@ -153,14 +149,14 @@ export const presensiRepository = {
       });
 
       return {
-        data: data.map((row) => {
+        data: (data ?? []).map((row) => {
           const unit = mapUnit(row);
-          unit.totalEmployees = perUnit.get(unit.id) ?? unit.totalEmployees;
+          unit.totalEmployees = perUnit.get(unit.id) ?? 0;
           return unit;
         }),
       };
-    } catch {
-      return { data: BUSINESS_UNITS };
+    } catch (reason) {
+      return { data: [], error: errorText(reason) };
     }
   },
 
@@ -169,12 +165,10 @@ export const presensiRepository = {
       let query = supabase.from('shifts').select('*');
       if (unitId && unitId !== 'ALL') query = query.eq('unit_id', unitId);
       const { data, error } = await query.order('start_time');
-      if (error || !data || data.length === 0) {
-        return { data: SHIFTS };
-      }
-      return { data: data.map(mapShift) };
-    } catch {
-      return { data: SHIFTS };
+      if (error) return { data: [], error: error.message };
+      return { data: (data ?? []).map(mapShift) };
+    } catch (reason) {
+      return { data: [], error: errorText(reason) };
     }
   },
 
@@ -183,12 +177,10 @@ export const presensiRepository = {
       let query = supabase.from('employees').select('*');
       if (unitId && unitId !== 'ALL') query = query.eq('unit_id', unitId);
       const { data, error } = await query.order('name');
-      if (error || !data || data.length === 0) {
-        return { data: EMPLOYEES };
-      }
-      return { data: data.map(mapEmployee) };
-    } catch {
-      return { data: EMPLOYEES };
+      if (error) return { data: [], error: error.message };
+      return { data: (data ?? []).map(mapEmployee) };
+    } catch (reason) {
+      return { data: [], error: errorText(reason) };
     }
   },
 
@@ -204,19 +196,17 @@ export const presensiRepository = {
       let query = supabase.from('attendance_records').select('*');
       if (unitId && unitId !== 'ALL') query = query.eq('unit_id', unitId);
       const { data, error } = await query.order('work_date', { ascending: false }).limit(limit);
-      if (error || !data || data.length === 0) {
-        return { data: INITIAL_ATTENDANCE };
-      }
+      if (error) return { data: [], error: error.message };
 
       const employeeById = new Map(employees.data.map((e) => [e.id, e]));
       const shiftById = new Map(shifts.data.map((s) => [s.id, s]));
       const unitById = new Map(units.data.map((u) => [String(u.id), u]));
 
       return {
-        data: data.map((row) => mapRecord(row, employeeById, shiftById, unitById)),
+        data: (data ?? []).map((row) => mapRecord(row, employeeById, shiftById, unitById)),
       };
-    } catch {
-      return { data: INITIAL_ATTENDANCE };
+    } catch (reason) {
+      return { data: [], error: errorText(reason) };
     }
   },
 

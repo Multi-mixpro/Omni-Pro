@@ -334,24 +334,6 @@ export default function App() {
   // bukan konstanta contoh seperti sebelumnya.
   const referenceData = { businessUnits, shifts, employees };
 
-  // 0. Belum ada data sama sekali -> jelaskan, jangan tampilkan layar kosong.
-  if (!currentUser && !isLoadingData && businessUnits.length === 0) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#F6F7F9' }}>
-        <div style={{ maxWidth: 460, textAlign: 'center', background: '#fff', border: '1px solid #E4E7EC', borderRadius: 16, padding: 32 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: '#18212F' }}>
-            Data unit belum tersedia
-          </h1>
-          <p style={{ fontSize: 14, color: '#667085', marginTop: 8, lineHeight: 1.6 }}>
-            {dataError
-              ? `Gagal memuat data: ${dataError}`
-              : 'Belum ada unit bisnis terdaftar pada sistem Presensi. Daftarkan unit, shift, dan karyawan terlebih dahulu sebelum absensi dapat digunakan.'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // 1. Unauthenticated View -> Show Login Page
   if (!currentUser) {
     return (

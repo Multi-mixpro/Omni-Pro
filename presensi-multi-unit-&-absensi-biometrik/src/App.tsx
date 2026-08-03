@@ -27,15 +27,8 @@ import {
   BusinessUnit,
 } from './types';
 
-import {
-  INITIAL_ATTENDANCE,
-  SHIFTS,
-  EMPLOYEES,
-  INITIAL_ALERTS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_NOTIFICATIONS,
-  BUSINESS_UNITS,
-} from './data/mockData';
+import { presensiRepository } from './data/presensiRepository';
+import { PresensiDataProvider } from './data/PresensiDataContext';
 
 export default function App() {
   // User Authentication & Session State
@@ -55,14 +48,16 @@ export default function App() {
     new Date().toISOString().split('T')[0]
   );
 
-  // App Core State
-  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>(BUSINESS_UNITS);
-  const [records, setRecords] = useState<AttendanceRecord[]>(INITIAL_ATTENDANCE);
-  const [shifts, setShifts] = useState<Shift[]>(SHIFTS);
-  const [employees, setEmployees] = useState<Employee[]>(EMPLOYEES);
-  const [alerts, setAlerts] = useState<SuddenAbsenceAlert[]>(INITIAL_ALERTS);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  // App Core State — seluruhnya diisi dari database, bukan data contoh.
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [alerts, setAlerts] = useState<SuddenAbsenceAlert[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [is2FAEnabled, setIs2FAEnabled] = useState<boolean>(true);
 
   // Modals & Panels
@@ -112,6 +107,38 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  // Muat data nyata dari schema `presensi`. Tidak ada data contoh: layar akan
+  // kosong sampai unit, shift, dan karyawan benar-benar didaftarkan.
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      setIsLoadingData(true);
+      setDataError(null);
+
+      const [unitRes, shiftRes, employeeRes, recordRes] = await Promise.all([
+        presensiRepository.listUnits(),
+        presensiRepository.listShifts(),
+        presensiRepository.listEmployees(),
+        presensiRepository.listAttendance(),
+      ]);
+
+      if (!active) return;
+
+      const firstError =
+        unitRes.error || shiftRes.error || employeeRes.error || recordRes.error;
+      if (firstError) setDataError(firstError);
+
+      setBusinessUnits(unitRes.data);
+      setShifts(shiftRes.data);
+      setEmployees(employeeRes.data);
+      setRecords(recordRes.data);
+      setIsLoadingData(false);
+    })();
+
+    return () => { active = false; };
+  }, []);
 
   // Record Update Handler
   const handleUpdateRecordStatus = (
@@ -303,6 +330,10 @@ export default function App() {
 
   const unreadNotifCount = notifications.filter((n) => !n.read).length;
 
+  // Data referensi disalurkan lewat context agar komponen memakai isi database,
+  // bukan konstanta contoh seperti sebelumnya.
+  const referenceData = { businessUnits, shifts, employees };
+
   // 1. Unauthenticated View -> Show Login Page
   if (!currentUser) {
     return (
@@ -334,6 +365,7 @@ export default function App() {
 
   // 3. Admin / Manager View -> Show Full Executive Management Dashboard
   return (
+    <PresensiDataProvider value={referenceData}>
     <div
       className={`min-h-screen ${
         darkMode
@@ -494,5 +526,6 @@ export default function App() {
         </div>
       </footer>
     </div>
+    </PresensiDataProvider>
   );
 }
