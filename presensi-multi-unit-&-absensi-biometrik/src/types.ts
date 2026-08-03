@@ -55,6 +55,7 @@ export interface Employee {
   status: 'ACTIVE' | 'INACTIVE';
   username?: string;
   password?: string;
+  pinCode?: string;
   portalAccessEnabled?: boolean;
 }
 
