@@ -315,13 +315,15 @@ export const presensiRepository = {
 
   async saveAttendanceRecord(record: AttendanceRecord): Promise<RepoResult<boolean>> {
     try {
+      const todayStr = record.date || new Date().toISOString().split('T')[0];
       const payload = {
         id: record.id || `ATT_${Date.now()}`,
         employee_id: record.employeeId,
         employee_name: record.employeeName,
         employee_code: record.employeeCode,
         unit_id: record.unitId,
-        date: record.date || new Date().toISOString().split('T')[0],
+        work_date: todayStr,
+        date: todayStr,
         shift_name: record.shiftName || '—',
         check_in_time: record.checkInTime || null,
         check_out_time: record.checkOutTime || null,
