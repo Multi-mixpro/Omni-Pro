@@ -367,3 +367,26 @@ END $$;
 GRANT USAGE ON SCHEMA presensi TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA presensi TO authenticated, service_role;
 GRANT SELECT ON ALL TABLES IN SCHEMA presensi TO anon;
+
+-- ===========================================================================
+-- 9. DATA UNIT & SHIFT (konfigurasi nyata, bukan contoh)
+-- ===========================================================================
+-- Unit bisnis beserta koordinat geofence dan shift operasionalnya adalah
+-- konfigurasi nyata yang dibutuhkan sistem untuk berjalan, sehingga tetap
+-- disertakan. Yang TIDAK disertakan adalah seed karyawan contoh (nama fiktif,
+-- foto stok, password tertanam) — karyawan didaftarkan lewat aplikasi.
+INSERT INTO presensi.business_units (id, name, tagline, category, icon_name, color, address, province, city, postal_code, landmark, latitude, longitude, radius_meters, wifi_ssid, wifi_bssid, allow_outside_geofence, require_biometric, operating_hours, time_zone, manager_name, manager_phone, manager_email)
+VALUES 
+('GG_SUPPLY', 'GG Supply', 'Logistik & Distribusi Supply Chain', 'Logistik & Armada', 'Truck', '#3B82F6', 'Jl. TB Simatupang No. 88, Cilandak, Jakarta Selatan', 'DKI Jakarta', 'Jakarta Selatan', '12430', 'Gedung Cibis Nine Tower B, Lantai 5', -6.2915000, 106.8123000, 80, 'GG_Supply_Office_5G', '74:83:C2:11:4A:8B', false, true, '07:30 - 18:00 WIB', 'WIB (UTC+7)', 'Bambang Supriyadi', '+62 812-9876-5432', 'bambang.s@ggsupply.co.id'),
+('GDSKUY', 'GUDSKUY', 'Gudang & E-Commerce Fulfillment Center', 'Warehousing & Hub', 'Warehouse', '#10B981', 'Kawasan Industri BSD Blok C3, Tangerang Selatan', 'Banten', 'Tangerang Selatan', '15310', 'Gate Utama Gudang Hub 3', -6.3021000, 106.6542000, 100, 'Gudskuy_Hub_Secure', '00:1F:D0:A2:3B:11', true, true, '08:00 - 20:00 WIB (2 Shift)', 'WIB (UTC+7)', 'Hendra Wijaya', '+62 813-1122-3344', 'hendra.w@gudskuy.com'),
+('BAKSO_UJO', 'Bakso Ujo', 'Kuliner & F&B Multi-Outlet', 'Kuliner / Resto', 'Utensils', '#F59E0B', 'Jl. Riau No. 42, Citarum, Bandung', 'Jawa Barat', 'Kota Bandung', '40115', 'Resto Outlet Utama', -6.9082000, 107.6189000, 50, 'BaksoUjo_Resto_POS', 'A4:C3:F0:88:99:AA', false, true, '09:00 - 22:00 WIB', 'WIB (UTC+7)', 'H. Ujo Suherman', '+62 815-6677-8899', 'ujo@baksoujo.id')
+ON CONFLICT (id) DO NOTHING;
+
+-- SEED DATA: SHIFTS
+INSERT INTO presensi.shifts (id, unit_id, name, start_time, end_time, tolerance_minutes, color, description)
+VALUES
+('SHIFT_PAGI_LOGISTICS', 'GG_SUPPLY', 'Shift Pagi Distribusi', '07:30', '16:00', 15, 'bg-blue-500/20 text-blue-400 border-blue-500/30', 'Pengiriman armada & muatan pagi'),
+('SHIFT_PAGI_GDSKUY', 'GDSKUY', 'Shift Pagi Fulfillment', '08:00', '17:00', 10, 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', 'Picking & Packing pesanan e-commerce pagi'),
+('SHIFT_OUTLET_1_BAKSO', 'BAKSO_UJO', 'Shift Dapur Pagi', '09:00', '17:30', 15, 'bg-amber-500/20 text-amber-400 border-amber-500/30', 'Persiapan kuah & bahan utama outlet')
+ON CONFLICT (id) DO NOTHING;
+

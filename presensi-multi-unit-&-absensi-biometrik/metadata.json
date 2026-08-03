@@ -1,0 +1,6 @@
+{
+  "name": "Presensi Multi-Unit & Absensi Biometrik",
+  "description": "Sistem presensi mobile & dashboard monitoring real-time berbasis geofencing dan biometrik wajah untuk GG Supply, Gdskuy, dan Bakso Ujo.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

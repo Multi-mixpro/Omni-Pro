@@ -2,7 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthGate } from '@/core/auth/AuthGate';
 import { useAuth } from '@/core/auth/useAuth';
 import PatenApp from '@/modules/launch/paten/App';
+import PresensiApp from '@/modules/presensi/App';
 import { SettingsPage } from '@/modules/launch/settings/SettingsPage';
+import { SystemGateway } from '@/app/pages/SystemGateway';
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
 
 const queryClient = new QueryClient({
@@ -83,6 +85,17 @@ function ProtectedSettingsPage() {
 function RouteView() {
   const { pathname } = useLocation();
 
+  // Gerbang masuk: pilih Product Launch OS atau Presensi.
+  if (pathname === '/' || pathname === '') {
+    return <SystemGateway />;
+  }
+
+  // Presensi punya login sendiri di dalam aplikasinya, memakai schema presensi
+  // dan hak akses terpisah dari Product Launch.
+  if (pathname === '/presensi' || pathname.startsWith('/presensi/')) {
+    return <PresensiApp />;
+  }
+
   if (pathname === '/launch' || pathname === '/launch/' || pathname === '/launch/login') {
     return <AuthGate />;
   }
@@ -100,8 +113,9 @@ function RouteView() {
     return <ProtectedPatenApp />;
   }
 
-  // Fallback default: Alihkan seluruh rute lama/portal ke Product Launch OS
-  return <Navigate to="/launch/app/today" replace />;
+  // Rute tak dikenal dikembalikan ke gerbang masuk agar pengguna dapat memilih
+  // sistem, bukan dipaksa ke salah satunya.
+  return <Navigate to="/" replace />;
 }
 
 export function AppRouter() {
