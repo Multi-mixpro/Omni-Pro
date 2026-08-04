@@ -2,7 +2,7 @@
  * Product Launch OS 3.0 - Workspace Panel: Sizes & Size Chart
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Ruler,
   Plus,
@@ -10,12 +10,15 @@ import {
   ChevronRight,
   ChevronLeft,
   Settings2,
+  Sparkles,
 } from 'lucide-react';
-import { Article, SizeChartRow, MeasurementField } from '../../../types';
+import { Article, SizeChartRow, MeasurementField, CategoryType } from '../../../types';
 import {
   MEASUREMENT_FIELDS,
   measurementFieldsForCategory,
   requiredFieldsForCategory,
+  buildCategoryDefaultSizeChart,
+  generateDefaultTargetValues,
 } from '../../../data/measurementFields';
 
 interface SizeChartPanelProps {
@@ -56,14 +59,14 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
   article,
   onUpdateArticle,
 }) => {
-  const [activeSizeIndex, setActiveSizeIndex] = useState(1); // Default 'M'
+  const [activeSizeIndex, setActiveSizeIndex] = useState(0);
   const [mobileMode, setMobileMode] = useState<'by_size' | 'full_matrix'>('by_size');
   const [viewMode, setViewMode] = useState<'target' | 'actual' | 'dual'>('target');
   const [showManageModal, setShowManageModal] = useState(false);
   const [customFieldName, setCustomFieldName] = useState('');
   const [customTolerance, setCustomTolerance] = useState(1.0);
 
-  const rawSizes = article.sizeSet || ['S', 'M', 'L', 'XL', '2XL'];
+  const rawSizes = article.sizeSet && article.sizeSet.length > 0 ? article.sizeSet : ['S', 'M', 'L', 'XL', '2XL'];
   const sizes = sortSizesSequentially(rawSizes);
   const activeSize = sizes[activeSizeIndex] || sizes[0] || 'M';
 
@@ -73,21 +76,52 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
   const categoryTemplateFields = requiredFieldsForCategory(article.category);
   const hasCategoryTemplate = categoryTemplateFields.length > 0;
 
-  // Apply default template: seeds the variable list only — real target measurements
-  // per size must still be entered by the user, never fabricated.
-  const applyCategoryTemplate = () => {
-    if (!hasCategoryTemplate) return;
+  // Auto-sync: Pastikan sizeChart selalu terisi & sinkron 100% dengan article.sizeSet & category
+  useEffect(() => {
+    const currentChart = article.sizeChart || [];
+    if (currentChart.length === 0) {
+      const synced = buildCategoryDefaultSizeChart(article.category, sizes);
+      onUpdateArticle({
+        ...article,
+        sizeChart: synced,
+        lastUpdated: new Date().toISOString(),
+      });
+    } else {
+      let needsSync = false;
+      const synced = currentChart.map((row) => {
+        const missingSizes = sizes.filter((s) => row.targetValues[s] === undefined);
+        if (missingSizes.length > 0) {
+          needsSync = true;
+          const newTargets = { ...row.targetValues };
+          const generated = generateDefaultTargetValues(row.fieldId.toUpperCase(), sizes);
+          sizes.forEach((s) => {
+            if (newTargets[s] === undefined) {
+              newTargets[s] = generated[s] || 50;
+            }
+          });
+          return { ...row, targetValues: newTargets };
+        }
+        return row;
+      });
 
-    const defaultChart: SizeChartRow[] = categoryTemplateFields.map((field) => ({
-      fieldId: field.id,
-      fieldName: field.labelId,
-      tolerance: field.defaultTolerance,
-      targetValues: {},
-      sampleActualValues: {},
-    }));
+      if (needsSync) {
+        onUpdateArticle({
+          ...article,
+          sizeChart: synced,
+          lastUpdated: new Date().toISOString(),
+        });
+      }
+    }
+  }, [article.id, article.category, sizes.join(',')]);
+
+  // Apply category size chart template
+  const applyCategoryTemplate = (selectedCategory?: CategoryType) => {
+    const targetCat = selectedCategory || article.category;
+    const defaultChart = buildCategoryDefaultSizeChart(targetCat, sizes);
 
     onUpdateArticle({
       ...article,
+      category: targetCat,
       sizeChart: defaultChart,
       lastUpdated: new Date().toISOString(),
     });
@@ -108,17 +142,13 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
     const existing = article.sizeChart || [];
     if (existing.some((r) => r.fieldId === field.id || r.fieldName === field.labelId)) return;
 
+    const defaultTargets = generateDefaultTargetValues(field.code, sizes);
+
     const newRow: SizeChartRow = {
       fieldId: field.id,
       fieldName: field.labelId,
       tolerance: field.defaultTolerance,
-      targetValues: {
-        S: 50,
-        M: 53,
-        L: 56,
-        XL: 59,
-        XXL: 62,
-      },
+      targetValues: defaultTargets,
       sampleActualValues: {},
     };
 
@@ -135,17 +165,16 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
     if (!customFieldName.trim()) return;
 
     const existing = article.sizeChart || [];
+    const defaultTargets: Record<string, number> = {};
+    sizes.forEach((s, idx) => {
+      defaultTargets[s] = 50 + idx * 2;
+    });
+
     const newRow: SizeChartRow = {
       fieldId: `custom-${Date.now()}`,
       fieldName: customFieldName.trim(),
       tolerance: Number(customTolerance) || 1.0,
-      targetValues: {
-        S: 50,
-        M: 53,
-        L: 56,
-        XL: 59,
-        XXL: 62,
-      },
+      targetValues: defaultTargets,
       sampleActualValues: {},
     };
 
@@ -248,14 +277,57 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
           </button>
 
           <button
-            onClick={applyCategoryTemplate}
+            onClick={() => applyCategoryTemplate()}
             disabled={!hasCategoryTemplate}
             title={hasCategoryTemplate ? undefined : `Belum ada template variabel untuk kategori ${article.category}. Gunakan "Pilih & Kelola Variabel" untuk menambah manual.`}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-600"
           >
             <Ruler className="w-3.5 h-3.5" />
-            <span>Template {article.category}</span>
+            <span>Reset Template {article.category}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Category Template Recommendation Switcher Bar */}
+      <div className="bg-slate-900 text-white p-3 rounded-2xl space-y-2 shadow-2xs">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-extrabold flex items-center gap-1.5 text-emerald-400">
+            <Sparkles className="w-3.5 h-3.5" />
+            Rekomendasi Variabel Size Chart Berdasarkan Kategori Garment:
+          </span>
+          <span className="text-[10px] text-slate-400 font-mono">
+            Kategori Aktif: <strong className="text-white underline">{article.category}</strong>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+          {[
+            { cat: 'T-Shirt / Shirt', icon: '👕', label: 'Kaos & Kemeja' },
+            { cat: 'Jacket / Hoodie', icon: '🧥', label: 'Jaket & Outer' },
+            { cat: 'Pants / Shorts', icon: '👖', label: 'Celana (Pants/Shorts)' },
+            { cat: 'Skirt / Dress', icon: '👗', label: 'Dress & Rok' },
+            { cat: 'Hat / Cap', icon: '🧢', label: 'Topi & Cap' },
+            { cat: 'Bag / Backpack', icon: '🎒', label: 'Tas & Backpack' },
+            { cat: 'Accessory / Custom', icon: '✂️', label: 'Custom / Aksesori' },
+          ].map((item) => {
+            const isCurrent = article.category === item.cat;
+            return (
+              <button
+                key={item.cat}
+                type="button"
+                onClick={() => applyCategoryTemplate(item.cat as CategoryType)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isCurrent
+                    ? 'bg-[#087E79] text-white shadow-2xs ring-2 ring-emerald-400/50'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                }`}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+                {isCurrent && <span className="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.2 rounded font-mono">Aktif</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -638,7 +710,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                 </button>
                 {hasCategoryTemplate && (
                   <button
-                    onClick={applyCategoryTemplate}
+                    onClick={() => applyCategoryTemplate()}
                     className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold text-xs hover:bg-slate-100 transition-colors shadow-2xs"
                   >
                     Terapkan Template {article.category}

@@ -22,6 +22,7 @@ import {
 import { Article, BusinessUnit, CategoryType, MaterialMaster } from '../../types';
 import { formatIDR } from '../../utils/calculations';
 import { optimizedImageUrl } from '../../utils/cloudinary';
+import { buildCategoryDefaultSizeChart } from '../../data/measurementFields';
 
 interface QuickCreateModalProps {
   isOpen?: boolean;
@@ -572,7 +573,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       colorways: colorwayList,
       sizeSet: sizeList,
       baseSize: sizeList.includes('M') ? 'M' : sizeList[0] || 'M',
-      sizeChart: [],
+      sizeChart: (editArticle as unknown as Article | null)?.sizeChart?.length ? (editArticle as unknown as Article).sizeChart : buildCategoryDefaultSizeChart(category, sizeList),
       sampleIterations: [],
       costComponents: [
         { id: 'cc-1', name: 'Material & Accessory Subtotal', category: 'Material', calculationMethod: 'per_unit', amount: targetHPP * 0.65, isIncluded: true, isCustom: false },

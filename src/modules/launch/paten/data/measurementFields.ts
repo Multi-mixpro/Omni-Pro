@@ -141,3 +141,95 @@ export function requiredFieldsForCategory(category: CategoryType): MeasurementFi
 export function measurementFieldCount(category: CategoryType): number {
   return measurementFieldsForCategory(category).length;
 }
+
+/**
+ * Buat angka target pengukuran garmen realistis per size (misal S, M, L, XL, 2XL atau 28, 30, 32).
+ * Dipergunakan untuk menginjeksi rekomendasi data awal yang sinkron dengan sizeSet artikel.
+ */
+export function generateDefaultTargetValues(
+  fieldCode: string,
+  sizes: string[]
+): Record<string, number> {
+  const values: Record<string, number> = {};
+
+  const baseSpecs: Record<string, { base: number; step: number }> = {
+    // T-Shirt / Shirt
+    CHEST_WIDTH_HALF: { base: 51, step: 3 },
+    BODY_LENGTH_HPS: { base: 70, step: 2 },
+    SHOULDER_WIDTH: { base: 46, step: 2 },
+    SLEEVE_LENGTH: { base: 21, step: 1 },
+    SLEEVE_OPENING_HALF: { base: 17, step: 1 },
+    BOTTOM_SWEEP_HALF: { base: 51, step: 3 },
+    NECK_WIDTH: { base: 18, step: 0.5 },
+    NECK_DROP_FRONT: { base: 9, step: 0.5 },
+    ARMHOLE_STRAIGHT: { base: 23, step: 1 },
+
+    // Jacket / Hoodie
+    CUFF_WIDTH_HALF: { base: 9.5, step: 0.5 },
+    HOOD_HEIGHT: { base: 36, step: 1 },
+    HOOD_WIDTH: { base: 26, step: 1 },
+    ZIPPER_LENGTH: { base: 65, step: 2 },
+    RIB_HEIGHT_HEM: { base: 6, step: 0 },
+
+    // Pants / Shorts
+    WAIST_RELAXED: { base: 79, step: 4 },
+    HIP_WIDTH_HALF: { base: 50, step: 2 },
+    INSEAM_LENGTH: { base: 75, step: 1 },
+    OUTSEAM_LENGTH: { base: 100, step: 2 },
+    LEG_OPENING_HALF: { base: 17, step: 1 },
+    THIGH_WIDTH_HALF: { base: 29.5, step: 1.5 },
+    FRONT_RISE: { base: 27, step: 1 },
+    BACK_RISE: { base: 37, step: 1 },
+    KNEE_WIDTH_HALF: { base: 21, step: 1 },
+
+    // Skirt / Dress
+    BUST_WIDTH_HALF: { base: 47, step: 3 },
+    WAIST_WIDTH_HALF: { base: 36, step: 2 },
+    TOTAL_LENGTH_HPS: { base: 112, step: 2 },
+    HEM_SWEEP_HALF: { base: 65, step: 4 },
+
+    // Hat / Cap
+    HEAD_CIRCUMFERENCE: { base: 58, step: 2 },
+    CROWN_HEIGHT_FRONT: { base: 16.5, step: 0.5 },
+    VISOR_LENGTH: { base: 7, step: 0.2 },
+    VISOR_WIDTH: { base: 18, step: 0.5 },
+
+    // Bag / Backpack
+    BAG_WIDTH: { base: 30, step: 2 },
+    BAG_HEIGHT: { base: 42, step: 3 },
+    BAG_DEPTH_GUSSET: { base: 14, step: 1 },
+    STRAP_LENGTH: { base: 85, step: 5 },
+    STRAP_WIDTH: { base: 7, step: 0 },
+  };
+
+  const spec = baseSpecs[fieldCode] || { base: 50, step: 2 };
+
+  const mIndex = sizes.findIndex((s) => s.trim().toUpperCase() === 'M' || s.trim() === '30');
+  const baseIndex = mIndex !== -1 ? mIndex : Math.floor((sizes.length - 1) / 2);
+
+  sizes.forEach((sz, idx) => {
+    const offset = idx - baseIndex;
+    values[sz] = Number((spec.base + offset * spec.step).toFixed(1));
+  });
+
+  return values;
+}
+
+/**
+ * Buat SizeChartRow default yang lengkap dan sinkron dengan kategori & sizeSet artikel.
+ */
+export function buildCategoryDefaultSizeChart(
+  category: CategoryType,
+  sizes: string[]
+): import('../types').SizeChartRow[] {
+  const fields = requiredFieldsForCategory(category);
+  const targetFields = fields.length > 0 ? fields : measurementFieldsForCategory(category);
+
+  return targetFields.map((field) => ({
+    fieldId: field.id,
+    fieldName: field.labelId,
+    tolerance: field.defaultTolerance,
+    targetValues: generateDefaultTargetValues(field.code, sizes),
+    sampleActualValues: {},
+  }));
+}
