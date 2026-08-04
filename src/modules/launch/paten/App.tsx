@@ -2,28 +2,26 @@
  * Product Launch OS 3.0 - Main Application Controller
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 import { SaveStatus, SaveState } from './components/shared/SaveStatus';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
-
-import { DashboardView } from './components/dashboard/DashboardView';
-import { ArticlePipelineView } from './components/pipeline/ArticlePipelineView';
-import { QuickCreateModal } from './components/pipeline/QuickCreateModal';
-import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
 import { ArticleStickyHeader } from './components/article/ArticleStickyHeader';
 
-import { ArticleBriefView } from './components/article/ArticleBriefView';
-import { ArticleDetailView } from './components/article/ArticleDetailView';
-import { ArticleWorkspaceView } from './components/workspace/ArticleWorkspaceView';
-import { ArticleImplementationView } from './components/implementation/ArticleImplementationView';
-
-import { MasterDataView } from './components/master/MasterDataView';
-import { ApprovalsView } from './components/approvals/ApprovalsView';
-import { TasksView } from './components/tasks/TasksView';
-import { CalendarView } from './components/calendar/CalendarView';
-import { ReportsView } from './components/reports/ReportsView';
+const DashboardView = React.lazy(() => import('./components/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
+const ArticlePipelineView = React.lazy(() => import('./components/pipeline/ArticlePipelineView').then(m => ({ default: m.ArticlePipelineView })));
+const QuickCreateModal = React.lazy(() => import('./components/pipeline/QuickCreateModal').then(m => ({ default: m.QuickCreateModal })));
+const GlobalSearchModal = React.lazy(() => import('./components/modals/GlobalSearchModal').then(m => ({ default: m.GlobalSearchModal })));
+const ArticleBriefView = React.lazy(() => import('./components/article/ArticleBriefView').then(m => ({ default: m.ArticleBriefView })));
+const ArticleDetailView = React.lazy(() => import('./components/article/ArticleDetailView').then(m => ({ default: m.ArticleDetailView })));
+const ArticleWorkspaceView = React.lazy(() => import('./components/workspace/ArticleWorkspaceView').then(m => ({ default: m.ArticleWorkspaceView })));
+const ArticleImplementationView = React.lazy(() => import('./components/implementation/ArticleImplementationView').then(m => ({ default: m.ArticleImplementationView })));
+const MasterDataView = React.lazy(() => import('./components/master/MasterDataView').then(m => ({ default: m.MasterDataView })));
+const ApprovalsView = React.lazy(() => import('./components/approvals/ApprovalsView').then(m => ({ default: m.ApprovalsView })));
+const TasksView = React.lazy(() => import('./components/tasks/TasksView').then(m => ({ default: m.TasksView })));
+const CalendarView = React.lazy(() => import('./components/calendar/CalendarView').then(m => ({ default: m.CalendarView })));
+const ReportsView = React.lazy(() => import('./components/reports/ReportsView').then(m => ({ default: m.ReportsView })));
 
 import { StorageService } from './services/storage';
 import { isAllBusinessUnits } from './services/businessUnits';
@@ -581,6 +579,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
 
         {/* View Switcher Engine */}
         <main className="p-3 sm:p-4">
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-[#087E79]" /></div>}>
           {activeTab === 'dashboard' && (
             <DashboardView
               articles={filteredArticles}
@@ -715,6 +714,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
           {activeTab === 'reports' && (
             <ReportsView articles={filteredArticles} />
           )}
+        </Suspense>
         </main>
 
         {/* Bottom Navigation for Mobile */}
@@ -731,6 +731,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
       </div>
 
       {/* Quick Create Modal */}
+      <Suspense fallback={null}>
       {showQuickCreateModal && (
         <QuickCreateModal
           isOpen={showQuickCreateModal}
@@ -776,6 +777,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
           onSelectTab={(tab) => selectTab(tab as PatenTab)}
         />
       )}
+      </Suspense>
     </div>
   );
 }
