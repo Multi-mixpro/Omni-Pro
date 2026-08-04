@@ -168,7 +168,16 @@ export interface ArticleBOMItem {
   usageArea: string; // e.g., "Body Utama", "Rib Leher", "Furing Saku"
   supplierId: string;
   supplierName: string;
-  netConsumption: number;
+  netConsumption: number; // konsumsi bersih acuan; saat per-ukuran aktif, ini = rata-rata seluruh ukuran
+  /**
+   * Konsumsi bersih per ukuran (sizeCode -> nilai). Opsional.
+   *
+   * Ukuran besar biasanya butuh lebih banyak kain daripada ukuran kecil, jadi
+   * satu angka konsumsi sering tidak akurat. Saat map ini terisi, netConsumption
+   * memakai rata-ratanya supaya HPP mencerminkan konsumsi kain gabungan lintas
+   * ukuran, bukan hanya satu titik.
+   */
+  consumptionBySize?: Record<string, number>;
   consumptionUnit: string;
   wastePercent: number;
   grossConsumption: number;

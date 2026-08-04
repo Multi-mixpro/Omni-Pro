@@ -6,6 +6,8 @@ import React, { useState } from 'react';
 import {
   FileCheck2,
   Plus,
+  Info,
+  ShieldCheck,
 } from 'lucide-react';
 import { ApprovalGate, Article } from '../../types';
 
@@ -95,6 +97,29 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
             Request Approval
           </button>
         )}
+      </div>
+
+      {/* Penjelasan tujuan — banyak yang bingung membedakan gate persetujuan
+          dari tugas biasa. */}
+      <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-3.5 flex gap-3">
+        <span className="p-2 rounded-xl bg-white text-[#087E79] shrink-0 h-fit">
+          <Info className="w-4 h-4" />
+        </span>
+        <div className="text-[11px] text-teal-950/80 leading-relaxed">
+          <p className="font-extrabold text-teal-900 text-xs mb-0.5">Untuk apa halaman ini?</p>
+          <p>
+            <strong>Approval Gate</strong> adalah titik “ya/tidak” resmi sebelum artikel boleh
+            lanjut ke tahap berikutnya — misalnya Brief dikunci, HPP disetujui, atau produksi
+            massal dilepas. Berbeda dari <strong>Tugas</strong> (pekerjaan harian) dan
+            <strong> Blocker</strong> (masalah yang menghambat): gate memberi jejak keputusan
+            <em> siapa menyetujui apa dan kapan</em>, sehingga tidak ada tahap besar yang jalan
+            tanpa persetujuan penanggung jawab.
+          </p>
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-teal-900/70">
+            <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Minta approval saat sebuah tahap siap dinilai</span>
+            <span className="inline-flex items-center gap-1"><FileCheck2 className="w-3 h-3" /> Approver memilih Setujui / Revisi / Tolak beserta catatan</span>
+          </p>
+        </div>
       </div>
 
       {/* Tabs */}

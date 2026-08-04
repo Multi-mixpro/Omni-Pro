@@ -7,6 +7,8 @@ import {
   CheckSquare,
   Plus,
   ShieldAlert,
+  Info,
+  GitBranch,
 } from 'lucide-react';
 import { Article, TaskItem, BlockerItem, DecisionRequest } from '../../types';
 
@@ -147,6 +149,35 @@ export const TasksView: React.FC<TasksViewProps> = ({
               <span>+ Laporkan Blocker</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Penjelasan tujuan tiap tab — supaya beda Tugas/Blocker/Keputusan jelas. */}
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="flex gap-2">
+          <span className="p-1.5 rounded-lg bg-white text-[#087E79] shrink-0 h-fit border border-slate-200"><CheckSquare className="w-3.5 h-3.5" /></span>
+          <div className="text-[11px] leading-snug">
+            <p className="font-extrabold text-slate-900">Tugas</p>
+            <p className="text-slate-500">Pekerjaan yang harus dikerjakan seseorang, punya PIC & tenggat. Klik status untuk memajukannya.</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <span className="p-1.5 rounded-lg bg-white text-rose-600 shrink-0 h-fit border border-slate-200"><ShieldAlert className="w-3.5 h-3.5" /></span>
+          <div className="text-[11px] leading-snug">
+            <p className="font-extrabold text-slate-900">Blocker</p>
+            <p className="text-slate-500">Masalah yang <em>menghentikan</em> progres artikel dan perlu segera diselesaikan agar tidak menunda rilis.</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <span className="p-1.5 rounded-lg bg-white text-indigo-600 shrink-0 h-fit border border-slate-200"><GitBranch className="w-3.5 h-3.5" /></span>
+          <div className="text-[11px] leading-snug">
+            <p className="font-extrabold text-slate-900">Keputusan</p>
+            <p className="text-slate-500">Pilihan yang menunggu jawaban pimpinan (mis. pilih vendor/opsi desain) sebelum tim bisa lanjut.</p>
+          </div>
+        </div>
+        <div className="sm:col-span-3 flex items-start gap-1.5 text-[10px] text-slate-400 pt-1 border-t border-slate-200">
+          <Info className="w-3 h-3 shrink-0 mt-0.5" />
+          <span>Keputusan resmi antar-tahap besar (kunci Brief, lepas produksi) memakai <strong>Approval Gate</strong> di menu terpisah, bukan di sini.</span>
         </div>
       </div>
 

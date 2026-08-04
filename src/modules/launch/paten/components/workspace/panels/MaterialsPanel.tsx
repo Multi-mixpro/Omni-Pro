@@ -24,6 +24,7 @@ import {
   Layers,
   Sparkles,
   X,
+  Ruler,
 } from 'lucide-react';
 import { Article, ArticleBOMItem, MaterialMaster, Supplier } from '../../../types';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
@@ -56,6 +57,61 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
   // Main table filter & search
   const [categoryFilter, setCategoryFilter] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Baris BOM yang sedang membuka editor konsumsi per-ukuran.
+  const [perSizeOpen, setPerSizeOpen] = useState<Record<string, boolean>>({});
+
+  const sizeSet = article.sizeSet && article.sizeSet.length > 0 ? article.sizeSet : [];
+
+  /** Rata-rata konsumsi lintas ukuran, dibulatkan 2 desimal. */
+  const averageOf = (bySize: Record<string, number>): number => {
+    const vals = Object.values(bySize).filter((v) => Number(v) > 0);
+    if (vals.length === 0) return 0;
+    return Number((vals.reduce((s, v) => s + Number(v), 0) / vals.length).toFixed(2));
+  };
+
+  /**
+   * Perbarui konsumsi satu ukuran. netConsumption ikut diperbarui memakai
+   * rata-rata seluruh ukuran agar biaya per pcs mencerminkan konsumsi gabungan.
+   */
+  const handleUpdatePerSizeConsumption = (itemId: string, sizeCode: string, value: string) => {
+    const updatedMaterials = (article.materials || []).map((mat) => {
+      if (mat.id !== itemId) return mat;
+      const bySize = { ...(mat.consumptionBySize || {}), [sizeCode]: Number(value) || 0 };
+      const avgNet = averageOf(bySize);
+      const gross = Number((avgNet * (1 + (mat.wastePercent || 0) / 100)).toFixed(2));
+      const cost = Math.round(gross * (mat.effectiveUnitPrice || 0));
+      return {
+        ...mat,
+        consumptionBySize: bySize,
+        netConsumption: avgNet,
+        grossConsumption: gross,
+        costPerProduct: cost,
+      };
+    });
+    onUpdateArticle({ ...article, materials: updatedMaterials, lastUpdated: new Date().toISOString() });
+  };
+
+  /**
+   * Aktif/nonaktifkan mode per-ukuran. Saat diaktifkan, seluruh ukuran diisi
+   * dengan konsumsi tunggal saat ini sebagai titik awal; saat dimatikan, angka
+   * tunggal (rata-rata terakhir) tetap dipakai.
+   */
+  const handleTogglePerSize = (item: ArticleBOMItem) => {
+    const turningOn = !item.consumptionBySize;
+    const updatedMaterials = (article.materials || []).map((mat) => {
+      if (mat.id !== item.id) return mat;
+      if (turningOn) {
+        const seed: Record<string, number> = {};
+        (sizeSet.length ? sizeSet : ['M']).forEach((s) => { seed[s] = mat.netConsumption || 0; });
+        return { ...mat, consumptionBySize: seed };
+      }
+      const { consumptionBySize: _drop, ...rest } = mat;
+      return rest as ArticleBOMItem;
+    });
+    onUpdateArticle({ ...article, materials: updatedMaterials, lastUpdated: new Date().toISOString() });
+    setPerSizeOpen((prev) => ({ ...prev, [item.id]: turningOn }));
+  };
 
   // Handle BOM Item inline updates
   const handleUpdateBOMItem = (itemId: string, field: string, value: any) => {
@@ -431,8 +487,12 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
                 const isCustomPrice = mat.isCustomPrice || mat.isCustomOverride || false;
                 const masterPrice = masterMat ? masterMat.latestPrice : mat.effectiveUnitPrice;
 
+                const perSizeActive = !!mat.consumptionBySize;
+                const isPerSizeOpen = !!perSizeOpen[mat.id];
+
                 return (
-                  <tr key={mat.id} className="hover:bg-slate-50/80 transition-colors">
+                  <React.Fragment key={mat.id}>
+                  <tr className="hover:bg-slate-50/80 transition-colors">
                     {/* Material Name & Code */}
                     <td className="py-2.5 px-3">
                       <span className="font-extrabold text-slate-900 block truncate max-w-[200px]" title={mat.materialName}>
@@ -484,8 +544,11 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
                           step="0.01"
                           value={mat.netConsumption || ''}
                           onChange={(e) => handleUpdateBOMItem(mat.id, 'netConsumption', e.target.value)}
-                          className="w-14 p-1 border border-slate-200 rounded text-center font-mono font-bold text-xs text-slate-900 focus:border-[#087E79] focus:outline-none"
-                          title="Konsumsi Bersih"
+                          disabled={perSizeActive}
+                          title={perSizeActive ? 'Dikelola per ukuran (rata-rata otomatis)' : 'Konsumsi Bersih'}
+                          className={`w-14 p-1 border rounded text-center font-mono font-bold text-xs focus:border-[#087E79] focus:outline-none ${
+                            perSizeActive ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-slate-200 text-slate-900'
+                          }`}
                         />
                         <span className="text-[10px] text-slate-500 font-mono">{mat.consumptionUnit}</span>
                         <span className="text-slate-300">+</span>
@@ -499,6 +562,28 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
                           />
                           <span className="text-[9px] text-slate-400">%</span>
                         </div>
+                      </div>
+                      {/* Toggle konsumsi per-ukuran — kain ukuran besar biasanya lebih boros. */}
+                      <div className="flex items-center justify-center mt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (perSizeActive) {
+                              setPerSizeOpen((prev) => ({ ...prev, [mat.id]: !prev[mat.id] }));
+                            } else {
+                              handleTogglePerSize(mat);
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold transition-colors ${
+                            perSizeActive
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                              : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                          title="Atur konsumsi berbeda tiap ukuran"
+                        >
+                          <Ruler className="w-2.5 h-2.5" />
+                          <span>{perSizeActive ? `Per ukuran (avg ${mat.netConsumption})` : 'Per ukuran'}</span>
+                        </button>
                       </div>
                     </td>
 
@@ -582,6 +667,64 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
                       />
                     </td>
                   </tr>
+
+                  {/* Baris editor konsumsi per-ukuran */}
+                  {perSizeActive && isPerSizeOpen && (
+                    <tr className="bg-indigo-50/40">
+                      <td colSpan={7} className="px-3 py-2.5">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="text-[11px] font-extrabold text-indigo-900 flex items-center gap-1.5">
+                            <Ruler className="w-3.5 h-3.5" />
+                            Konsumsi {mat.materialName} per ukuran ({mat.consumptionUnit})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePerSize(mat)}
+                            className="text-[10px] font-bold text-slate-500 hover:text-rose-600 underline"
+                          >
+                            Matikan per-ukuran
+                          </button>
+                        </div>
+                        {sizeSet.length === 0 ? (
+                          <p className="text-[11px] text-slate-500 italic">
+                            Tetapkan dulu rentang ukuran di lembar “Ukuran & Size Chart”.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {sizeSet.map((sz) => (
+                              <div
+                                key={sz}
+                                className={`flex flex-col items-center rounded-lg border px-2 py-1.5 ${
+                                  sz === article.baseSize ? 'border-[#087E79] bg-white' : 'border-slate-200 bg-white'
+                                }`}
+                              >
+                                <span className="text-[9px] font-extrabold text-slate-500 uppercase">
+                                  {sz}{sz === article.baseSize ? ' · base' : ''}
+                                </span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={mat.consumptionBySize?.[sz] ?? ''}
+                                  onChange={(e) => handleUpdatePerSizeConsumption(mat.id, sz, e.target.value)}
+                                  className="w-16 mt-0.5 p-1 border border-slate-200 rounded text-center font-mono font-bold text-xs text-slate-900 focus:border-[#087E79] focus:outline-none"
+                                />
+                              </div>
+                            ))}
+                            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-1.5">
+                              <span className="text-[9px] font-extrabold text-indigo-500 uppercase">Rata-rata</span>
+                              <span className="text-xs font-mono font-black text-indigo-800 mt-0.5">
+                                {mat.netConsumption} {mat.consumptionUnit}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-slate-500 mt-2">
+                          Biaya per pcs memakai rata-rata konsumsi ini agar HPP mencerminkan seluruh ukuran, bukan satu titik.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
