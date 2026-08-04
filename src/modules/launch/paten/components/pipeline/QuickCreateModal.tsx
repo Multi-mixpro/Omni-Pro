@@ -18,6 +18,7 @@ import {
   Lock,
   Unlock,
   Loader2,
+  Upload,
 } from 'lucide-react';
 import { Article, BusinessUnit, CategoryType, MaterialMaster } from '../../types';
 import { formatIDR } from '../../utils/calculations';
@@ -367,10 +368,18 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     setNewPhotoUrl('');
   };
 
-  /** Unggah satu atau beberapa berkas foto dari komputer ke Cloudinary. */
-  const handleUploadFiles = async (files: FileList | null) => {
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string || '');
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  /** Unggah satu atau beberapa berkas foto dari komputer / HP ke Cloudinary / Local Base64. */
+  const handleUploadFiles = async (files: FileList | Array<File> | null) => {
     if (!files || files.length === 0) return;
-    if (!onUploadPhoto) return;
 
     const room = MAX_PHOTOS - productPhotos.length;
     if (room <= 0) {
@@ -383,7 +392,19 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     setUploadError(null);
     try {
       for (const file of queue) {
-        const url = await onUploadPhoto(file);
+        let url = '';
+        if (onUploadPhoto) {
+          try {
+            url = await onUploadPhoto(file);
+          } catch {
+            url = await readFileAsDataUrl(file);
+          }
+        } else {
+          url = await readFileAsDataUrl(file);
+        }
+
+        if (!url) continue;
+
         setProductPhotos((prev) => {
           if (prev.length >= MAX_PHOTOS) return prev;
           return [
@@ -938,32 +959,26 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                     </div>
                   ))}
 
-                  {/* Add Photo Tile — pemilih berkas lokal (aktif bila upload tersedia) */}
+                  {/* Add Photo Tile — pemilih berkas lokal / HP */}
                   {productPhotos.length < MAX_PHOTOS && (
                     <>
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/webp"
+                        accept="image/*"
                         multiple
                         className="hidden"
                         onChange={(e) => void handleUploadFiles(e.target.files)}
                       />
                       <button
                         type="button"
-                        disabled={!onUploadPhoto || isUploading}
+                        disabled={isUploading}
                         onClick={() => fileInputRef.current?.click()}
-                        title={
-                          onUploadPhoto
-                            ? 'Pilih foto dari komputer'
-                            : 'Simpan artikel terlebih dahulu, lalu unggah foto lewat tombol Edit Data Artikel'
-                        }
+                        title="Pilih foto dari komputer / HP Anda"
                         className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-3 text-center transition-all min-h-[120px] ${
-                          !onUploadPhoto
-                            ? 'border-slate-200 bg-slate-50 cursor-not-allowed'
-                            : isUploading
+                          isUploading
                             ? 'border-[#087E79] bg-[#DDF4F1]/20 cursor-wait'
-                            : 'border-slate-300 hover:border-[#087E79] bg-white hover:bg-[#DDF4F1]/10 cursor-pointer'
+                            : 'border-emerald-300 hover:border-[#087E79] bg-emerald-50/40 hover:bg-[#DDF4F1]/20 cursor-pointer shadow-2xs'
                         }`}
                       >
                         {isUploading ? (
@@ -973,12 +988,12 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                           </>
                         ) : (
                           <>
-                            <Camera className={`w-6 h-6 mb-1 ${onUploadPhoto ? 'text-slate-400' : 'text-slate-300'}`} />
-                            <span className={`text-[11px] font-bold ${onUploadPhoto ? 'text-slate-700' : 'text-slate-400'}`}>
-                              {onUploadPhoto ? 'Unggah dari Komputer' : 'Unggah tersedia setelah disimpan'}
+                            <Upload className="w-6 h-6 mb-1 text-[#087E79]" />
+                            <span className="text-[11px] font-extrabold text-[#087E79]">
+                              📁 Unggah Foto dari Lokal
                             </span>
-                            <span className="text-[9px] text-slate-400 mt-0.5">
-                              ({productPhotos.length}/{MAX_PHOTOS})
+                            <span className="text-[9px] font-semibold text-slate-500 mt-0.5">
+                              Pilih berkas dari Komputer / HP ({productPhotos.length}/{MAX_PHOTOS})
                             </span>
                           </>
                         )}
