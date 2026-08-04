@@ -482,10 +482,17 @@ function mapService(row: Row): ServiceMaster {
   };
 }
 
-export async function loadWorkspace(): Promise<WorkspaceSnapshot> {
-  const queries = await Promise.all([
-    rows(supabase.from('paten_records').select('*')),
-    rows(supabase.from('launch_projects').select('*, business_unit:business_units(*), owner:profiles!launch_projects_owner_id_fkey(*)').order('updated_at', { ascending: false })),
+let activeLoadWorkspacePromise: Promise<WorkspaceSnapshot> | null = null;
+
+export function loadWorkspace(): Promise<WorkspaceSnapshot> {
+  if (activeLoadWorkspacePromise) {
+    return activeLoadWorkspacePromise;
+  }
+  activeLoadWorkspacePromise = (async () => {
+    try {
+      const queries = await Promise.all([
+        rows(supabase.from('paten_records').select('*')),
+        rows(supabase.from('launch_projects').select('*, business_unit:business_units(*), owner:profiles!launch_projects_owner_id_fkey(*)').order('updated_at', { ascending: false })),
     rows(supabase.from('profiles').select('*')),
     rows(supabase.from('suppliers').select('*')),
     rows(supabase.from('materials').select('*')),
@@ -675,18 +682,23 @@ export async function loadWorkspace(): Promise<WorkspaceSnapshot> {
   const updates = rowsFor(updatesBase.length ? updatesBase : allowDemoData ? INITIAL_PROGRESS_UPDATES : [], 'progress_update', bridge);
   const hasRemoteData = projects.length > 0 || bridge.length > 0 || suppliersRaw.length > 0;
 
-  return {
-    articles,
-    suppliers,
-    materials,
-    services,
-    tasks,
-    blockers,
-    decisions,
-    approvals,
-    updates,
-    source: hasRemoteData ? 'supabase' : 'demo',
-  };
+    return {
+      articles,
+      suppliers,
+      materials,
+      services,
+      tasks,
+      blockers,
+      decisions,
+      approvals,
+      updates,
+      source: hasRemoteData ? 'supabase' : 'demo',
+    };
+  } finally {
+    activeLoadWorkspacePromise = null;
+  }
+})();
+return activeLoadWorkspacePromise;
 }
 
 function projectIdFor(type: RecordType, value: Row): string | null {
