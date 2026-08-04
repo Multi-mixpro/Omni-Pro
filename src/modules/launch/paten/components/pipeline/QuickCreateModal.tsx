@@ -51,19 +51,7 @@ const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
 // dengan produk nyata pernah ikut tersimpan ke artikel dan menyesatkan tim produksi.
 // Foto kini diunggah dari komputer ke Cloudinary, atau ditempel via URL asli produk.
 
-// Standard WP Columbia Fallback Colors (Used only when Master Data has no registered colors yet)
-const DEFAULT_WP_COLUMBIA_COLORS = [
-  { name: 'Black Solid WP', code: 'COL-01', hex: '#121212', material: 'WP COLUMBIA' },
-  { name: 'Navy Deep WP', code: 'COL-02', hex: '#1B2A4A', material: 'WP COLUMBIA' },
-  { name: 'Olive Army WP', code: 'COL-03', hex: '#4B5320', material: 'WP COLUMBIA' },
-  { name: 'Terracotta Rust WP', code: 'COL-04', hex: '#C85A32', material: 'WP COLUMBIA' },
-  { name: 'Khaki Tan WP', code: 'COL-05', hex: '#C2B280', material: 'WP COLUMBIA' },
-  { name: 'Burgundy Crimson WP', code: 'COL-06', hex: '#800020', material: 'WP COLUMBIA' },
-  { name: 'Steel Grey WP', code: 'COL-07', hex: '#4A5568', material: 'WP COLUMBIA' },
-  { name: 'Mustard Yellow WP', code: 'COL-08', hex: '#E3A857', material: 'WP COLUMBIA' },
-  { name: 'Sage Green WP', code: 'COL-09', hex: '#6B8E78', material: 'WP COLUMBIA' },
-  { name: 'Maroon Deep WP', code: 'COL-10', hex: '#500014', material: 'WP COLUMBIA' },
-];
+// Standard Color Hex Helper for Material Master Colors
 
 function getColorHexFromName(colorName: string): string {
   const name = colorName.toLowerCase();
@@ -196,13 +184,17 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     [],
   );
 
-  // Selected Color Variants from Registered Materials (Auto-filtered against obsolete dummy presets)
+  // Selected Color Variants from Registered Materials (Starts 100% CLEAN/EMPTY for new articles)
   const [selectedColorways, setSelectedColorways] = useState<
     Array<{ id: string; code: string; name: string; hex: string; materialSource?: string }>
   >(() => {
     if (editArticle?.colorways?.length) {
       const validSelected = editArticle.colorways
-        .filter((col) => !OBSOLETE_DUMMY_COLOR_NAMES.includes(col.name.trim().toLowerCase()))
+        .filter(
+          (col) =>
+            !OBSOLETE_DUMMY_COLOR_NAMES.includes(col.name.trim().toLowerCase()) &&
+            col.name.trim().toLowerCase() !== 'black solid wp',
+        )
         .map((col) => ({
           id: col.id,
           code: col.code,
@@ -212,33 +204,17 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
 
       if (validSelected.length > 0) return validSelected;
     }
-    return [
-      {
-        id: 'col-1',
-        code: DEFAULT_WP_COLUMBIA_COLORS[0].code,
-        name: DEFAULT_WP_COLUMBIA_COLORS[0].name,
-        hex: DEFAULT_WP_COLUMBIA_COLORS[0].hex,
-        materialSource: DEFAULT_WP_COLUMBIA_COLORS[0].material,
-      },
-    ];
+    return [];
   });
 
   // Auto-purge any obsolete dummy colorways when modal is opened or editArticle changes
   useEffect(() => {
     setSelectedColorways((prev) => {
-      const cleaned = prev.filter((col) => !OBSOLETE_DUMMY_COLOR_NAMES.includes(col.name.trim().toLowerCase()));
-      if (cleaned.length === 0) {
-        return [
-          {
-            id: 'col-1',
-            code: DEFAULT_WP_COLUMBIA_COLORS[0].code,
-            name: DEFAULT_WP_COLUMBIA_COLORS[0].name,
-            hex: DEFAULT_WP_COLUMBIA_COLORS[0].hex,
-            materialSource: DEFAULT_WP_COLUMBIA_COLORS[0].material,
-          },
-        ];
-      }
-      return cleaned;
+      return prev.filter(
+        (col) =>
+          !OBSOLETE_DUMMY_COLOR_NAMES.includes(col.name.trim().toLowerCase()) &&
+          col.name.trim().toLowerCase() !== 'black solid wp',
+      );
     });
   }, [editArticle, OBSOLETE_DUMMY_COLOR_NAMES]);
 
@@ -279,15 +255,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       });
     }
 
-    // 2. If NO colors were registered in Master Data, fallback ONLY to WP COLUMBIA default colors
-    if (map.size === 0) {
-      DEFAULT_WP_COLUMBIA_COLORS.forEach((col) => {
-        const key = `${col.material.trim().toLowerCase()}:::${col.name.trim().toLowerCase()}`;
-        map.set(key, { ...col });
-      });
-    }
-
-    // 3. Add custom created colors during current session
+    // 2. Add custom created colors during current session
     customMaterialColors.forEach((col) => {
       const key = `${col.material.trim().toLowerCase()}:::${col.name.trim().toLowerCase()}`;
       map.set(key, { ...col });
@@ -483,10 +451,6 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const handleToggleColorway = (col: { name: string; code: string; hex: string; material?: string }) => {
     const exists = selectedColorways.some((c) => c.name === col.name);
     if (exists) {
-      if (selectedColorways.length === 1) {
-        setNotice('Minimal 1 varian warna harus terdaftar.');
-        return;
-      }
       setSelectedColorways((prev) => prev.filter((c) => c.name !== col.name));
     } else {
       setSelectedColorways((prev) => [
@@ -1331,31 +1295,39 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
 
                 {/* Selected Colorways Badges Row */}
                 <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-200 min-h-[48px]">
-                  {selectedColorways.map((col) => (
-                    <div
-                      key={col.id}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-2xs"
-                    >
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border border-white/40 shrink-0"
-                        style={{ backgroundColor: col.hex }}
-                      />
-                      <span>{col.name}</span>
-                      <span className="font-mono text-[9px] text-slate-400">({col.code})</span>
-                      {col.materialSource && (
-                        <span className="text-[9px] bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-mono">
-                          {col.materialSource}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleColorway(col)}
-                        className="text-slate-400 hover:text-rose-400 ml-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                  {selectedColorways.length === 0 ? (
+                    <div className="w-full text-center py-1.5 px-2">
+                      <span className="text-xs font-semibold text-slate-400">
+                        Belum ada varian warna terpilih. Silakan klik varian warna dari katalog di bawah untuk menambahkan.
+                      </span>
                     </div>
-                  ))}
+                  ) : (
+                    selectedColorways.map((col) => (
+                      <div
+                        key={col.id}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-2xs animate-fadeIn"
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-white/40 shrink-0"
+                          style={{ backgroundColor: col.hex }}
+                        />
+                        <span>{col.name}</span>
+                        <span className="font-mono text-[9px] text-slate-400">({col.code})</span>
+                        {col.materialSource && (
+                          <span className="text-[9px] bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-mono">
+                            {col.materialSource}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleColorway(col)}
+                          className="text-slate-400 hover:text-rose-400 ml-1 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
 
                 {/* Material Select Dropdown & Search Control Bar */}
