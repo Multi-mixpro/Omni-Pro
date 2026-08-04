@@ -26,6 +26,7 @@ import { CalendarView } from './components/calendar/CalendarView';
 import { ReportsView } from './components/reports/ReportsView';
 
 import { StorageService } from './services/storage';
+import { isAllBusinessUnits } from './services/businessUnits';
 import { uploadArticleMedia } from './services/media';
 import { compressImageForUpload } from './utils/cloudinary';
 import { deriveArticleIndicators } from './utils/calculations';
@@ -115,7 +116,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   // Navigation & Filter States
   const [activeTab, setActiveTab] = useState<PatenTab>(initialRoute.tab);
 
-  const [selectedUnit, setSelectedUnit] = useState<BusinessUnit>('GUDSKUY');
+  const [selectedUnit, setSelectedUnit] = useState<BusinessUnit>('Semua Unit Bisnis');
   const [selectedArticleId, setSelectedArticleId] = useState<string>(initialRoute.articleId || '');
   const [showQuickCreateModal, setShowQuickCreateModal] = useState(false);
   const [showGlobalSearchModal, setShowGlobalSearchModal] = useState(false);
@@ -478,9 +479,11 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     void StorageService.saveServices(updated).catch(() => setServices(previous));
   };
 
-  // Filter Articles by Business Unit
+  // Filter Articles by Business Unit.
+  // "Semua Unit Bisnis" (default) menampilkan seluruh artikel — sebelumnya cek
+  // hanya cocok dengan 'Semua' sehingga default justru mengosongkan daftar.
   const filteredArticles = articles.filter((a) => {
-    if (!selectedUnit || (selectedUnit as string) === 'Semua') return true;
+    if (isAllBusinessUnits(selectedUnit)) return true;
     return a.businessUnit === selectedUnit;
   });
 

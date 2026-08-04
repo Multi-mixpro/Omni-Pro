@@ -3,10 +3,26 @@
  */
 
 import React, { useState } from 'react';
-import { Target, Users, CheckCircle, Image as ImageIcon, Link as LinkIcon, Palette, Ruler } from 'lucide-react';
+import {
+  Target,
+  Users,
+  CheckCircle,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Palette,
+  Ruler,
+  Building2,
+  Tag,
+  User,
+  CalendarClock,
+  Rocket,
+  Wallet,
+  Coins,
+} from 'lucide-react';
 import { Article } from '../../../types';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
 import { optimizedImageUrl } from '../../../utils/cloudinary';
+import { formatIDR } from '../../../utils/calculations';
 
 interface BriefPanelProps {
   article: Article;
@@ -36,8 +52,62 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ article, onUpdateArticle
     });
   };
 
+  // Ringkasan data yang diisi saat pembuatan artikel. Sebelumnya unit bisnis,
+  // kategori, gender, season, dan target harga/tanggal tidak tampil di Brief
+  // sehingga terasa "hilang" padahal tersimpan pada artikel.
+  const identityItems: Array<{
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    value: string;
+    sub?: string;
+    tint: string;
+  }> = [
+    { icon: Building2, label: 'Unit Bisnis', value: article.businessUnit || '—', tint: 'text-teal-600 bg-teal-50' },
+    { icon: Tag, label: 'Kategori', value: article.category || '—', sub: article.subCategory, tint: 'text-indigo-600 bg-indigo-50' },
+    { icon: User, label: 'Target Gender', value: article.genderTarget || '—', tint: 'text-violet-600 bg-violet-50' },
+    { icon: CalendarClock, label: 'Season / Koleksi', value: article.seasonCollection || '—', tint: 'text-sky-600 bg-sky-50' },
+    { icon: CalendarClock, label: 'Target Sample', value: article.targetSampleDate || '—', tint: 'text-amber-600 bg-amber-50' },
+    { icon: Rocket, label: 'Target Rilis', value: article.targetReleaseDate || '—', tint: 'text-orange-600 bg-orange-50' },
+    { icon: Wallet, label: 'Target MSRP', value: article.targetPriceMSRP ? formatIDR(article.targetPriceMSRP) : '—', tint: 'text-emerald-600 bg-emerald-50' },
+    { icon: Coins, label: 'Target HPP', value: article.targetHPP ? formatIDR(article.targetHPP) : '—', tint: 'text-rose-600 bg-rose-50' },
+  ];
+
   return (
     <div className="space-y-3 text-xs text-slate-900">
+      {/* Identitas & Target Artikel — data dasar dari form pembuatan artikel */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="flex items-center gap-1.5 text-slate-500 font-extrabold text-[10px] uppercase tracking-wider mb-2.5">
+          <Target className="w-3.5 h-3.5 text-[#087E79]" />
+          <span>Identitas & Target Artikel</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {identityItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.label}
+                className="flex items-start gap-2 p-2 rounded-xl border border-slate-100 bg-slate-50/60"
+              >
+                <span className={`p-1.5 rounded-lg shrink-0 ${item.tint}`}>
+                  <Icon className="w-3.5 h-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide truncate">
+                    {item.label}
+                  </div>
+                  <div className="text-[11px] font-extrabold text-slate-900 leading-tight break-words">
+                    {item.value}
+                  </div>
+                  {item.sub && (
+                    <div className="text-[10px] font-medium text-slate-500 truncate">{item.sub}</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Varian Warna & Rentang Ukuran Brief */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gradient-to-br from-[#DDF4F1]/60 to-teal-50/80 p-3.5 rounded-2xl border border-teal-200 shadow-2xs">
         {/* Colorways */}

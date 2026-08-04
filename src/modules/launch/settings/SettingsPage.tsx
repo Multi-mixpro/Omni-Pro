@@ -28,6 +28,11 @@ import {
   type TeamMember,
   type UpdateTeamUserInput,
 } from '../data/teamRepository';
+import {
+  loadStoredBusinessUnits,
+  saveStoredBusinessUnits,
+  type BusinessUnitItem,
+} from '../paten/services/businessUnits';
 import { useProjects } from '../hooks/useLaunch';
 
 const emptyUser = (): NewTeamUserInput => ({ username: '', pin: '', full_name: '', job_title: '', role_code: '' });
@@ -89,6 +94,76 @@ export function SettingsPage() {
   const [memberFeedback, setMemberFeedback] = useState<string | null>(null);
   const [memberFeedbackTone, setMemberFeedbackTone] = useState<'success' | 'error'>('success');
   const [projectId, setProjectId] = useState('');
+
+  // Dynamic Business Units state
+  const [buList, setBuList] = useState<BusinessUnitItem[]>(() => loadStoredBusinessUnits());
+  const [showBuModal, setShowBuModal] = useState(false);
+  const [buEditId, setBuEditId] = useState<string | null>(null);
+  const [buName, setBuName] = useState('');
+  const [buCode, setBuCode] = useState('');
+  const [buDesc, setBuDesc] = useState('');
+
+  const handleSaveBu = (e: FormEvent) => {
+    e.preventDefault();
+    if (!buName.trim()) return;
+
+    let updated: BusinessUnitItem[];
+    if (buEditId) {
+      updated = buList.map((bu) =>
+        bu.id === buEditId
+          ? {
+              ...bu,
+              name: buName.trim(),
+              code: buCode.trim().toUpperCase() || buName.trim().toUpperCase(),
+              description: buDesc.trim() || 'Unit bisnis studio rilis.',
+            }
+          : bu
+      );
+    } else {
+      const newBu: BusinessUnitItem = {
+        id: `bu-${Date.now()}`,
+        name: buName.trim(),
+        code: buCode.trim().toUpperCase() || buName.trim().toUpperCase(),
+        description: buDesc.trim() || 'Unit bisnis studio rilis.',
+        status: 'Aktif',
+      };
+      updated = [...buList, newBu];
+    }
+
+    setBuList(updated);
+    saveStoredBusinessUnits(updated);
+    setShowBuModal(false);
+    setBuEditId(null);
+    setBuName('');
+    setBuCode('');
+    setBuDesc('');
+  };
+
+  const handleOpenNewBu = () => {
+    setBuEditId(null);
+    setBuName('');
+    setBuCode('');
+    setBuDesc('');
+    setShowBuModal(true);
+  };
+
+  const handleEditBu = (bu: BusinessUnitItem) => {
+    setBuEditId(bu.id);
+    setBuName(bu.name);
+    setBuCode(bu.code);
+    setBuDesc(bu.description);
+    setShowBuModal(true);
+  };
+
+  const handleDeleteBu = (id: string) => {
+    if (buList.length <= 1) {
+      alert('Minimal harus ada 1 Unit Bisnis.');
+      return;
+    }
+    const updated = buList.filter((b) => b.id !== id);
+    setBuList(updated);
+    saveStoredBusinessUnits(updated);
+  };
 
   const access = useQuery({
     queryKey: ['launch-access', projectId],
@@ -594,39 +669,134 @@ export function SettingsPage() {
 
       {/* Langkah 4 — Kelola Unit Bisnis / Brand Studio */}
       <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl p-4 space-y-3 shadow-2xs">
-        <SectionHead
-          step={4}
-          icon={<ShieldCheck className="w-5 h-5" />}
-          tint="bg-white text-indigo-600 shadow-2xs"
-          title="Kelola Unit Bisnis / Brand Studio"
-          subtitle="Daftar unit bisnis/brand terdaftar untuk klasifikasi artikel dan sinkronisasi brief."
-        />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <SectionHead
+            step={4}
+            icon={<ShieldCheck className="w-5 h-5" />}
+            tint="bg-white text-indigo-600 shadow-2xs"
+            title="Kelola Unit Bisnis / Brand Studio"
+            subtitle="Tambah, ubah, atau hapus unit bisnis/brand terdaftar."
+          />
+          <button
+            type="button"
+            onClick={handleOpenNewBu}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-2xs transition-colors shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Unit Bisnis</span>
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-          {[
-            { name: 'GUDSKUY', code: 'GUDSKUY', desc: 'Unit Bisnis utama koleksi streetwear & merchandise.', status: 'Aktif Utama' },
-            { name: 'GG Supply', code: 'GG_SUPPLY', desc: 'Unit Bisnis divisi supply, apparel & manufacturing.', status: 'Aktif Utama' },
-            { name: 'Mainline Studio', code: 'MAINLINE', desc: 'Unit Bisnis studio rilis lini utama.', status: 'Aktif' },
-            { name: 'Streetwear Co', code: 'STREETWEAR', desc: 'Lini koleksi spesialis streetwear.', status: 'Aktif' },
-            { name: 'Activewear Lab', code: 'ACTIVEWEAR', desc: 'Lini koleksi sportswear & activewear.', status: 'Aktif' },
-          ].map((unit) => (
-            <div key={unit.name} className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-xs text-slate-900">{unit.name}</span>
+          {buList.map((unit) => (
+            <div
+              key={unit.id}
+              className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-2"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-xs text-slate-900 truncate">{unit.name}</span>
                   <span className="px-1.5 py-0.2 rounded-md bg-indigo-100 text-indigo-700 font-mono text-[9px] font-bold">
                     {unit.code}
                   </span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold shrink-0">
+                    {unit.status}
+                  </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-0.5">{unit.desc}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5 truncate">{unit.description}</p>
               </div>
-              <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">
-                {unit.status}
-              </span>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleEditBu(unit)}
+                  title="Edit Unit Bisnis"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                >
+                  <PencilLine className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteBu(unit.id)}
+                  title="Hapus Unit Bisnis"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Modal Form Tambah / Edit Unit Bisnis */}
+      {showBuModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm p-4 flex items-center justify-center">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-indigo-900 text-white">
+              <h3 className="font-extrabold text-sm">
+                {buEditId ? 'Edit Unit Bisnis' : 'Tambah Unit Bisnis Baru'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowBuModal(false)}
+                className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-indigo-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveBu} className="p-5 space-y-3.5 text-xs text-slate-900">
+              <div>
+                <label className="block font-extrabold text-slate-900 mb-1">
+                  Nama Unit Bisnis / Brand <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Misal: GUDSKUY, GG Supply, Streetwear Co"
+                  value={buName}
+                  onChange={(e) => setBuName(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-900 focus:border-indigo-600 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block font-extrabold text-slate-900 mb-1">Kode Prefix Singkat</label>
+                <input
+                  type="text"
+                  placeholder="Misal: GUDSKUY, GG_SUPPLY"
+                  value={buCode}
+                  onChange={(e) => setBuCode(e.target.value.toUpperCase())}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-900 focus:border-indigo-600 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block font-extrabold text-slate-900 mb-1">Deskripsi Singkat</label>
+                <textarea
+                  rows={2}
+                  placeholder="Penjelasan ringkas fokus koleksi unit bisnis ini..."
+                  value={buDesc}
+                  onChange={(e) => setBuDesc(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:border-indigo-600 focus:outline-none"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowBuModal(false)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-extrabold hover:bg-indigo-700 shadow-2xs"
+                >
+                  Simpan Unit Bisnis
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm p-4 sm:p-6">

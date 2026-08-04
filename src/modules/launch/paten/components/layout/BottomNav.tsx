@@ -20,6 +20,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { BusinessUnit } from '../../types';
+import { loadStoredBusinessUnits } from '../../services/businessUnits';
 
 interface BottomNavProps {
   activeTab: string;
@@ -44,12 +45,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 }) => {
   const [showMoreSheet, setShowMoreSheet] = useState(false);
 
+  const storedUnits = loadStoredBusinessUnits();
   const businessUnits: BusinessUnit[] = [
-    'GUDSKUY',
-    'GG Supply',
-    'Mainline Studio',
-    'Streetwear Co',
-    'Activewear Lab',
+    'Semua Unit Bisnis',
+    ...Array.from(new Set(storedUnits.map((u) => u.name))),
   ];
 
   return (

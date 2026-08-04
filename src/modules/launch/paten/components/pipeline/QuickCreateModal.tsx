@@ -21,6 +21,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { Article, BusinessUnit, CategoryType, MaterialMaster } from '../../types';
+import { loadStoredBusinessUnits, isAllBusinessUnits } from '../../services/businessUnits';
 import { formatIDR } from '../../utils/calculations';
 import { optimizedImageUrl } from '../../utils/cloudinary';
 import { buildCategoryDefaultSizeChart } from '../../data/measurementFields';
@@ -110,7 +111,12 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [name, setName] = useState(editArticle?.name ?? '');
   const [category, setCategory] = useState<CategoryType>(editArticle?.category ?? 'Jacket / Hoodie');
   const [subCategory, setSubCategory] = useState(editArticle?.subCategory ?? 'Outerwear Technical');
-  const [businessUnit, setBusinessUnit] = useState<BusinessUnit>(editArticle?.businessUnit ?? activeBusinessUnit);
+  // "Semua Unit Bisnis" adalah filter tampilan, bukan unit nyata — jangan
+  // dipakai sebagai unit artikel baru. Jatuhkan ke unit terdaftar pertama.
+  const defaultBusinessUnit: BusinessUnit = isAllBusinessUnits(activeBusinessUnit)
+    ? (loadStoredBusinessUnits()[0]?.name ?? 'Mainline Studio')
+    : activeBusinessUnit;
+  const [businessUnit, setBusinessUnit] = useState<BusinessUnit>(editArticle?.businessUnit ?? defaultBusinessUnit);
   const [genderTarget, setGenderTarget] = useState<'Men' | 'Women' | 'Unisex' | 'Kids'>(
     editArticle?.genderTarget ?? 'Unisex',
   );
@@ -843,11 +849,20 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                     onChange={(e) => setBusinessUnit(e.target.value as BusinessUnit)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-[#087E79] focus:outline-none cursor-pointer"
                   >
-                    <option value="GUDSKUY">GUDSKUY</option>
-                    <option value="GG Supply">GG Supply</option>
-                    <option value="Mainline Studio">Mainline Studio</option>
-                    <option value="Streetwear Co">Streetwear Co</option>
-                    <option value="Activewear Lab">Activewear Lab</option>
+                    {/* Sertakan unit artikel saat ini walau sudah dihapus/di-rename,
+                        agar penetapan lama tidak diam-diam berpindah. */}
+                    {Array.from(
+                      new Set(
+                        [
+                          !isAllBusinessUnits(businessUnit) ? (businessUnit as string) : '',
+                          ...loadStoredBusinessUnits().map((bu) => bu.name),
+                        ].filter(Boolean),
+                      ),
+                    ).map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

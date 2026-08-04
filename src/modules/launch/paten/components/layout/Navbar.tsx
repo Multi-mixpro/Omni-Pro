@@ -14,6 +14,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { BusinessUnit, ApprovalGate } from '../../types';
+import { loadStoredBusinessUnits } from '../../services/businessUnits';
 
 interface NavbarProps {
   activeBusinessUnit: BusinessUnit;
@@ -50,12 +51,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+  const storedUnits = loadStoredBusinessUnits();
   const businessUnits: BusinessUnit[] = [
-    'GUDSKUY',
-    'GG Supply',
-    'Mainline Studio',
-    'Streetwear Co',
-    'Activewear Lab',
+    'Semua Unit Bisnis',
+    ...Array.from(new Set(storedUnits.map((u) => u.name))),
   ];
 
   return (

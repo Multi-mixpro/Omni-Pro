@@ -21,6 +21,7 @@ import {
   CalendarCheck2,
 } from 'lucide-react';
 import { Article, BusinessUnit, TaskItem, ScheduleHealth } from '../../types';
+import { isAllBusinessUnits } from '../../services/businessUnits';
 
 interface CalendarViewProps {
   articles: Article[];
@@ -100,7 +101,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const events: CalendarEvent[] = [];
 
     articles.forEach((art) => {
-      if (selectedUnitFilter !== 'Semua' && art.businessUnit !== selectedUnitFilter) {
+      if (!isAllBusinessUnits(selectedUnitFilter) && art.businessUnit !== selectedUnitFilter) {
         return;
       }
 

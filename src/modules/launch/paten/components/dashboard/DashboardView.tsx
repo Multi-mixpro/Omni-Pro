@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Article, ApprovalGate, DecisionRequest, BlockerItem, BusinessUnit } from '../../types';
+import { isAllBusinessUnits } from '../../services/businessUnits';
 import { formatIDR } from '../../utils/calculations';
 import { stageBadgeClass } from '../../utils/stageStyles';
 import { optimizedImageUrl } from '../../utils/cloudinary';
@@ -43,7 +44,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   // Filter articles by active business unit
   const filteredArticles = (articles || []).filter(
-    (a) => !activeBusinessUnit || (activeBusinessUnit as string) === 'Semua' || a.businessUnit === activeBusinessUnit
+    (a) => isAllBusinessUnits(activeBusinessUnit) || a.businessUnit === activeBusinessUnit
   );
 
   const activeCount = filteredArticles.filter((a) => a.status === 'Active' || a.status === 'In Production').length;

@@ -14,6 +14,13 @@ import {
   Pencil,
   Link as LinkIcon,
   ExternalLink,
+  Building2,
+  Tag,
+  User,
+  CalendarClock,
+  Rocket,
+  Palette,
+  Ruler,
 } from 'lucide-react';
 import { Article } from '../../types';
 import { formatIDR } from '../../utils/calculations';
@@ -83,6 +90,89 @@ export const ArticleBriefView: React.FC<ArticleBriefViewProps> = ({
               <span>Edit Brief</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Identitas, Varian Warna & Rentang Ukuran — data dari form pembuatan artikel */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {[
+            { icon: Building2, label: 'Unit Bisnis', value: article.businessUnit || '—', tint: 'text-teal-600 bg-teal-50' },
+            { icon: Tag, label: 'Kategori', value: article.category || '—', tint: 'text-indigo-600 bg-indigo-50' },
+            { icon: User, label: 'Gender', value: article.genderTarget || '—', tint: 'text-violet-600 bg-violet-50' },
+            { icon: CalendarClock, label: 'Season', value: article.seasonCollection || '—', tint: 'text-sky-600 bg-sky-50' },
+            { icon: CalendarClock, label: 'Target Sample', value: article.targetSampleDate || '—', tint: 'text-amber-600 bg-amber-50' },
+            { icon: Rocket, label: 'Target Rilis', value: article.targetReleaseDate || '—', tint: 'text-orange-600 bg-orange-50' },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.label} className="flex items-start gap-2 p-2 rounded-xl border border-slate-100 bg-slate-50/60">
+                <span className={`p-1.5 rounded-lg shrink-0 ${item.tint}`}>
+                  <Icon className="w-3.5 h-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide truncate">{item.label}</div>
+                  <div className="text-[11px] font-extrabold text-slate-900 leading-tight break-words">{item.value}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          {/* Colorways */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-[#087E79] font-extrabold text-[11px]">
+              <Palette className="w-3.5 h-3.5" />
+              <span>Varian Warna ({article.colorways?.length || 0})</span>
+            </div>
+            {article.colorways && article.colorways.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {article.colorways.map((cw) => (
+                  <span
+                    key={cw.id || cw.name}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-slate-200 text-[11px] font-bold text-slate-800 shadow-2xs"
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                      style={{ backgroundColor: cw.hex || '#000000' }}
+                    />
+                    <span>{cw.name}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 italic">Belum ada varian warna dipilih.</p>
+            )}
+          </div>
+
+          {/* Size Range */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-[#087E79] font-extrabold text-[11px]">
+              <Ruler className="w-3.5 h-3.5" />
+              <span>Rentang Ukuran ({article.sizeSet?.length || 0})</span>
+            </div>
+            {article.sizeSet && article.sizeSet.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {article.sizeSet.map((sz) => {
+                  const isBase = sz === article.baseSize;
+                  return (
+                    <span
+                      key={sz}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black shadow-2xs border ${
+                        isBase ? 'bg-[#087E79] text-white border-[#087E79]' : 'bg-white text-slate-800 border-slate-300'
+                      }`}
+                    >
+                      <span>{sz}</span>
+                      {isBase && <span className="text-[8px] font-mono uppercase bg-white/30 px-1 rounded">BASE</span>}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 italic">Belum ada ukuran dipilih.</p>
+            )}
+          </div>
         </div>
       </div>
 
