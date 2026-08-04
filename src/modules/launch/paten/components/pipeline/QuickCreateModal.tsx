@@ -248,34 +248,42 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [customColorHex, setCustomColorHex] = useState('#3B82F6');
   const [customColorMaterial, setCustomColorMaterial] = useState('Kain WP Columbia');
 
-  // Combined Available Colorways Catalog from Data Master + Static Preset + Custom Created
+  // Combined Available Colorways Catalog from Data Master + Static Preset + Custom Created (Deduplicated)
   const catalogMaterialColors = useMemo<{ name: string; code: string; hex: string; material: string }[]>(() => {
-    const list: { name: string; code: string; hex: string; material: string }[] = [
-      ...REGISTERED_RAW_MATERIAL_COLORS,
-      ...customMaterialColors,
-    ];
+    const map = new Map<string, { name: string; code: string; hex: string; material: string }>();
 
-    // Merge colors from Master Materials prop if available
+    // 1. Add static base catalog first
+    REGISTERED_RAW_MATERIAL_COLORS.forEach((col) => {
+      const key = `${col.material.trim().toLowerCase()}:::${col.name.trim().toLowerCase()}`;
+      map.set(key, { ...col });
+    });
+
+    // 2. Merge colors from Master Materials prop if available (deduplicated)
     if (materials && materials.length > 0) {
       materials.forEach((mat) => {
         if (mat.availableColors && Array.isArray(mat.availableColors)) {
           mat.availableColors.forEach((colName: string, idx: number) => {
-            const exists = list.some(
-              (c) => c.name.toLowerCase() === colName.toLowerCase() && c.material.toLowerCase() === mat.name.toLowerCase()
-            );
-            if (!exists) {
-              list.push({
-                name: colName,
+            const key = `${mat.name.trim().toLowerCase()}:::${colName.trim().toLowerCase()}`;
+            if (!map.has(key)) {
+              map.set(key, {
+                name: colName.trim(),
                 code: `${mat.code ? mat.code.slice(-3) : 'MAT'}-${(idx + 1).toString().padStart(2, '0')}`,
                 hex: getColorHexFromName(colName),
-                material: mat.name,
+                material: mat.name.trim(),
               });
             }
           });
         }
       });
     }
-    return list;
+
+    // 3. Add custom created colors
+    customMaterialColors.forEach((col) => {
+      const key = `${col.material.trim().toLowerCase()}:::${col.name.trim().toLowerCase()}`;
+      map.set(key, { ...col });
+    });
+
+    return Array.from(map.values());
   }, [materials, customMaterialColors]);
 
   // List of unique Material names available in the catalog for filtering
