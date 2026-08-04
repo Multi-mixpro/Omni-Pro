@@ -152,15 +152,37 @@ export const ProductionPanel: React.FC<ProductionPanelProps> = ({
 
               <div className="grid grid-cols-3 gap-2 text-[10px]">
                 <label className="rounded-xl bg-emerald-50 p-2 font-bold text-emerald-700">Passed
-                  <input type="number" min="0" value={batch.passedQty} onChange={(event) => patchBatch(batch.id, { passedQty: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-emerald-100 bg-white px-2 py-1 font-mono text-slate-900" />
+                  <input type="number" min="0" value={batch.passedQty} onChange={(event) => patchBatch(batch.id, { passedQty: Math.max(0, Number(event.target.value)) })} className="mt-1 w-full rounded-lg border border-emerald-100 bg-white px-2 py-1 font-mono text-slate-900" />
                 </label>
                 <label className="rounded-xl bg-rose-50 p-2 font-bold text-rose-700">Rejected
-                  <input type="number" min="0" value={batch.rejectedQty} onChange={(event) => patchBatch(batch.id, { rejectedQty: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-rose-100 bg-white px-2 py-1 font-mono text-slate-900" />
+                  <input type="number" min="0" value={batch.rejectedQty} onChange={(event) => patchBatch(batch.id, { rejectedQty: Math.max(0, Number(event.target.value)) })} className="mt-1 w-full rounded-lg border border-rose-100 bg-white px-2 py-1 font-mono text-slate-900" />
                 </label>
                 <label className="rounded-xl bg-amber-50 p-2 font-bold text-amber-700">Rework
-                  <input type="number" min="0" value={batch.reworkQty} onChange={(event) => patchBatch(batch.id, { reworkQty: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-amber-100 bg-white px-2 py-1 font-mono text-slate-900" />
+                  <input type="number" min="0" value={batch.reworkQty} onChange={(event) => patchBatch(batch.id, { reworkQty: Math.max(0, Number(event.target.value)) })} className="mt-1 w-full rounded-lg border border-amber-100 bg-white px-2 py-1 font-mono text-slate-900" />
                 </label>
               </div>
+
+              {/* Rekonsiliasi hasil QC vs target — angka yang tak masuk akal
+                  (total QC melebihi target) ditandai agar tidak lolos ke laporan. */}
+              {(() => {
+                const inspected = batch.passedQty + batch.rejectedQty + batch.reworkQty;
+                const over = inspected > batch.totalTargetQty;
+                const remaining = batch.totalTargetQty - inspected;
+                return (
+                  <div className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold ${
+                    over ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-600'
+                  }`}>
+                    <span>Diperiksa: <span className="font-mono">{inspected}</span> / {batch.totalTargetQty} pcs</span>
+                    {over ? (
+                      <span className="inline-flex items-center gap-1 text-rose-700">
+                        ⚠ Melebihi target {inspected - batch.totalTargetQty} pcs — periksa input QC
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">Sisa belum diperiksa: <span className="font-mono">{remaining}</span> pcs</span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>

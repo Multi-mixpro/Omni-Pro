@@ -27,8 +27,14 @@ export const LaunchPanel: React.FC<LaunchPanelProps> = ({ article, onUpdateArtic
   };
 
   const handleAddPoint = () => {
-    if (!newPoint.trim()) return;
-    const updated = [...sellingPoints, newPoint];
+    const point = newPoint.trim();
+    if (!point) return;
+    // Cegah duplikat & simpan versi yang sudah dirapikan (tanpa spasi berlebih).
+    if (sellingPoints.some((p) => p.trim().toLowerCase() === point.toLowerCase())) {
+      setNewPoint('');
+      return;
+    }
+    const updated = [...sellingPoints, point];
     setSellingPoints(updated);
     onUpdateArticle({
       ...article,
@@ -111,6 +117,12 @@ export const LaunchPanel: React.FC<LaunchPanelProps> = ({ article, onUpdateArtic
             placeholder="Tambah keunggulan produk baru..."
             value={newPoint}
             onChange={(e) => setNewPoint(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddPoint();
+              }
+            }}
             className="flex-1 p-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-[#087E79]"
           />
           <button
