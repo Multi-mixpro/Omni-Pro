@@ -235,7 +235,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
     {
       key: 'brief',
       phaseId: 'phase-1',
-      title: '1. Product Brief & Direction',
+      title: '1. Brief & Arah Produk',
       subtitle: 'Arah produk, target pengguna, kriteria kelulusan & referensi',
       icon: Target,
       component: <BriefPanel article={article} onUpdateArticle={onUpdateArticle} />,
@@ -243,7 +243,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
     {
       key: 'colors',
       phaseId: 'phase-1',
-      title: '2. Colors & Variants (SKU)',
+      title: '2. Warna & Varian (SKU)',
       subtitle: 'Varian warna, Pantone, swatch & kombinasi SKU',
       icon: Palette,
       component: <ColorsPanel article={article} onUpdateArticle={onUpdateArticle} />,
@@ -251,7 +251,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
     {
       key: 'sizes',
       phaseId: 'phase-1',
-      title: '3. Sizes & Size Chart',
+      title: '3. Ukuran & Size Chart',
       subtitle: 'Spesifikasi ukuran, template rekomendasi kategori & kelola variabel',
       icon: Ruler,
       component: <SizeChartPanel article={article} onUpdateArticle={onUpdateArticle} />,
@@ -259,7 +259,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
     {
       key: 'materials',
       phaseId: 'phase-2',
-      title: '4. Materials & Accessories (BOM)',
+      title: '4. Material & Aksesori (BOM)',
       subtitle: 'Pilihan kain, trimming & kalkulasi BOM',
       icon: Package,
       component: (
@@ -274,7 +274,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
     {
       key: 'suppliers',
       phaseId: 'phase-2',
-      title: '5. Source & Suppliers',
+      title: '5. Sumber & Supplier',
       subtitle: 'Perbandingan supplier, lead time, MOQ & pemilihan sumber',
       icon: Building2,
       component: (
@@ -289,7 +289,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
     {
       key: 'pattern',
       phaseId: 'phase-2',
-      title: '6. Pattern & Marker Efficiency',
+      title: '6. Pola & Efisiensi Marker',
       subtitle: 'Versi pola, drafter, efisiensi marker & konsumsi kain',
       icon: Layers,
       component: <PatternPanel article={article} onUpdateArticle={onUpdateArticle} />,
@@ -297,7 +297,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
     {
       key: 'sampling',
       phaseId: 'phase-3',
-      title: '7. Sampling & Fitting',
+      title: '7. Sampel & Fitting',
       subtitle: 'Iterasi sampel V1/V2, pengukuran aktual & temuan defect',
       icon: Layers,
       component: <SamplingPanel article={article} onUpdateArticle={onUpdateArticle} />,

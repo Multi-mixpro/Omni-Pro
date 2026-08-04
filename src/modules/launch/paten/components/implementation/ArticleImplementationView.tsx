@@ -243,7 +243,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
     {
       key: 'hpp',
       phaseId: 'impl-phase-1',
-      title: '8. HPP & Pricing Simulator',
+      title: '8. HPP & Simulasi Harga',
       subtitle: 'Kalkulasi HPP, jasa CMT, margin profit & simulasi harga jual',
       icon: DollarSign,
       component: (
@@ -257,7 +257,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
     {
       key: 'readiness',
       phaseId: 'impl-phase-1',
-      title: '9. QC & Production Readiness Gate',
+      title: '9. Gerbang Kelayakan QC',
       subtitle: 'Checklist gate kelayakan produksi massal & standar kelulusan QC',
       icon: ShieldCheck,
       component: <ReadinessPanel article={article} onUpdateArticle={onUpdateArticle} />,
@@ -265,7 +265,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
     {
       key: 'stock',
       phaseId: 'impl-phase-2',
-      title: '10. Stock Matrix & Production Budget',
+      title: '10. Matriks Stok & Anggaran',
       subtitle: 'Matriks warna x ukuran x kuantitas & kalkulasi anggaran modal',
       icon: Grid,
       component: <StockMatrixPanel article={article} onUpdateArticle={onUpdateArticle} />,
@@ -273,7 +273,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
     {
       key: 'production',
       phaseId: 'impl-phase-2',
-      title: '11. Production Batches Execution',
+      title: '11. Eksekusi Batch Produksi',
       subtitle: 'Pemantauan batch produksi & vendor jahit/cutting',
       icon: Factory,
       component: <ProductionPanel article={article} onUpdateArticle={onUpdateArticle} />,
@@ -281,7 +281,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
     {
       key: 'launch',
       phaseId: 'impl-phase-3',
-      title: '12. Launch & Marketing Copy',
+      title: '12. Rilis & Materi Pemasaran',
       subtitle: 'Copywriting katalog, selling points & persiapan rilis pasar',
       icon: Rocket,
       component: <LaunchPanel article={article} onUpdateArticle={onUpdateArticle} />,
@@ -289,7 +289,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
     {
       key: 'tasks',
       phaseId: 'impl-phase-3',
-      title: '13. Tasks & Operational Progress Feed',
+      title: '13. Tugas & Progres Tim',
       subtitle: 'Timeline, log aktivitas & update progres tim',
       icon: CheckSquare,
       component: <TasksPanel article={article} updates={updates} onAddUpdate={onAddUpdate} currentUserName={currentUserName} currentUserAvatar={currentUserAvatar} />,
@@ -297,7 +297,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
     {
       key: 'files',
       phaseId: 'impl-phase-3',
-      title: '14. Files & Discussion History',
+      title: '14. Berkas & Riwayat Diskusi',
       subtitle: 'Dokumen pendukung, techpack & riwayat instruksi',
       icon: FileText,
       component: <FilesPanel article={article} onUpdateArticle={onUpdateArticle} />,
