@@ -158,7 +158,7 @@ export function NewProjectBriefPage() {
             <div className="brief-section-heading"><span className="section-number">02</span><div><span className="eyebrow">Fondasi keputusan</span><h3>Foto &amp; referensi</h3><p>Gunakan beberapa sudut gambar, URL gambar, dan link yang dapat dipelajari tim.</p></div><span className={`section-state ${referenceCount ? 'ready' : ''}`}>{referenceCount ? <><Check size={14} /> {referenceCount} referensi</> : 'Minimal 1'}</span></div>
 
             <div className="reference-source-grid">
-              <label className="multi-upload-zone"><UploadCloud size={30} /><b>Upload beberapa gambar</b><span>Pilih foto, screenshot, atau sketsa dari perangkat</span><small>JPG, PNG, WebP · maksimal 8 file · 10 MB/file</small><input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={event => addFiles(event.target.files)} /></label>
+              <label className="multi-upload-zone"><UploadCloud size={30} /><b>Upload beberapa gambar</b><span>Pilih foto, screenshot, atau sketsa dari perangkat</span><small>WebP, JPG, PNG, GIF, SVG, AVIF, HEIC · maksimal 8 file · 10 MB/file</small><input type="file" multiple accept="image/*,.webp,.png,.jpg,.jpeg,.gif,.bmp,.svg,.avif,.heic,.heif" onChange={event => addFiles(event.target.files)} /></label>
               <div className="reference-guidance"><Sparkles size={21} /><div><b>Referensi yang baik</b><p>Gabungkan tampak depan/belakang, detail konstruksi, material, warna, dan pembanding pasar.</p></div></div>
             </div>
 

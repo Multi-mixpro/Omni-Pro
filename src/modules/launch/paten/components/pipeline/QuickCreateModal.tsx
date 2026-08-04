@@ -965,7 +965,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.webp,.png,.jpg,.jpeg,.gif,.bmp,.svg,.avif,.heic,.heif"
                         multiple
                         className="hidden"
                         onChange={(e) => void handleUploadFiles(e.target.files)}

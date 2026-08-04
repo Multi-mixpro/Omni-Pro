@@ -80,7 +80,7 @@ export function ResearchPanel({ projectId, stage, references, researchSummary, o
           <label className="field"><span>Jenis</span><select value={type} onChange={e => setType(e.target.value as ReferenceType)}>{REFERENCE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
           <label className="field"><span>Link sumber (opsional)</span><input placeholder="https://…" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} /></label>
           <label className="field field-wide"><span>Insight/catatan</span><textarea rows={2} placeholder="Apa yang bisa dipelajari dari referensi ini…" value={insight} onChange={e => setInsight(e.target.value)} /></label>
-          <label className="field"><span>Atau unggah gambar</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setImage(e.target.files?.[0] ?? null)} /></label>
+          <label className="field"><span>Atau unggah gambar</span><input type="file" accept="image/*,.webp,.png,.jpg,.jpeg,.gif,.bmp,.svg,.avif,.heic,.heif" onChange={e => setImage(e.target.files?.[0] ?? null)} /></label>
           {addError && <div className="form-error field-wide">{addError}</div>}
           <button className="button button-primary" disabled={addReference.isPending} type="submit"><Plus size={17} /> {addReference.isPending ? 'Menyimpan…' : 'Simpan referensi'}</button>
         </form>
