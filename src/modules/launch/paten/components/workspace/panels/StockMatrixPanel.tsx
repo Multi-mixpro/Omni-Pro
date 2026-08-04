@@ -84,7 +84,21 @@ export const StockMatrixPanel: React.FC<StockMatrixPanelProps> = ({
     });
   };
 
-  const { totalQty, totalBudget, totalRevenue, grossMarginPercent } = calculateMatrixTotals(activeScenario.matrix);
+  // Total dihitung ulang LIVE, bukan dari nilai tersimpan per sel:
+  //  * hanya sel yang warna & ukurannya masih ada yang dihitung — sel milik
+  //    warna/ukuran yang sudah dihapus tidak lagi menggelembungkan total,
+  //  * biaya & omzet memakai HPP/MSRP terbaru, sehingga tidak basi saat harga
+  //    berubah setelah kuantitas diisi.
+  const colorIdSet = new Set(colorways.map((c) => c.id));
+  const sizeSet2 = new Set(sizes);
+  const totalQty = activeScenario.matrix
+    .filter((c) => colorIdSet.has(c.colorId) && sizeSet2.has(c.sizeCode))
+    .reduce((sum, c) => sum + (c.plannedQty || 0), 0);
+  const totalBudget = totalQty * currentHPP;
+  const totalRevenue = totalQty * currentMSRP;
+  const grossMarginPercent = totalRevenue > 0
+    ? Number((((totalRevenue - totalBudget) / totalRevenue) * 100).toFixed(1))
+    : 0;
 
   return (
     <div className="space-y-4 text-xs text-slate-900">
