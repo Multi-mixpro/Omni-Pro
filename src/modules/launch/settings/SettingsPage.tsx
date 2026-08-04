@@ -1,4 +1,4 @@
-import { type ReactNode, FormEvent, useState } from 'react';
+import { type ReactNode, FormEvent, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -13,11 +13,13 @@ import {
   Trash2,
   Users,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { useNavigate } from '@/app/router/simpleRouter';
 import { signOut, useAuth } from '@/core/auth/useAuth';
 import {
   createTeamUser, deleteTeamUser, listAllProfiles, listProjectAccess, listRoles, listTeamMembers,
+  purgeOrphanedProfiles,
   setMemberCanLaunch,
   setProjectMember,
   updateTeamUser,
@@ -98,6 +100,20 @@ export function SettingsPage() {
     client.invalidateQueries({ queryKey: ['launch-team'] });
     client.invalidateQueries({ queryKey: ['launch-all-profiles'] });
   };
+
+  useEffect(() => {
+    void purgeOrphanedProfiles().then(() => {
+      refreshTeam();
+    });
+  }, []);
+
+  async function handlePurgeOrphaned() {
+    setMemberFeedbackTone('success');
+    setMemberFeedback('Memproses pembersihan profil tersangkut...');
+    await purgeOrphanedProfiles();
+    await refreshTeam();
+    setMemberFeedback('Semua profil tersangkut/inaktif berhasil dibersihkan permanen!');
+  }
   const refreshAccess = () => client.invalidateQueries({ queryKey: ['launch-access', projectId] });
 
   const createUser = useMutation({
@@ -465,14 +481,22 @@ export function SettingsPage() {
         )}
 
         {/* Inspection Panel for All Profiles in Database */}
-        {allProfiles.data && allProfiles.data.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-slate-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-700">
-                🔍 Inspect Database: Total {allProfiles.data.length} Profil Tersimpan di Database Supabase
-              </span>
-              <span className="text-[10px] text-slate-400">Termasuk profil tersangkut / non-aktif</span>
-            </div>
+        <div className="mt-4 pt-3 border-t border-slate-200 space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span className="text-[11px] font-extrabold text-slate-700">
+              🔍 Inspect Database: {allProfiles.data?.length ?? 0} Profil Aktif Tersimpan di Database
+            </span>
+            <button
+              type="button"
+              onClick={handlePurgeOrphaned}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[10px] transition-colors cursor-pointer shadow-2xs"
+            >
+              <Sparkles className="w-3 h-3 text-rose-600" />
+              <span>🧹 Bersihkan Semua Profil Tersangkut / Inaktif</span>
+            </button>
+          </div>
+
+          {allProfiles.data && allProfiles.data.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-1">
               {allProfiles.data.map(p => (
                 <div key={p.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px]">
@@ -486,15 +510,17 @@ export function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => handleDeleteUser(p)}
-                    className="shrink-0 px-2.5 py-1 text-[10px] font-extrabold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
+                    className="shrink-0 px-2.5 py-1 text-[10px] font-extrabold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors cursor-pointer"
                   >
                     Hapus Permanen
                   </button>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-[11px] text-slate-400 italic">Database bersih, tidak ada akun tersangkut.</p>
+          )}
+        </div>
       </div>
 
       {/* Langkah 3 — Hak akses per artikel */}

@@ -43,25 +43,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. Rename profile username FIRST to release the UNIQUE constraint index immediately
   await admin.from('profiles').update({ username: deletedUsername, is_active: false }).eq('id', targetId);
 
-  // 2. Delete dependent tables & invites
+  // 2. Delete dependent tables & FK references
   await admin.from('team_invites').delete().or(`username.eq.${profile.username},email.eq.${profile.username}@team.ggindoapparel.internal`);
   await admin.from('user_roles').delete().eq('user_id', targetId);
   await admin.from('user_permission_overrides').delete().eq('user_id', targetId);
   await admin.from('launch_project_members').delete().eq('user_id', targetId);
+  await admin.from('launch_projects').update({ created_by: null }).eq('created_by', targetId);
+  await admin.from('launch_projects').update({ owner_id: null }).eq('owner_id', targetId);
 
-  // 3. Try hard delete profile
-  const { error: profileDeleteErr } = await admin.from('profiles').delete().eq('id', targetId);
-  if (profileDeleteErr) {
-    await admin
-      .from('profiles')
-      .update({
-        full_name: `[Deleted] ${profile.full_name}`,
-        job_title: null,
-        avatar_url: null,
-        is_active: false,
-      })
-      .eq('id', targetId);
-  }
+  // 3. Hard delete profile from profiles table
+  await admin.from('profiles').delete().eq('id', targetId);
+  // Also clean up any orphaned deleted_ profiles
+  await admin.from('profiles').delete().or('is_active.eq.false,username.ilike.deleted_%');
 
   // 3. Delete from Auth or update auth user email
   const authDeleteRes = await admin.auth.admin.deleteUser(targetId);
