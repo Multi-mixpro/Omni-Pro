@@ -843,6 +843,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                     onChange={(e) => setBusinessUnit(e.target.value as BusinessUnit)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-[#087E79] focus:outline-none cursor-pointer"
                   >
+                    <option value="GUDSKUY">GUDSKUY</option>
+                    <option value="GG Supply">GG Supply</option>
                     <option value="Mainline Studio">Mainline Studio</option>
                     <option value="Streetwear Co">Streetwear Co</option>
                     <option value="Activewear Lab">Activewear Lab</option>

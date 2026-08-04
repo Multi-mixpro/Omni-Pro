@@ -222,8 +222,11 @@ export function buildCategoryDefaultSizeChart(
   category: CategoryType,
   sizes: string[]
 ): import('../types').SizeChartRow[] {
-  const fields = requiredFieldsForCategory(category);
-  const targetFields = fields.length > 0 ? fields : measurementFieldsForCategory(category);
+  const allFields = measurementFieldsForCategory(category);
+  const requiredAndRecommended = allFields.filter(
+    (f) => f.importance === 'Required' || f.importance === 'Recommended'
+  );
+  const targetFields = requiredAndRecommended.length > 0 ? requiredAndRecommended : allFields;
 
   return targetFields.map((field) => ({
     fieldId: field.id,

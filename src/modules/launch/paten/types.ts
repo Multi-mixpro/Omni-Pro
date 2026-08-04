@@ -2,7 +2,7 @@
  * Product Launch OS 3.0 - Type Definitions
  */
 
-export type BusinessUnit = 'Mainline Studio' | 'Streetwear Co' | 'Activewear Lab';
+export type BusinessUnit = 'GUDSKUY' | 'GG Supply' | 'Mainline Studio' | 'Streetwear Co' | 'Activewear Lab' | string;
 
 export type ArticleStage =
   | 'Prospect'

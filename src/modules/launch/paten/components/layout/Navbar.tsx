@@ -51,6 +51,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const businessUnits: BusinessUnit[] = [
+    'GUDSKUY',
+    'GG Supply',
     'Mainline Studio',
     'Streetwear Co',
     'Activewear Lab',

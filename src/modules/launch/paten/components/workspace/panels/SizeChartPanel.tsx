@@ -514,10 +514,10 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
             <table className="w-full text-left text-[10px] sm:text-[11px] border-collapse">
               <thead>
                 <tr className="bg-slate-100/90 text-slate-800 border-b border-slate-300 font-extrabold select-none">
-                  <th className="py-1.5 px-2.5 border-r border-slate-300 w-44 sm:w-52">
+                  <th className="py-1 px-2 border-r border-slate-300 w-36 sm:w-44 text-[10px]">
                     Variabel Pengukuran (POM)
                   </th>
-                  <th className="py-1.5 px-1 text-center border-r border-slate-300 w-12">
+                  <th className="py-1 px-0.5 text-center border-r border-slate-300 w-10 text-[10px]">
                     Tol (±)
                   </th>
                   {sizes.map((sz) => {
@@ -525,8 +525,8 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                     return (
                       <th
                         key={sz}
-                        className={`py-1 px-1 text-center border-r border-slate-300 ${
-                          viewMode === 'dual' ? 'min-w-[62px]' : 'min-w-[48px]'
+                        className={`py-1 px-0.5 text-center border-r border-slate-300 ${
+                          viewMode === 'dual' ? 'min-w-[54px]' : 'min-w-[40px]'
                         } ${isBase ? 'bg-[#DDF4F1]/70 text-[#087E79]' : ''}`}
                       >
                         <div className="font-extrabold text-[11px] flex items-center justify-center gap-0.5">
@@ -551,7 +551,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                       </th>
                     );
                   })}
-                  <th className="py-1 px-0.5 text-center w-6 border-slate-300"></th>
+                  <th className="py-1 px-0.5 text-center w-5 border-slate-300"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
@@ -560,10 +560,10 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                     key={row.fieldId}
                     className={`${idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'} hover:bg-slate-100/60 transition-colors`}
                   >
-                    <td className="py-1 px-2 font-bold text-slate-900 border-r border-slate-200 truncate max-w-[200px]">
+                    <td className="py-0.5 px-1.5 font-bold text-slate-900 border-r border-slate-200 truncate max-w-[170px] text-[10px] sm:text-[11px]">
                       {row.fieldName}
                     </td>
-                    <td className="py-1 px-1 text-center text-slate-500 font-mono text-[9px] border-r border-slate-200 bg-slate-50/80">
+                    <td className="py-0.5 px-0.5 text-center text-slate-500 font-mono text-[9px] border-r border-slate-200 bg-slate-50/80">
                       ±{row.tolerance}
                     </td>
                     {sizes.map((sz) => {
@@ -576,7 +576,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                       return (
                         <td
                           key={sz}
-                          className={`py-0.5 px-0.5 text-center border-r border-slate-200 ${
+                          className={`py-0.5 px-0.2 text-center border-r border-slate-200 ${
                             isBase ? 'bg-teal-50/20' : ''
                           }`}
                         >
@@ -588,7 +588,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                               onChange={(e) =>
                                 handleUpdateTargetValue(row.fieldId, sz, Number(e.target.value))
                               }
-                              className="w-10 py-0.5 px-0.5 border border-slate-200 bg-slate-50/80 rounded text-center font-mono font-bold text-[10px] text-slate-900 focus:bg-white focus:border-[#087E79] focus:outline-none transition-all"
+                              className="w-9 py-0.5 px-0.5 border border-slate-200 bg-slate-50/80 rounded-md text-center font-mono font-bold text-[10px] text-slate-900 focus:bg-white focus:border-[#087E79] focus:outline-none transition-all shadow-2xs"
                             />
                           )}
 
@@ -601,7 +601,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                               onChange={(e) =>
                                 handleUpdateActualValue(row.fieldId, sz, Number(e.target.value))
                               }
-                              className={`w-10 py-0.5 px-0.5 border rounded text-center font-mono font-bold text-[10px] focus:outline-none transition-all ${
+                              className={`w-9 py-0.5 px-0.5 border rounded-md text-center font-mono font-bold text-[10px] focus:outline-none transition-all shadow-2xs ${
                                 isPass === true
                                   ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-black'
                                   : isPass === false
@@ -620,9 +620,9 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                                 onChange={(e) =>
                                   handleUpdateTargetValue(row.fieldId, sz, Number(e.target.value))
                                 }
-                                className="w-8 py-0.2 px-0.5 border border-slate-200 bg-slate-50/80 rounded text-center font-mono font-bold text-[10px] text-slate-900 focus:bg-white focus:border-[#087E79] focus:outline-none transition-all"
+                                className="w-7 py-0.2 px-0.2 border border-slate-200 bg-slate-50/80 rounded text-center font-mono font-bold text-[9px] text-slate-900 focus:bg-white focus:border-[#087E79] focus:outline-none transition-all"
                               />
-                              <span className="text-slate-300 text-[9px] font-mono">/</span>
+                              <span className="text-slate-300 text-[8px] font-mono">/</span>
                               <input
                                 type="number"
                                 step="0.1"
@@ -631,7 +631,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                                 onChange={(e) =>
                                   handleUpdateActualValue(row.fieldId, sz, Number(e.target.value))
                                 }
-                                className={`w-8 py-0.2 px-0.5 border rounded text-center font-mono font-bold text-[10px] focus:outline-none transition-all ${
+                                className={`w-7 py-0.2 px-0.2 border rounded text-center font-mono font-bold text-[9px] focus:outline-none transition-all ${
                                   isPass === true
                                     ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-black'
                                     : isPass === false

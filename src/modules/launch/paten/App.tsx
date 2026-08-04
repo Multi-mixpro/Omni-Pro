@@ -115,7 +115,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   // Navigation & Filter States
   const [activeTab, setActiveTab] = useState<PatenTab>(initialRoute.tab);
 
-  const [selectedUnit, setSelectedUnit] = useState<BusinessUnit>('Mainline Studio');
+  const [selectedUnit, setSelectedUnit] = useState<BusinessUnit>('GUDSKUY');
   const [selectedArticleId, setSelectedArticleId] = useState<string>(initialRoute.articleId || '');
   const [showQuickCreateModal, setShowQuickCreateModal] = useState(false);
   const [showGlobalSearchModal, setShowGlobalSearchModal] = useState(false);

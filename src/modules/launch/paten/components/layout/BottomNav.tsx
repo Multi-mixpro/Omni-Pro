@@ -45,6 +45,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const [showMoreSheet, setShowMoreSheet] = useState(false);
 
   const businessUnits: BusinessUnit[] = [
+    'GUDSKUY',
+    'GG Supply',
     'Mainline Studio',
     'Streetwear Co',
     'Activewear Lab',

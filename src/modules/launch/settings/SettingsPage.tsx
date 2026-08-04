@@ -592,6 +592,42 @@ export function SettingsPage() {
         )}
       </div>
 
+      {/* Langkah 4 — Kelola Unit Bisnis / Brand Studio */}
+      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl p-4 space-y-3 shadow-2xs">
+        <SectionHead
+          step={4}
+          icon={<ShieldCheck className="w-5 h-5" />}
+          tint="bg-white text-indigo-600 shadow-2xs"
+          title="Kelola Unit Bisnis / Brand Studio"
+          subtitle="Daftar unit bisnis/brand terdaftar untuk klasifikasi artikel dan sinkronisasi brief."
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          {[
+            { name: 'GUDSKUY', code: 'GUDSKUY', desc: 'Unit Bisnis utama koleksi streetwear & merchandise.', status: 'Aktif Utama' },
+            { name: 'GG Supply', code: 'GG_SUPPLY', desc: 'Unit Bisnis divisi supply, apparel & manufacturing.', status: 'Aktif Utama' },
+            { name: 'Mainline Studio', code: 'MAINLINE', desc: 'Unit Bisnis studio rilis lini utama.', status: 'Aktif' },
+            { name: 'Streetwear Co', code: 'STREETWEAR', desc: 'Lini koleksi spesialis streetwear.', status: 'Aktif' },
+            { name: 'Activewear Lab', code: 'ACTIVEWEAR', desc: 'Lini koleksi sportswear & activewear.', status: 'Aktif' },
+          ].map((unit) => (
+            <div key={unit.name} className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-xs text-slate-900">{unit.name}</span>
+                  <span className="px-1.5 py-0.2 rounded-md bg-indigo-100 text-indigo-700 font-mono text-[9px] font-bold">
+                    {unit.code}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-0.5">{unit.desc}</p>
+              </div>
+              <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">
+                {unit.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm p-4 sm:p-6">
           <div className="max-w-3xl mx-auto h-full flex items-center justify-center">
