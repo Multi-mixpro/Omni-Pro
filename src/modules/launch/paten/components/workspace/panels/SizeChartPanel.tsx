@@ -12,6 +12,7 @@ import {
   Settings2,
   Sparkles,
   Search,
+  Lock,
 } from 'lucide-react';
 import { Article, SizeChartRow, MeasurementField, CategoryType } from '../../../types';
 import {
@@ -117,15 +118,61 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
     }
   }, [article.id, article.category, sizes.join(',')]);
 
-  // Apply category size chart template
+  /** Jumlah sel yang sudah dibakukan tim di seluruh size chart. */
+  const bakedCellCount = (article.sizeChart || []).reduce(
+    (total, row) => total + (row.bakedSizes?.length ?? 0),
+    0,
+  );
+
+  /**
+   * Terapkan template variabel milik sebuah kategori.
+   *
+   * Template hanya menyediakan angka rekomendasi sebagai titik awal. Angka yang
+   * sudah dibakukan tim dipertahankan, karena itu keputusan produksi — bukan
+   * saran otomatis. Sebelumnya seluruh size chart ditimpa tanpa peringatan,
+   * sehingga hasil pengukuran internal bisa hilang hanya karena satu klik.
+   *
+   * Kategori artikel TIDAK ikut berubah di sini. Mengganti kategori artikel
+   * adalah keputusan pada data dasar artikel, bukan efek samping dari memilih
+   * template pengukuran.
+   */
   const applyCategoryTemplate = (selectedCategory?: CategoryType) => {
     const targetCat = selectedCategory || article.category;
-    const defaultChart = buildCategoryDefaultSizeChart(targetCat, sizes);
+    const templateChart = buildCategoryDefaultSizeChart(targetCat, sizes);
+    const existing = article.sizeChart || [];
+
+    const merged: SizeChartRow[] = templateChart.map((templateRow) => {
+      const previous = existing.find(
+        (row) => row.fieldId === templateRow.fieldId || row.fieldName === templateRow.fieldName,
+      );
+      if (!previous?.bakedSizes?.length) return templateRow;
+
+      // Pertahankan tiap angka baku, timpa sisanya dengan rekomendasi template.
+      const targetValues = { ...templateRow.targetValues };
+      previous.bakedSizes.forEach((sizeCode) => {
+        if (previous.targetValues[sizeCode] !== undefined) {
+          targetValues[sizeCode] = previous.targetValues[sizeCode];
+        }
+      });
+      return {
+        ...templateRow,
+        targetValues,
+        tolerance: previous.tolerance,
+        sampleActualValues: previous.sampleActualValues,
+        bakedSizes: previous.bakedSizes,
+      };
+    });
+
+    // Baris baku yang tidak ada di template tetap dipertahankan di akhir.
+    const keptCustomRows = existing.filter(
+      (row) =>
+        row.bakedSizes?.length
+        && !templateChart.some((t) => t.fieldId === row.fieldId || t.fieldName === row.fieldName),
+    );
 
     onUpdateArticle({
       ...article,
-      category: targetCat,
-      sizeChart: defaultChart,
+      sizeChart: [...merged, ...keptCustomRows],
       lastUpdated: new Date().toISOString(),
     });
   };
@@ -191,18 +238,41 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
     setCustomTolerance(1.0);
   };
 
+  /**
+   * Angka target yang diketik manual otomatis menjadi angka baku internal:
+   * begitu tim menetapkan ukuran sendiri, itu bukan lagi saran template.
+   */
   const handleUpdateTargetValue = (fieldId: string, sizeCode: string, val: number) => {
     const updatedRows = (article.sizeChart || []).map((row) => {
       if (row.fieldId === fieldId) {
+        const bakedSizes = row.bakedSizes?.includes(sizeCode)
+          ? row.bakedSizes
+          : [...(row.bakedSizes ?? []), sizeCode];
         return {
           ...row,
           targetValues: {
             ...row.targetValues,
             [sizeCode]: val,
           },
+          bakedSizes,
         };
       }
       return row;
+    });
+
+    onUpdateArticle({
+      ...article,
+      sizeChart: updatedRows,
+      lastUpdated: new Date().toISOString(),
+    });
+  };
+
+  /** Tandai seluruh angka pada satu variabel sebagai baku, atau lepas kembali. */
+  const handleToggleRowBaked = (fieldId: string) => {
+    const updatedRows = (article.sizeChart || []).map((row) => {
+      if (row.fieldId !== fieldId) return row;
+      const allBaked = sizes.every((s) => row.bakedSizes?.includes(s));
+      return { ...row, bakedSizes: allBaked ? [] : [...sizes] };
     });
 
     onUpdateArticle({
@@ -270,68 +340,37 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
           </div>
         </div>
 
+        {/* Pemilihan template kategori sengaja tidak diletakkan di sini.
+            Template menimpa angka rekomendasi, jadi aksinya ditempatkan di dalam
+            modal kelola variabel agar tidak terpicu sekali klik saat menyunting. */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowManageModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer"
           >
-            <Settings2 className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Pilih & Kelola Variabel</span>
-          </button>
-
-          <button
-            onClick={() => applyCategoryTemplate()}
-            disabled={!hasCategoryTemplate}
-            title={hasCategoryTemplate ? undefined : `Belum ada template variabel untuk kategori ${article.category}. Gunakan "Pilih & Kelola Variabel" untuk menambah manual.`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo-600"
-          >
-            <Ruler className="w-3.5 h-3.5" />
-            <span>Reset Template {article.category}</span>
+            <Settings2 className="w-3.5 h-3.5" />
+            <span>Pilih &amp; Kelola Variabel</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px] font-mono">
+              {currentChart.length}
+            </span>
           </button>
         </div>
       </div>
 
-      {/* Category Template Recommendation Switcher Bar */}
-      <div className="bg-slate-900 text-white p-3 rounded-2xl space-y-2 shadow-2xs">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-extrabold flex items-center gap-1.5 text-emerald-400">
-            <Sparkles className="w-3.5 h-3.5" />
-            Rekomendasi Variabel Size Chart Berdasarkan Kategori Garment:
-          </span>
-          <span className="text-[10px] text-slate-400 font-mono">
-            Kategori Aktif: <strong className="text-white underline">{article.category}</strong>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-          {[
-            { cat: 'T-Shirt / Shirt', icon: '👕', label: 'Kaos & Kemeja' },
-            { cat: 'Jacket / Hoodie', icon: '🧥', label: 'Jaket & Outer' },
-            { cat: 'Pants / Shorts', icon: '👖', label: 'Celana (Pants/Shorts)' },
-            { cat: 'Skirt / Dress', icon: '👗', label: 'Dress & Rok' },
-            { cat: 'Hat / Cap', icon: '🧢', label: 'Topi & Cap' },
-            { cat: 'Bag / Backpack', icon: '🎒', label: 'Tas & Backpack' },
-            { cat: 'Accessory / Custom', icon: '✂️', label: 'Custom / Aksesori' },
-          ].map((item) => {
-            const isCurrent = article.category === item.cat;
-            return (
-              <button
-                key={item.cat}
-                type="button"
-                onClick={() => applyCategoryTemplate(item.cat as CategoryType)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                  isCurrent
-                    ? 'bg-[#087E79] text-white shadow-2xs ring-2 ring-emerald-400/50'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                }`}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-                {isCurrent && <span className="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.2 rounded font-mono">Aktif</span>}
-              </button>
-            );
-          })}
-        </div>
+      {/* Keterangan angka rekomendasi vs angka baku internal */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px]">
+        <span className="font-extrabold text-slate-500 uppercase tracking-wide">Arti angka:</span>
+        <span className="flex items-center gap-1.5 text-slate-600">
+          <span className="w-4 h-4 rounded border border-dashed border-slate-300 bg-slate-50 inline-block" />
+          <span><strong className="text-slate-700">Rekomendasi</strong> — saran template, belum ditetapkan</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-emerald-700">
+          <span className="w-4 h-4 rounded border border-emerald-300 bg-emerald-50 inline-block" />
+          <span><strong>Baku internal</strong> — sudah ditetapkan tim, aman dari template</span>
+        </span>
+        <span className="ml-auto font-mono text-slate-400">
+          {bakedCellCount} sel baku
+        </span>
       </div>
 
       {/* Mobile/Desktop Mode Switcher */}
@@ -551,7 +590,9 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                       </th>
                     );
                   })}
-                  <th className="py-1 px-0.5 text-center w-5 border-slate-300"></th>
+                  <th className="py-1 px-0.5 text-center w-12 border-slate-300 text-[8px] font-bold text-slate-400 uppercase">
+                    Baku / Hapus
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
@@ -572,6 +613,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                       const diff = actual !== undefined ? Number((actual - target).toFixed(1)) : null;
                       const isPass = diff !== null ? Math.abs(diff) <= row.tolerance : null;
                       const isBase = sz === article.baseSize;
+                      const isBaked = !!row.bakedSizes?.includes(sz);
 
                       return (
                         <td
@@ -585,10 +627,15 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                               type="number"
                               step="0.1"
                               value={target || ''}
+                              title={isBaked ? 'Angka baku internal — tidak tertimpa template' : 'Angka rekomendasi template — ketik untuk membakukan'}
                               onChange={(e) =>
                                 handleUpdateTargetValue(row.fieldId, sz, Number(e.target.value))
                               }
-                              className="w-9 py-0.5 px-0.5 border border-slate-200 bg-slate-50/80 rounded-md text-center font-mono font-bold text-[10px] text-slate-900 focus:bg-white focus:border-[#087E79] focus:outline-none transition-all shadow-2xs"
+                              className={`w-9 py-0.5 px-0.5 border rounded-md text-center font-mono font-bold text-[10px] focus:bg-white focus:border-[#087E79] focus:outline-none transition-all shadow-2xs ${
+                                isBaked
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                                  : 'border-dashed border-slate-300 bg-slate-50/80 text-slate-500'
+                              }`}
                             />
                           )}
 
@@ -617,10 +664,15 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                                 type="number"
                                 step="0.1"
                                 value={target || ''}
+                                title={isBaked ? 'Angka baku internal' : 'Angka rekomendasi template'}
                                 onChange={(e) =>
                                   handleUpdateTargetValue(row.fieldId, sz, Number(e.target.value))
                                 }
-                                className="w-7 py-0.2 px-0.2 border border-slate-200 bg-slate-50/80 rounded text-center font-mono font-bold text-[9px] text-slate-900 focus:bg-white focus:border-[#087E79] focus:outline-none transition-all"
+                                className={`w-7 py-0.2 px-0.2 border rounded text-center font-mono font-bold text-[9px] focus:bg-white focus:border-[#087E79] focus:outline-none transition-all ${
+                                  isBaked
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                                    : 'border-dashed border-slate-300 bg-slate-50/80 text-slate-500'
+                                }`}
                               />
                               <span className="text-slate-300 text-[8px] font-mono">/</span>
                               <input
@@ -644,14 +696,31 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                         </td>
                       );
                     })}
-                    <td className="py-0.5 px-0.5 text-center">
-                      <button
-                        onClick={() => handleRemoveRow(row.fieldId)}
-                        className="p-0.5 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Keluarkan / Hapus Variabel (X)"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                    <td className="py-0.5 px-0.5">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <button
+                          onClick={() => handleToggleRowBaked(row.fieldId)}
+                          className={`p-0.5 rounded transition-colors ${
+                            sizes.every((s) => row.bakedSizes?.includes(s))
+                              ? 'text-emerald-600 hover:bg-emerald-50'
+                              : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'
+                          }`}
+                          title={
+                            sizes.every((s) => row.bakedSizes?.includes(s))
+                              ? 'Sudah baku — klik untuk kembalikan ke angka rekomendasi'
+                              : 'Bakukan seluruh angka baris ini sebagai standar internal'
+                          }
+                        >
+                          <Lock className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveRow(row.fieldId)}
+                          className="p-0.5 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title="Keluarkan / Hapus Variabel (X)"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -731,23 +800,91 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
       {/* Modal: Kelola & Pilih Variabel Pengukuran */}
       {showManageModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-lg border border-slate-200 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 shrink-0">
-              <div className="flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-[#087E79]" />
-                <h3 className="font-bold text-sm text-slate-900">
-                  Kelola & Pilih Variabel Pengukuran
-                </h3>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-5xl border border-slate-200 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-indigo-100 text-indigo-600 shrink-0">
+                  <Settings2 className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900">
+                    Kelola &amp; Pilih Variabel Pengukuran
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Kategori artikel: <strong className="text-slate-700">{article.category}</strong> ·
+                    {' '}{currentChart.length} variabel aktif · {bakedCellCount} sel baku internal
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setShowManageModal(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="overflow-y-auto space-y-4 flex-1 pr-1">
+              {/* Terapkan Template Kategori — sengaja ditaruh di dalam modal,
+                  bukan di panel luar, karena aksinya menimpa angka rekomendasi. */}
+              <div className="space-y-2.5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-extrabold text-amber-950 block">
+                      Terapkan Template Variabel Kategori
+                    </span>
+                    <p className="text-[10px] text-amber-900/80 mt-0.5 leading-relaxed">
+                      Template mengisi daftar variabel beserta <strong>angka rekomendasi</strong> sebagai
+                      titik awal. Angka yang sudah Anda bakukan tetap dipertahankan, dan
+                      kategori artikel tidak ikut berubah — ubah kategori lewat “Edit Data Artikel”.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { cat: 'T-Shirt / Shirt', icon: '👕', label: 'Kaos & Kemeja' },
+                    { cat: 'Jacket / Hoodie', icon: '🧥', label: 'Jaket & Outer' },
+                    { cat: 'Pants / Shorts', icon: '👖', label: 'Celana' },
+                    { cat: 'Skirt / Dress', icon: '👗', label: 'Dress & Rok' },
+                    { cat: 'Hat / Cap', icon: '🧢', label: 'Topi & Cap' },
+                    { cat: 'Bag / Backpack', icon: '🎒', label: 'Tas & Backpack' },
+                    { cat: 'Accessory / Custom', icon: '✂️', label: 'Custom / Aksesori' },
+                  ].map((item) => {
+                    const isCurrent = article.category === item.cat;
+                    return (
+                      <button
+                        key={item.cat}
+                        type="button"
+                        onClick={() => {
+                          const ok = window.confirm(
+                            `Terapkan template "${item.label}"?\n\n`
+                            + `Variabel akan disusun ulang mengikuti template dan angka yang belum `
+                            + `dibakukan diganti angka rekomendasi.\n`
+                            + `${bakedCellCount} sel baku internal Anda tetap dipertahankan.`,
+                          );
+                          if (ok) applyCategoryTemplate(item.cat as CategoryType);
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 border ${
+                          isCurrent
+                            ? 'bg-white border-amber-400 text-amber-900 ring-1 ring-amber-300'
+                            : 'bg-white/70 border-amber-200 text-amber-900/80 hover:bg-white'
+                        }`}
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                        {isCurrent && (
+                          <span className="text-[8px] bg-amber-200 text-amber-900 px-1 py-0.2 rounded font-mono uppercase">
+                            Kategori ini
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Active Variables List */}
               <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <span className="text-[11px] font-extrabold text-slate-700 block">
@@ -934,7 +1071,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                 }
 
                 return (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
                     {targetList.map((field) => renderFieldCard(field))}
                   </div>
                 );

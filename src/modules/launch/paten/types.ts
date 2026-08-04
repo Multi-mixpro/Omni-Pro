@@ -198,6 +198,15 @@ export interface SizeChartRow {
   tolerance: number;
   targetValues: Record<string, number>; // sizeCode -> cm value (e.g. { 'S': 68, 'M': 70, 'L': 72 })
   sampleActualValues?: Record<string, number>; // sizeCode -> actual cm
+  /**
+   * Ukuran yang angkanya sudah dibakukan tim (hasil internal), bukan lagi angka
+   * rekomendasi otomatis dari template kategori.
+   *
+   * Dipakai untuk membedakan dua hal yang sebelumnya tercampur: angka bawaan
+   * template hanyalah titik awal, sedangkan angka baku adalah keputusan produksi
+   * yang tidak boleh tertimpa diam-diam saat template kategori diterapkan ulang.
+   */
+  bakedSizes?: string[];
 }
 
 export interface Colorway {

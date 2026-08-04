@@ -18,6 +18,7 @@ import {
   Rocket,
   Wallet,
   Coins,
+  ExternalLink,
 } from 'lucide-react';
 import { Article } from '../../../types';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
@@ -27,6 +28,15 @@ import { formatIDR } from '../../../utils/calculations';
 interface BriefPanelProps {
   article: Article;
   onUpdateArticle: (updated: Article) => void;
+}
+
+/** Nama domain sumber, supaya asal referensi terbaca tanpa URL panjang. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
 
 export const BriefPanel: React.FC<BriefPanelProps> = ({ article, onUpdateArticle }) => {
@@ -268,15 +278,23 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ article, onUpdateArticle
                     <span className="font-bold text-slate-900 truncate">{ref.title}</span>
                   </div>
                   {ref.url && (
-                    <a
-                      href={ref.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-violet-700 hover:underline flex items-center gap-1 font-medium min-w-0"
-                    >
-                      <LinkIcon className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{ref.url}</span>
-                    </a>
+                    <>
+                      <p className="text-[10px] text-slate-400 font-mono truncate" title={ref.url}>
+                        {hostOf(ref.url)}
+                      </p>
+                      {/* Tombol eksplisit: sebelumnya sumber hanya berupa teks URL
+                          kecil yang tidak terlihat seperti sesuatu yang bisa dibuka. */}
+                      <a
+                        href={ref.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        title={`Buka sumber referensi: ${ref.url}`}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-700 transition-colors shadow-2xs"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Buka Sumber</span>
+                      </a>
+                    </>
                   )}
                   {ref.note && <p className="text-[11px] text-slate-500 italic">{ref.note}</p>}
                 </div>

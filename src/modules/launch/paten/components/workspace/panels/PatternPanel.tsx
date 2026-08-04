@@ -21,6 +21,13 @@ export const PatternPanel: React.FC<PatternPanelProps> = ({ article, onUpdateArt
   const [patternNotes, setPatternNotes] = useState(stored?.notes || '');
   const [saved, setSaved] = useState(false);
 
+  /** Apa yang masih menghalangi penyimpanan — ditampilkan, bukan disembunyikan. */
+  const missingFields = [
+    !patternMaker.trim() && 'nama pattern maker',
+    markerEfficiency <= 0 && 'efisiensi marker',
+    estimatedConsumption <= 0 && 'konsumsi per produk',
+  ].filter(Boolean) as string[];
+
   const handleSave = () => {
     onUpdateArticle({
       ...article,
@@ -70,10 +77,18 @@ export const PatternPanel: React.FC<PatternPanelProps> = ({ article, onUpdateArt
         <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1 shadow-2xs">
           <span className="flex items-center gap-1 text-[11px] text-slate-500"><Gauge className="h-3 w-3" /> Efisiensi Marker</span>
           <div className="flex items-center gap-2 font-mono font-bold text-sm text-[#087E79]">
+            {/* Dibatasi 0-100: efisiensi marker adalah persentase, dan nilai di
+                luar rentang akan menyesatkan perhitungan konsumsi kain. */}
             <input
               type="number"
+              min={0}
+              max={100}
+              step="0.1"
               value={markerEfficiency}
-              onChange={(e) => setMarkerEfficiency(parseFloat(e.target.value) || 0)}
+              onChange={(e) => {
+                const next = parseFloat(e.target.value) || 0;
+                setMarkerEfficiency(Math.min(100, Math.max(0, next)));
+              }}
               className="w-20 bg-transparent border-b border-slate-200 text-slate-900 focus:outline-none text-right focus:border-[#087E79]"
             />
             <span>%</span>
@@ -116,15 +131,25 @@ export const PatternPanel: React.FC<PatternPanelProps> = ({ article, onUpdateArt
         />
       </div>
 
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
-        <p className="text-[11px] text-slate-500">
-          {stored?.updatedAt ? `Terakhir disimpan ${new Date(stored.updatedAt).toLocaleString('id-ID')}` : 'Belum ada spesifikasi pola tersimpan.'}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="min-w-0">
+          <p className="text-[11px] text-slate-500">
+            {stored?.updatedAt ? `Terakhir disimpan ${new Date(stored.updatedAt).toLocaleString('id-ID')}` : 'Belum ada spesifikasi pola tersimpan.'}
+          </p>
+          {/* Sebelumnya tombol simpan mati tanpa keterangan, sehingga tidak
+              terlihat apa yang masih kurang. */}
+          {missingFields.length > 0 && (
+            <p className="text-[11px] font-bold text-amber-700 mt-0.5">
+              Lengkapi dulu: {missingFields.join(', ')}.
+            </p>
+          )}
+        </div>
         <button
           type="button"
           onClick={handleSave}
-          disabled={!patternMaker.trim() || markerEfficiency <= 0 || estimatedConsumption <= 0}
-          className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-4 py-2 text-[11px] font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={missingFields.length > 0}
+          title={missingFields.length > 0 ? `Lengkapi dulu: ${missingFields.join(', ')}` : 'Simpan spesifikasi pola'}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-950 px-4 py-2 text-[11px] font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 shrink-0"
         >
           <Save className="h-3.5 w-3.5" />
           {saved ? 'Tersimpan' : 'Simpan Pola'}

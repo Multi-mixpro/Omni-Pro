@@ -13,10 +13,10 @@ import {
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
-import { Article, ApprovalGate, DecisionRequest, BlockerItem, BusinessUnit } from '../../types';
+import { Article, ApprovalGate, DecisionRequest, BlockerItem, BusinessUnit, ArticleStage } from '../../types';
 import { isAllBusinessUnits } from '../../services/businessUnits';
 import { formatIDR } from '../../utils/calculations';
-import { stageBadgeClass } from '../../utils/stageStyles';
+import { stageBadgeClass, stageDotClass } from '../../utils/stageStyles';
 import { optimizedImageUrl } from '../../utils/cloudinary';
 
 interface DashboardViewProps {
@@ -60,6 +60,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const hppAboveTargetCount = filteredArticles.filter(
     (a) => a.calculatedHPP > a.targetHPP && a.targetHPP > 0
   ).length;
+
+  // --- Konteks tambahan agar KPI terbaca sebagai ukuran, bukan sekadar angka ---
+  const totalArticles = filteredArticles.length;
+  const pct = (n: number) => (totalArticles > 0 ? Math.round((n / totalArticles) * 100) : 0);
+
+  /** Rata-rata kelengkapan data seluruh artikel pada unit aktif. */
+  const avgCompleteness = totalArticles > 0
+    ? Math.round(
+        filteredArticles.reduce((sum, a) => sum + (a.dataCompletenessPercent || 0), 0) / totalArticles,
+      )
+    : 0;
+
+  /** Tenggat rilis yang jatuh dalam 30 hari ke depan, terdekat lebih dulu. */
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcomingDeadlines = filteredArticles
+    .map((a) => {
+      if (!a.targetReleaseDate) return null;
+      const due = new Date(a.targetReleaseDate);
+      if (Number.isNaN(due.getTime())) return null;
+      const days = Math.ceil((due.getTime() - today.getTime()) / 86_400_000);
+      return { article: a, days };
+    })
+    .filter((entry): entry is { article: Article; days: number } => entry !== null)
+    .sort((a, b) => a.days - b.days);
+
+  const dueSoonCount = upcomingDeadlines.filter((d) => d.days >= 0 && d.days <= 30).length;
+  const overdueCount = upcomingDeadlines.filter((d) => d.days < 0).length;
+
+  /** Sebaran artikel per tahap, untuk melihat di mana pipeline menumpuk. */
+  const STAGE_ORDER: ArticleStage[] = [
+    'Prospect', 'Specification', 'Source & Pattern', 'Sampling',
+    'Costing', 'Production Plan', 'Production', 'Launch',
+  ];
+  const stageDistribution = STAGE_ORDER.map((stage) => ({
+    stage,
+    count: filteredArticles.filter((a) => a.stage === stage).length,
+  })).filter((entry) => entry.count > 0);
 
   const safeApprovals = pendingApprovals || [];
   const safeBlockers = blockers || [];
@@ -186,8 +224,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-2xl font-black text-sky-950">{activeCount}</span>
             <span className="text-[11px] text-sky-700/60 font-medium">/ {filteredArticles.length} total</span>
           </div>
-          <p className="text-[10px] text-sky-700 font-bold mt-0.5">
-            {prospectCount} prospek baru
+          <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/70 overflow-hidden">
+            <div className="h-full rounded-full bg-sky-600" style={{ width: `${pct(activeCount)}%` }} />
+          </div>
+          <p className="text-[10px] text-sky-700 font-bold mt-1">
+            {pct(activeCount)}% aktif · {prospectCount} prospek baru
           </p>
         </div>
 
@@ -206,8 +247,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-2xl font-black text-amber-800">{atRiskCount}</span>
             <span className="text-[11px] text-amber-700/60 font-medium">artikel</span>
           </div>
-          <p className="text-[10px] text-rose-600 font-bold mt-0.5">
-            {blockers.length} blocker kritis
+          <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/70 overflow-hidden">
+            <div className="h-full rounded-full bg-amber-500" style={{ width: `${pct(atRiskCount)}%` }} />
+          </div>
+          <p className="text-[10px] font-bold mt-1 text-rose-600">
+            {safeBlockers.length} blocker · {overdueCount} lewat tenggat
           </p>
         </div>
 
@@ -226,8 +270,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-2xl font-black text-emerald-800">{readyProdCount}</span>
             <span className="text-[11px] text-emerald-700/60 font-medium">artikel</span>
           </div>
-          <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
-            Readiness Gate lulus
+          <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/70 overflow-hidden">
+            <div className="h-full rounded-full bg-emerald-600" style={{ width: `${pct(readyProdCount)}%` }} />
+          </div>
+          <p className="text-[10px] text-emerald-700 font-bold mt-1">
+            Readiness Gate lulus · rata-rata data {avgCompleteness}%
           </p>
         </div>
 
@@ -249,6 +296,84 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Sebaran tahap & tenggat — memperlihatkan di mana pipeline menumpuk dan
+          apa yang jatuh tempo, bukan hanya jumlah total. */}
+      {totalArticles > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          {/* Distribusi tahap */}
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+            <div className="flex items-center justify-between mb-2.5">
+              <h2 className="font-extrabold text-xs text-slate-900">Sebaran Tahap Pipeline</h2>
+              <span className="text-[10px] font-mono text-slate-400">{totalArticles} artikel</span>
+            </div>
+
+            {/* Bar proporsi bertingkat */}
+            <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-slate-100">
+              {stageDistribution.map((entry) => (
+                <div
+                  key={entry.stage}
+                  className={stageDotClass(entry.stage)}
+                  style={{ width: `${pct(entry.count)}%` }}
+                  title={`${entry.stage}: ${entry.count} artikel`}
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2.5">
+              {stageDistribution.map((entry) => (
+                <button
+                  key={entry.stage}
+                  onClick={() => onSelectTab('pipeline')}
+                  className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-slate-900 transition-colors"
+                >
+                  <span className={`w-2 h-2 rounded-full ${stageDotClass(entry.stage)}`} />
+                  <span>{entry.stage}</span>
+                  <span className="font-mono text-slate-400">{entry.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tenggat terdekat */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-extrabold text-xs text-slate-900">Tenggat Terdekat</h2>
+              <span className="text-[10px] font-mono text-slate-400">{dueSoonCount} dalam 30 hari</span>
+            </div>
+
+            {upcomingDeadlines.length === 0 ? (
+              <p className="text-[11px] text-slate-400 italic py-2">Belum ada target rilis terjadwal.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {upcomingDeadlines.slice(0, 4).map(({ article: art, days }) => (
+                  <button
+                    key={art.id}
+                    onClick={() => onOpenArticle(art.id, 'workspace')}
+                    className="w-full flex items-center justify-between gap-2 p-2 rounded-xl border border-slate-100 bg-slate-50/60 hover:border-[#087E79] transition-colors text-left"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-mono font-bold text-[#087E79] truncate">{art.code}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{art.targetReleaseDate}</div>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold shrink-0 ${
+                        days < 0
+                          ? 'bg-rose-100 text-rose-700'
+                          : days <= 7
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {days < 0 ? `${Math.abs(days)} hr lewat` : days === 0 ? 'Hari ini' : `${days} hr lagi`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Article Pipeline Overview Grid */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-2xs">

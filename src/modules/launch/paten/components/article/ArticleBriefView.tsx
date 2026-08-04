@@ -31,6 +31,15 @@ interface ArticleBriefViewProps {
   onUpdateArticle: (updated: Article) => void;
 }
 
+/** Nama domain sumber, supaya asal referensi terbaca tanpa URL panjang. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
 export const ArticleBriefView: React.FC<ArticleBriefViewProps> = ({
   article,
   onUpdateArticle,
@@ -306,8 +315,8 @@ export const ArticleBriefView: React.FC<ArticleBriefViewProps> = ({
                       href={ref.url}
                       target="_blank"
                       rel="noreferrer noopener"
-                      title={ref.url}
-                      className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200 hover:border-violet-400 transition-colors shadow-2xs"
+                      title={`Buka sumber referensi: ${ref.url}`}
+                      className="group flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200 hover:border-violet-400 hover:bg-violet-50/40 transition-colors shadow-2xs"
                     >
                       <span className="w-8 h-8 rounded-lg bg-violet-50 border border-violet-100 grid place-items-center shrink-0">
                         <LinkIcon className="w-3.5 h-3.5 text-violet-500" />
@@ -316,11 +325,15 @@ export const ArticleBriefView: React.FC<ArticleBriefViewProps> = ({
                         <span className="block font-bold text-xs text-slate-900 truncate">
                           {ref.title}
                         </span>
-                        <span className="block text-[10px] text-violet-700 truncate">
-                          {ref.url}
+                        <span className="block text-[10px] text-slate-400 font-mono truncate">
+                          {hostOf(ref.url || '')}
                         </span>
                       </span>
-                      <ExternalLink className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                      {/* Penanda aksi yang jelas — kartu ini memang bisa dibuka. */}
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-600 text-white text-[10px] font-bold shrink-0 group-hover:bg-violet-700 transition-colors">
+                        <ExternalLink className="w-3 h-3" />
+                        <span className="hidden sm:inline">Buka</span>
+                      </span>
                     </a>
                   ))}
                 </div>
