@@ -218,6 +218,18 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     });
   }, [editArticle, OBSOLETE_DUMMY_COLOR_NAMES]);
 
+  // Custom Hex Overrides map (colorName -> customHex)
+  const [customHexOverrides, setCustomHexOverrides] = useState<Record<string, string>>({});
+
+  const handleUpdateColorHex = (colorName: string, newHex: string) => {
+    setCustomHexOverrides((prev) => ({ ...prev, [colorName]: newHex }));
+
+    // Also update selectedColorways if this colorway is currently selected
+    setSelectedColorways((prev) =>
+      prev.map((c) => (c.name === colorName ? { ...c, hex: newHex } : c))
+    );
+  };
+
   // Material Filter & Color Search State in Step 3
   const [selectedMaterialFilter, setSelectedMaterialFilter] = useState<string>('ALL');
   const [colorSearchQuery, setColorSearchQuery] = useState<string>('');
@@ -243,10 +255,11 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
           mat.availableColors.forEach((colName: string, idx: number) => {
             const key = `${mat.name.trim().toLowerCase()}:::${colName.trim().toLowerCase()}`;
             if (!map.has(key)) {
+              const hex = customHexOverrides[colName.trim()] || getColorHexFromName(colName);
               map.set(key, {
                 name: colName.trim(),
                 code: `${mat.code ? mat.code.slice(-3) : 'MAT'}-${(idx + 1).toString().padStart(2, '0')}`,
-                hex: getColorHexFromName(colName),
+                hex,
                 material: mat.name.trim(),
               });
             }
@@ -258,11 +271,12 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     // 2. Add custom created colors during current session
     customMaterialColors.forEach((col) => {
       const key = `${col.material.trim().toLowerCase()}:::${col.name.trim().toLowerCase()}`;
-      map.set(key, { ...col });
+      const hex = customHexOverrides[col.name.trim()] || col.hex;
+      map.set(key, { ...col, hex });
     });
 
     return Array.from(map.values());
-  }, [materials, customMaterialColors]);
+  }, [materials, customMaterialColors, customHexOverrides]);
 
   // List of unique Material names available in the catalog for filtering
   const availableMaterialNames = useMemo<string[]>(() => {
@@ -1307,10 +1321,25 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                         key={col.id}
                         className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-2xs animate-fadeIn"
                       >
-                        <span
-                          className="w-3.5 h-3.5 rounded-full border border-white/40 shrink-0"
-                          style={{ backgroundColor: col.hex }}
-                        />
+                        {/* Swatch Circle with Custom Color Picker */}
+                        <div
+                          className="relative flex items-center justify-center shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Klik untuk ubah warna HEX custom"
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-white/50 block shadow-2xs cursor-pointer"
+                            style={{ backgroundColor: col.hex }}
+                          />
+                          <input
+                            type="color"
+                            value={col.hex}
+                            onChange={(e) => handleUpdateColorHex(col.name, e.target.value)}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            title="Klik untuk ubah warna HEX custom"
+                          />
+                        </div>
+
                         <span>{col.name}</span>
                         <span className="font-mono text-[9px] text-slate-400">({col.code})</span>
                         {col.materialSource && (
@@ -1341,7 +1370,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                     </span>
                   </div>
 
-                  {/* Controls Row: Material Dropdown Select + Live Search Input */}
+                  {/* Controls Row: Material Dropdown Select + Live Material Search Input */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                     {/* Material Select Dropdown ke Bawah (6 columns) */}
                     <div className="sm:col-span-6 relative">
@@ -1367,14 +1396,14 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Live Search Input Box (6 columns) */}
+                    {/* Live Material Search Input Box (6 columns) */}
                     <div className="sm:col-span-6 relative">
                       <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
                         value={colorSearchQuery}
                         onChange={(e) => setColorSearchQuery(e.target.value)}
-                        placeholder="Cari varian warna / kode (misal: Black, COL-01)..."
+                        placeholder="Cari data material / bahan baku (misal: WP COLUMBIA)..."
                         className="w-full pl-8 pr-8 py-2 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#087E79] focus:outline-none shadow-2xs"
                       />
                       {colorSearchQuery && (
@@ -1393,7 +1422,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                   {filteredCatalogColors.length === 0 ? (
                     <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-300">
                       <p className="text-xs font-semibold text-slate-500">
-                        Tidak ada varian warna yang cocok dengan pencarian / filter Anda.
+                        Tidak ada varian warna atau bahan baku yang cocok dengan pencarian Anda.
                       </p>
                       <button
                         type="button"
@@ -1411,9 +1440,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                       {filteredCatalogColors.map((rawColor: { name: string; code: string; hex: string; material: string }) => {
                         const isSelected = selectedColorways.some((c) => c.name === rawColor.name);
                         return (
-                          <button
+                          <div
                             key={`${rawColor.material}-${rawColor.code}`}
-                            type="button"
                             onClick={() => handleToggleColorway(rawColor)}
                             className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                               isSelected
@@ -1422,10 +1450,28 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                             }`}
                           >
                             <div className="flex items-center gap-2.5">
-                              <span
-                                className="w-4.5 h-4.5 rounded-full border border-slate-300 shrink-0 shadow-2xs"
-                                style={{ backgroundColor: rawColor.hex }}
-                              />
+                              {/* Swatch Circle with Interactive Custom Hex Color Picker */}
+                              <div
+                                className="relative flex items-center justify-center shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                                title="Klik lingkaran warna untuk ubah warna HEX custom"
+                              >
+                                <span
+                                  className="w-5 h-5 rounded-full border border-slate-300 shrink-0 shadow-2xs block cursor-pointer transition-transform hover:scale-110"
+                                  style={{ backgroundColor: rawColor.hex }}
+                                />
+                                <input
+                                  type="color"
+                                  value={rawColor.hex}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleUpdateColorHex(rawColor.name, e.target.value);
+                                  }}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  title="Klik lingkaran warna untuk ubah warna HEX custom"
+                                />
+                              </div>
+
                               <div>
                                 <div className="text-xs font-bold leading-tight">{rawColor.name}</div>
                                 <div className="text-[10px] text-emerald-700 font-extrabold flex items-center gap-1 mt-0.5">
@@ -1440,7 +1486,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                               </span>
                               {isSelected && <Check className="w-4 h-4 text-[#087E79]" />}
                             </div>
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
