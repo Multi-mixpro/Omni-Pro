@@ -178,17 +178,38 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     editArticle?.sizeSet?.length ? [...editArticle.sizeSet] : [...ALL_SIZES],
   );
 
-  // Selected Color Variants from Registered Materials
+  // Known obsolete dummy preset color names to filter out
+  const OBSOLETE_DUMMY_COLOR_NAMES = useMemo(
+    () => [
+      'obsidian black',
+      'midnight navy',
+      'off-white natural',
+      'sage green',
+      'steel grey',
+      'terracotta rust',
+      'dark charcoal',
+      'olive army',
+      'muted beige / khaki',
+      'burgundy crimson',
+    ],
+    [],
+  );
+
+  // Selected Color Variants from Registered Materials (Auto-filtered against obsolete dummy presets)
   const [selectedColorways, setSelectedColorways] = useState<
     Array<{ id: string; code: string; name: string; hex: string; materialSource?: string }>
   >(() => {
     if (editArticle?.colorways?.length) {
-      return editArticle.colorways.map((col) => ({
-        id: col.id,
-        code: col.code,
-        name: col.name,
-        hex: col.hex,
-      }));
+      const validSelected = editArticle.colorways
+        .filter((col) => !OBSOLETE_DUMMY_COLOR_NAMES.includes(col.name.trim().toLowerCase()))
+        .map((col) => ({
+          id: col.id,
+          code: col.code,
+          name: col.name,
+          hex: col.hex,
+        }));
+
+      if (validSelected.length > 0) return validSelected;
     }
     return [
       {
@@ -200,6 +221,25 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       },
     ];
   });
+
+  // Auto-purge any obsolete dummy colorways when modal is opened or editArticle changes
+  useEffect(() => {
+    setSelectedColorways((prev) => {
+      const cleaned = prev.filter((col) => !OBSOLETE_DUMMY_COLOR_NAMES.includes(col.name.trim().toLowerCase()));
+      if (cleaned.length === 0) {
+        return [
+          {
+            id: 'col-1',
+            code: DEFAULT_WP_COLUMBIA_COLORS[0].code,
+            name: DEFAULT_WP_COLUMBIA_COLORS[0].name,
+            hex: DEFAULT_WP_COLUMBIA_COLORS[0].hex,
+            materialSource: DEFAULT_WP_COLUMBIA_COLORS[0].material,
+          },
+        ];
+      }
+      return cleaned;
+    });
+  }, [editArticle, OBSOLETE_DUMMY_COLOR_NAMES]);
 
   // Material Filter & Custom Color State in Step 3
   const [selectedMaterialFilter, setSelectedMaterialFilter] = useState<string>('ALL');

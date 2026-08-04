@@ -383,9 +383,9 @@ export const INITIAL_ARTICLES: Article[] = [
       },
     ],
     colorways: [
-      { id: 'col-1', code: 'BLK', name: 'Obsidian Black', hex: '#121212', isSampleColor: true },
-      { id: 'col-2', code: 'OLV', name: 'Tactical Olive', hex: '#3B4135', isSampleColor: false },
-      { id: 'col-3', code: 'GRY', name: 'Concrete Gray', hex: '#63666A', isSampleColor: false },
+      { id: 'col-1', code: 'COL-01', name: 'Black Solid WP', hex: '#121212', isSampleColor: true },
+      { id: 'col-2', code: 'COL-02', name: 'Navy Deep WP', hex: '#1B2A4A', isSampleColor: false },
+      { id: 'col-3', code: 'COL-03', name: 'Olive Army WP', hex: '#4B5320', isSampleColor: false },
     ],
     sizeSet: ['S', 'M', 'L', 'XL', 'XXL'],
     baseSize: 'M',
@@ -402,7 +402,7 @@ export const INITIAL_ARTICLES: Article[] = [
         dateReceived: '2026-07-20',
         workshopName: 'Studio Pola & CMT Bandung',
         targetSize: 'M',
-        colorwayName: 'Obsidian Black',
+        colorwayName: 'Black Solid WP',
         status: 'Approved with Revision',
         measurementActuals: [],
         findings: [
