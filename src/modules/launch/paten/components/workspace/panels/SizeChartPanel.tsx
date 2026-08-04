@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   Settings2,
   Sparkles,
+  Search,
 } from 'lucide-react';
 import { Article, SizeChartRow, MeasurementField, CategoryType } from '../../../types';
 import {
@@ -63,6 +64,8 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
   const [mobileMode, setMobileMode] = useState<'by_size' | 'full_matrix'>('by_size');
   const [viewMode, setViewMode] = useState<'target' | 'actual' | 'dual'>('target');
   const [showManageModal, setShowManageModal] = useState(false);
+  const [modalCategoryFilter, setModalCategoryFilter] = useState<string>('RECOMMENDED');
+  const [modalSearchQuery, setModalSearchQuery] = useState<string>('');
   const [customFieldName, setCustomFieldName] = useState('');
   const [customTolerance, setCustomTolerance] = useState(1.0);
 
@@ -746,23 +749,24 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
 
             <div className="overflow-y-auto space-y-4 flex-1 pr-1">
               {/* Active Variables List */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-bold text-slate-500 block uppercase">
-                  Variabel Aktif saat ini ({currentChart.length})
+              <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[11px] font-extrabold text-slate-700 block">
+                  Variabel Aktif Saat Ini ({currentChart.length}):
                 </span>
                 {currentChart.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {currentChart.map((row) => (
                       <span
                         key={row.fieldId}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-800 shadow-2xs"
                       >
                         <span>{row.fieldName}</span>
-                        <span className="text-[10px] text-slate-400">±{row.tolerance}cm</span>
+                        <span className="text-[10px] text-slate-400 font-mono">±{row.tolerance}cm</span>
                         <button
+                          type="button"
                           onClick={() => handleRemoveRow(row.fieldId)}
-                          className="text-slate-400 hover:text-rose-600 transition-colors"
-                          title="Hapus variabel"
+                          className="text-slate-400 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                          title="Keluarkankan / Hapus variabel"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -774,48 +778,132 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                 )}
               </div>
 
-              {/* Auto-detected recommendations for THIS article's category */}
+              {/* Category Filter Tabs & Search Bar inside Modal */}
+              <div className="space-y-2.5 pt-1">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="text-[11px] font-extrabold text-slate-800 block">
+                    Pilih Variabel Berdasarkan Kategori Garment:
+                  </span>
+
+                  {/* Search Input Box */}
+                  <div className="relative w-full sm:w-56">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={modalSearchQuery}
+                      onChange={(e) => setModalSearchQuery(e.target.value)}
+                      placeholder="Cari variabel (misal: Dada)..."
+                      className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#087E79] focus:outline-none shadow-2xs"
+                    />
+                    {modalSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setModalSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category Pills inside Modal */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  {[
+                    { id: 'RECOMMENDED', label: `✨ Rekomendasi (${article.category})` },
+                    { id: 'T-Shirt / Shirt', label: '👕 Kaos & Kemeja' },
+                    { id: 'Jacket / Hoodie', label: '🧥 Jaket & Outer' },
+                    { id: 'Pants / Shorts', label: '👖 Celana' },
+                    { id: 'Skirt / Dress', label: '👗 Dress & Rok' },
+                    { id: 'Hat / Cap', label: '🧢 Topi & Cap' },
+                    { id: 'Bag / Backpack', label: '🎒 Tas & Backpack' },
+                    { id: 'Accessory / Custom', label: '✂️ Custom' },
+                    { id: 'ALL', label: '🌐 Semua Variabel' },
+                  ].map((tab) => {
+                    const isSelected = modalCategoryFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setModalCategoryFilter(tab.id)}
+                        className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#087E79] text-white shadow-2xs'
+                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Filtered Variable Cards Grid Grouped Cleanly */}
               {(() => {
-                const renderField = (field: MeasurementField, highlight: boolean) => {
+                let targetList: MeasurementField[] = [];
+
+                if (modalCategoryFilter === 'RECOMMENDED') {
+                  targetList = categoryFields;
+                } else if (modalCategoryFilter === 'ALL') {
+                  targetList = MEASUREMENT_FIELDS;
+                } else {
+                  targetList = MEASUREMENT_FIELDS.filter((f) => f.category === modalCategoryFilter);
+                }
+
+                if (modalSearchQuery.trim()) {
+                  const q = modalSearchQuery.toLowerCase().trim();
+                  targetList = targetList.filter(
+                    (f) =>
+                      f.labelId.toLowerCase().includes(q) ||
+                      f.aliasEn.toLowerCase().includes(q) ||
+                      f.code.toLowerCase().includes(q) ||
+                      f.category.toLowerCase().includes(q)
+                  );
+                }
+
+                const renderFieldCard = (field: MeasurementField) => {
                   const isAdded = activeFieldIds.has(field.id) || activeFieldNames.has(field.labelId);
                   return (
                     <div
                       key={field.id}
                       className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
                         isAdded
-                          ? 'bg-emerald-50/50 border-emerald-200 text-slate-600'
-                          : highlight
-                          ? 'bg-white border-indigo-200 hover:border-indigo-400'
-                          : 'bg-white border-slate-200 hover:border-[#087E79]'
+                          ? 'bg-emerald-50/70 border-emerald-300 text-slate-700 shadow-2xs font-semibold'
+                          : 'bg-white border-slate-200 hover:border-[#087E79] text-slate-800'
                       }`}
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-xs text-slate-900">{field.labelId}</span>
+                          <span className="font-bold text-xs text-slate-900 leading-tight">{field.labelId}</span>
                           <span
-                            className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                            className={`px-1.5 py-0.2 rounded-full text-[9px] font-extrabold ${
                               field.importance === 'Required'
-                                ? 'bg-rose-100 text-rose-700'
+                                ? 'bg-rose-100 text-rose-700 border border-rose-200'
                                 : field.importance === 'Recommended'
-                                ? 'bg-amber-100 text-amber-700'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
                                 : 'bg-slate-100 text-slate-600'
                             }`}
                           >
                             {field.importance}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-400 block truncate" title={field.measurementMethod}>
-                          ±{field.defaultTolerance} cm • {field.measurementMethod}
+                        <div className="text-[10px] text-slate-400 block truncate mt-0.5" title={field.measurementMethod}>
+                          <span className="font-mono text-emerald-700 font-bold">±{field.defaultTolerance}cm</span> • {field.measurementMethod}
+                        </div>
+                        <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                          Kategori: <strong>{field.category}</strong>
                         </span>
                       </div>
                       {isAdded ? (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0">
-                          Aktif
+                        <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0 border border-emerald-200">
+                          ✓ Aktif
                         </span>
                       ) : (
                         <button
+                          type="button"
                           onClick={() => handleAddPresetField(field)}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#087E79] text-white text-[11px] font-bold hover:bg-[#066864] transition-colors shrink-0 shadow-2xs"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#087E79] text-white text-[11px] font-bold hover:bg-[#066864] transition-colors shrink-0 shadow-2xs cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
                           <span>Tambah</span>
@@ -825,73 +913,63 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                   );
                 };
 
-                return (
-                  <>
-                    <div className="space-y-2 pt-2 border-t border-slate-100">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase">
-                          Rekomendasi untuk kategori
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-extrabold">
-                          {article.category}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {categoryFields.length} variabel terdeteksi otomatis
-                        </span>
-                      </div>
-                      {categoryFields.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {categoryFields.map((field) => renderField(field, true))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-400 italic">
-                          Belum ada variabel referensi untuk kategori ini.
-                        </p>
-                      )}
+                if (targetList.length === 0) {
+                  return (
+                    <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                      <p className="text-xs font-semibold text-slate-500">
+                        Tidak ada variabel pengukuran yang cocok dengan pencarian / tab filter Anda.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModalCategoryFilter('ALL');
+                          setModalSearchQuery('');
+                        }}
+                        className="mt-2 text-xs font-extrabold text-[#087E79] underline hover:text-[#066864]"
+                      >
+                        Tampilkan Semua Variabel
+                      </button>
                     </div>
+                  );
+                }
 
-                    <details className="pt-2 border-t border-slate-100">
-                      <summary className="text-[11px] font-bold text-slate-500 uppercase cursor-pointer hover:text-slate-700">
-                        Variabel dari kategori lain ({otherCategoryFields.length})
-                      </summary>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                        {otherCategoryFields.map((field) => renderField(field, false))}
-                      </div>
-                    </details>
-                  </>
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {targetList.map((field) => renderFieldCard(field))}
+                  </div>
                 );
               })()}
 
               {/* Add Custom Field Form */}
-              <form onSubmit={handleAddCustomField} className="pt-2 border-t border-slate-100 space-y-2">
-                <span className="text-[11px] font-bold text-slate-500 block uppercase">
-                  Tambah Variabel Pengukuran Custom
+              <form onSubmit={handleAddCustomField} className="pt-3 border-t border-slate-200 space-y-2">
+                <span className="text-[11px] font-extrabold text-slate-800 block uppercase">
+                  ➕ Tambah Variabel Pengukuran Custom Baru:
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <input
                     type="text"
                     placeholder="Misal: Lebar Kelim Bawah / Tingkat Kerung Lengan"
                     value={customFieldName}
                     onChange={(e) => setCustomFieldName(e.target.value)}
-                    className="flex-1 p-2 rounded-lg border border-slate-200 text-xs text-slate-900 focus:border-[#087E79] focus:outline-none"
+                    className="flex-1 p-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:border-[#087E79] focus:outline-none shadow-2xs"
                   />
-                  <div className="w-24 shrink-0 flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
-                    <span className="text-[10px] text-slate-400">±</span>
+                  <div className="w-full sm:w-28 shrink-0 flex items-center gap-1 bg-slate-50 border border-slate-300 rounded-xl px-2 py-1.5">
+                    <span className="text-[10px] text-slate-400 font-bold">±</span>
                     <input
                       type="number"
                       step="0.1"
                       value={customTolerance}
                       onChange={(e) => setCustomTolerance(Number(e.target.value))}
-                      className="w-full text-xs font-bold text-center bg-transparent focus:outline-none"
+                      className="w-full text-xs font-bold text-center bg-transparent focus:outline-none text-slate-900"
                     />
-                    <span className="text-[10px] text-slate-400">cm</span>
+                    <span className="text-[10px] text-slate-400 font-bold">cm</span>
                   </div>
                   <button
                     type="submit"
                     disabled={!customFieldName.trim()}
-                    className="px-3 py-2 bg-[#087E79] text-white font-bold text-xs rounded-lg hover:bg-[#066864] disabled:opacity-50 transition-colors shrink-0 shadow-2xs"
+                    className="px-3.5 py-2 bg-[#087E79] text-white font-bold text-xs rounded-xl hover:bg-[#066864] disabled:opacity-50 transition-colors shrink-0 shadow-2xs cursor-pointer"
                   >
-                    Tambah
+                    + Tambah
                   </button>
                 </div>
               </form>
@@ -899,8 +977,9 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
 
             <div className="pt-2 border-t border-slate-100 flex justify-end shrink-0">
               <button
+                type="button"
                 onClick={() => setShowManageModal(false)}
-                className="px-4 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold text-xs rounded-lg transition-colors"
+                className="px-4 py-1.5 bg-[#087E79] text-white hover:bg-[#066864] font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-2xs"
               >
                 Selesai
               </button>

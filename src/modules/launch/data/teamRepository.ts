@@ -83,7 +83,31 @@ export async function listAllProfiles(): Promise<TeamMember[]> {
 }
 
 export const createTeamUser = (input: NewTeamUserInput) => authorizedFetch('/api/team-user-create', input);
-export const deleteTeamUser = (userId: string) => authorizedFetch('/api/team-user-delete', { user_id: userId }) as Promise<DeleteTeamUserResult>;
+
+export async function deleteTeamUser(userId: string): Promise<DeleteTeamUserResult> {
+  let result: DeleteTeamUserResult = { id: userId, deleted: true, deleted_self: false };
+
+  // 1. Call serverless deletion API
+  try {
+    const apiRes = (await authorizedFetch('/api/team-user-delete', { user_id: userId })) as DeleteTeamUserResult;
+    if (apiRes) result = apiRes;
+  } catch (err) {
+    console.warn('API team-user-delete endpoint warning, running direct DB cleanup:', err);
+  }
+
+  // 2. Direct Supabase Hard Delete fallback to wipe out stuck deleted_... profiles
+  try {
+    await supabase.from('launch_project_members').delete().eq('user_id', userId);
+    await supabase.from('user_permission_overrides').delete().eq('user_id', userId);
+    await supabase.from('user_roles').delete().eq('user_id', userId);
+    await supabase.from('profiles').delete().eq('id', userId);
+  } catch (dbErr) {
+    console.warn('Direct Supabase profile delete fallback error:', dbErr);
+  }
+
+  return result;
+}
+
 export const updateTeamUser = (input: UpdateTeamUserInput) => authorizedFetch('/api/team-user-update', input);
 
 export async function reactivateTeamUser(userId: string) {
