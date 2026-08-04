@@ -2,7 +2,7 @@
  * Product Launch OS 3.0 - Top Navigation Bar
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Bell,
@@ -51,10 +51,21 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  const storedUnits = loadStoredBusinessUnits();
+  const [buList, setBuList] = useState(() => loadStoredBusinessUnits());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setBuList(loadStoredBusinessUnits());
+    };
+    window.addEventListener('business-units-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('business-units-updated', handleUpdate);
+    };
+  }, []);
+
   const businessUnits: BusinessUnit[] = [
     'Semua Unit Bisnis',
-    ...Array.from(new Set(storedUnits.map((u) => u.name))),
+    ...Array.from(new Set(buList.map((u) => u.name))),
   ];
 
   return (

@@ -132,6 +132,7 @@ export function SettingsPage() {
 
     setBuList(updated);
     saveStoredBusinessUnits(updated);
+    window.dispatchEvent(new Event('business-units-updated'));
     setShowBuModal(false);
     setBuEditId(null);
     setBuName('');
@@ -163,6 +164,7 @@ export function SettingsPage() {
     const updated = buList.filter((b) => b.id !== id);
     setBuList(updated);
     saveStoredBusinessUnits(updated);
+    window.dispatchEvent(new Event('business-units-updated'));
   };
 
   const access = useQuery({
