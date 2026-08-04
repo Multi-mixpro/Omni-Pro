@@ -133,11 +133,24 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ article, onUpdateArticle
                   key={cw.id || cw.name}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 shadow-2xs"
                 >
-                  <span
-                    className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
-                    style={{ backgroundColor: cw.hex || '#000000' }}
-                  />
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border border-slate-300 block"
+                      style={{ backgroundColor: cw.hex || '#000000' }}
+                    />
+                    {cw.secondaryHex && (
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border border-slate-300 block -ml-1.5"
+                        style={{ backgroundColor: cw.secondaryHex }}
+                      />
+                    )}
+                  </div>
                   <span>{cw.name}</span>
+                  {cw.comboPartsNote && (
+                    <span className="text-[10px] text-slate-400 italic">
+                      ({cw.comboPartsNote})
+                    </span>
+                  )}
                   <span className="text-[10px] text-slate-400 font-mono">({cw.code})</span>
                   {cw.isSampleColor && (
                     <span className="text-[8px] bg-amber-100 text-amber-800 px-1 py-0.2 rounded font-extrabold">

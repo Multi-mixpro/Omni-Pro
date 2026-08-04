@@ -194,7 +194,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
 
   // Selected Color Variants from Registered Materials (Starts 100% CLEAN/EMPTY for new articles)
   const [selectedColorways, setSelectedColorways] = useState<
-    Array<{ id: string; code: string; name: string; hex: string; materialSource?: string }>
+    Array<{ id: string; code: string; name: string; hex: string; secondaryHex?: string; comboPartsNote?: string; materialSource?: string }>
   >(() => {
     if (editArticle?.colorways?.length) {
       const validSelected = editArticle.colorways
@@ -208,6 +208,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
           code: col.code,
           name: col.name,
           hex: col.hex,
+          secondaryHex: col.secondaryHex,
+          comboPartsNote: col.comboPartsNote,
         }));
 
       if (validSelected.length > 0) return validSelected;
@@ -242,7 +244,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [selectedMaterialFilter, setSelectedMaterialFilter] = useState<string>('ALL');
   const [colorSearchQuery, setColorSearchQuery] = useState<string>('');
   const [customMaterialColors, setCustomMaterialColors] = useState<
-    Array<{ name: string; code: string; hex: string; material: string }>
+    Array<{ name: string; code: string; hex: string; secondaryHex?: string; comboPartsNote?: string; material: string }>
   >([]);
 
   // Inline Custom Color Form State
@@ -251,10 +253,13 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [customColorCode, setCustomColorCode] = useState('');
   const [customColorHex, setCustomColorHex] = useState('#3B82F6');
   const [customColorMaterial, setCustomColorMaterial] = useState('WP COLUMBIA');
+  const [isCombination, setIsCombination] = useState(false);
+  const [customSecondaryHex, setCustomSecondaryHex] = useState('#E2E8F0');
+  const [customComboNotes, setCustomComboNotes] = useState('');
 
   // Combined Available Colorways Catalog derived EXCLUSIVELY from Master Data (`materials` prop) + Custom Created
-  const catalogMaterialColors = useMemo<{ name: string; code: string; hex: string; material: string }[]>(() => {
-    const map = new Map<string, { name: string; code: string; hex: string; material: string }>();
+  const catalogMaterialColors = useMemo<{ name: string; code: string; hex: string; secondaryHex?: string; comboPartsNote?: string; material: string }[]>(() => {
+    const map = new Map<string, { name: string; code: string; hex: string; secondaryHex?: string; comboPartsNote?: string; material: string }>();
 
     // 1. Extract colors directly from Master Materials prop (Database / Master Data Central)
     if (materials && materials.length > 0) {
@@ -293,8 +298,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     return Array.from(set);
   }, [catalogMaterialColors]);
 
-  // Filtered catalog based on selectedMaterialFilter AND colorSearchQuery
-  const filteredCatalogColors = useMemo<{ name: string; code: string; hex: string; material: string }[]>(() => {
+  const filteredCatalogColors = useMemo<{ name: string; code: string; hex: string; secondaryHex?: string; comboPartsNote?: string; material: string }[]>(() => {
     let list = catalogMaterialColors;
 
     if (selectedMaterialFilter !== 'ALL') {
@@ -326,6 +330,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       name: customColorName.trim(),
       code,
       hex: customColorHex,
+      secondaryHex: isCombination ? customSecondaryHex : undefined,
+      comboPartsNote: isCombination ? customComboNotes.trim() : undefined,
       material: customColorMaterial.trim() || 'Custom Fabric',
     };
     setCustomMaterialColors((prev) => [...prev, newColor]);
@@ -338,12 +344,16 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
         code,
         name: newColor.name,
         hex: newColor.hex,
+        secondaryHex: newColor.secondaryHex,
+        comboPartsNote: newColor.comboPartsNote,
         materialSource: newColor.material,
       },
     ]);
 
     setCustomColorName('');
     setCustomColorCode('');
+    setCustomComboNotes('');
+    setIsCombination(false);
     setIsAddCustomColorOpen(false);
     setNotice(`Varian warna '${newColor.name}' (${newColor.material}) berhasil ditambahkan!`);
   };
@@ -522,10 +532,14 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     const validLinks = referenceLinks.filter((link) => link.trim() !== '');
 
     const colorwayList = selectedColorways.map((col, idx) => ({
-      id: col.id || `col-${idx}`,
+      id: col.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(col.id)
+        ? col.id
+        : crypto.randomUUID(),
       code: col.code,
       name: col.name,
       hex: col.hex,
+      secondaryHex: col.secondaryHex,
+      comboPartsNote: col.comboPartsNote,
       isSampleColor: idx === 0,
     }));
     const sizeList = selectedSizes.length > 0 ? selectedSizes : ['S', 'M', 'L', 'XL'];
@@ -1267,12 +1281,25 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                   </button>
                 </div>
 
-                {/* Inline Form to Add Custom Colorway */}
-                {isAddCustomColorOpen && (
+                {/* Inline Form to                 {isAddCustomColorOpen && (
                   <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-200 space-y-3 animate-fadeIn">
-                    <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Form Tambah Varian Warna Bahan Baku Baru:</span>
+                    <div className="text-xs font-extrabold text-emerald-950 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Form Tambah Varian Warna Bahan Baku Baru:</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          id="isCombinationCustom"
+                          checked={isCombination}
+                          onChange={(e) => setIsCombination(e.target.checked)}
+                          className="rounded text-[#087E79] focus:ring-[#087E79]"
+                        />
+                        <label htmlFor="isCombinationCustom" className="text-[11px] font-bold text-slate-700 cursor-pointer">
+                          Model Warna Kombinasi (2-Tone / Multi-Color)
+                        </label>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
@@ -1282,7 +1309,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                           type="text"
                           value={customColorName}
                           onChange={(e) => setCustomColorName(e.target.value)}
-                          placeholder="misal: Steel Blue WP"
+                          placeholder={isCombination ? "misal: Black / Gold" : "misal: Steel Blue WP"}
                           className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-900"
                         />
                       </div>
@@ -1321,22 +1348,51 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                       <div>
                         <label className="block text-[10px] font-bold text-slate-700 mb-0.5">Warna Swatch</label>
                         <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={customColorHex}
-                            onChange={(e) => setCustomColorHex(e.target.value)}
-                            className="w-8 h-8 rounded cursor-pointer border border-slate-300 p-0.5"
-                          />
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex flex-col items-center">
+                              <span className="text-[8px] text-slate-400">Utama</span>
+                              <input
+                                type="color"
+                                value={customColorHex}
+                                onChange={(e) => setCustomColorHex(e.target.value)}
+                                className="w-8 h-8 rounded cursor-pointer border border-slate-300 p-0.5"
+                              />
+                            </div>
+                            {isCombination && (
+                              <div className="flex flex-col items-center">
+                                <span className="text-[8px] text-slate-400">Combo</span>
+                                <input
+                                  type="color"
+                                  value={customSecondaryHex}
+                                  onChange={(e) => setCustomSecondaryHex(e.target.value)}
+                                  className="w-8 h-8 rounded cursor-pointer border border-slate-300 p-0.5"
+                                />
+                              </div>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={handleAddCustomColorway}
-                            className="flex-1 py-1.5 px-2 rounded-lg bg-[#087E79] hover:bg-[#066561] text-white font-bold text-xs shadow-2xs"
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-[#087E79] hover:bg-[#066561] text-white font-bold text-xs shadow-2xs self-end"
                           >
                             + Tambahkan
                           </button>
                         </div>
                       </div>
                     </div>
+
+                    {isCombination && (
+                      <div className="grid grid-cols-1 gap-1 bg-white p-2.5 rounded-lg border border-emerald-100">
+                        <label className="text-[10px] font-bold text-emerald-950">Detail Kombinasi Bagian Warna (2-Tone / Multi-Color):</label>
+                        <input
+                          type="text"
+                          placeholder="misal: Body Utama Black WP, Lengan & Kerah Gold, Lining/Furing Gold"
+                          value={customComboNotes}
+                          onChange={(e) => setCustomComboNotes(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:border-[#087E79]"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1356,7 +1412,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                       >
                         {/* Swatch Circle with Custom Color Picker */}
                         <div
-                          className="relative flex items-center justify-center shrink-0"
+                          className="relative flex items-center justify-center shrink-0 gap-0.5"
                           onClick={(e) => e.stopPropagation()}
                           title="Klik untuk ubah warna HEX custom"
                         >
@@ -1364,6 +1420,12 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                             className="w-3.5 h-3.5 rounded-full border border-white/50 block shadow-2xs cursor-pointer"
                             style={{ backgroundColor: col.hex }}
                           />
+                          {col.secondaryHex && (
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-white/50 block shadow-2xs cursor-pointer -ml-1.5"
+                              style={{ backgroundColor: col.secondaryHex }}
+                            />
+                          )}
                           <input
                             type="color"
                             value={col.hex}
@@ -1374,6 +1436,11 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                         </div>
 
                         <span>{col.name}</span>
+                        {col.comboPartsNote && (
+                          <span className="text-[10px] text-slate-400 italic">
+                            ({col.comboPartsNote})
+                          </span>
+                        )}
                         <span className="font-mono text-[9px] text-slate-400">({col.code})</span>
                         {col.materialSource && (
                           <span className="text-[9px] bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-mono">

@@ -164,12 +164,23 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({ article })
                   key={cw.id || cw.name}
                   className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 bg-slate-50"
                 >
-                  <span
-                    className="w-8 h-8 rounded-lg border border-slate-300 shrink-0"
-                    style={{ backgroundColor: cw.hex || '#000000' }}
-                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      className="w-7 h-7 rounded-lg border border-slate-300 block"
+                      style={{ backgroundColor: cw.hex || '#000000' }}
+                    />
+                    {cw.secondaryHex && (
+                      <span
+                        className="w-7 h-7 rounded-lg border border-slate-300 block -ml-3"
+                        style={{ backgroundColor: cw.secondaryHex }}
+                      />
+                    )}
+                  </div>
                   <div className="min-w-0">
                     <div className="font-bold text-slate-900 truncate text-xs">{cw.name}</div>
+                    {cw.comboPartsNote && (
+                      <div className="text-[10px] text-slate-500 italic truncate">{cw.comboPartsNote}</div>
+                    )}
                     <div className="text-[10px] font-mono text-slate-500 truncate">
                       {cw.code}{cw.pantone ? ` · ${cw.pantone}` : ''}
                     </div>

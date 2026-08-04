@@ -68,6 +68,7 @@ const lastPayloads = new Map<RecordType, Map<string, string>>();
 const lastRevisions = new Map<RecordType, Map<string, number>>();
 const errorListeners = new Set<(message: string | null) => void>();
 let persistenceQueue: Promise<void> = Promise.resolve();
+let lastLocalWriteTime = 0;
 
 function reportError(reason: unknown) {
   const message =
@@ -699,9 +700,15 @@ function projectIdFor(type: RecordType, value: Row): string | null {
 }
 
 function queue(operation: () => Promise<unknown>): Promise<void> {
-  const result = persistenceQueue.then(operation).then(() => {
-    clearError();
-  });
+  const result = persistenceQueue
+    .then(async () => {
+      lastLocalWriteTime = Date.now();
+      await operation();
+      lastLocalWriteTime = Date.now();
+    })
+    .then(() => {
+      clearError();
+    });
   persistenceQueue = result.catch((reason) => {
     reportError(reason);
   });
@@ -801,22 +808,35 @@ async function syncArticleOperations(
 ) {
   const changed = (select: (value: Article) => unknown) =>
     !previous || JSON.stringify(select(previous)) !== JSON.stringify(select(article));
-  const validColorways = (article.colorways || []).filter((item) => UUID_PATTERN.test(item.id));
-  if (changed((value) => value.colorways) && validColorways.length) {
-    const { error } = await supabase.from('launch_colorways').upsert(
-      validColorways.map((item) => ({
-        id: item.id,
-        project_id: article.id,
-        name: item.name,
-        color_code: item.code || null,
-        hex_code: item.hex || null,
-        panel_notes: item.comboPartsNote || null,
-        status: item.isSampleColor ? 'APPROVED' : 'CANDIDATE',
-        created_by: userId,
-      })),
-      { onConflict: 'id' },
-    );
-    if (error) throw error;
+  if (changed((value) => value.colorways)) {
+    const validColorways = (article.colorways || []).filter((item) => UUID_PATTERN.test(item.id));
+    const validIds = validColorways.map((c) => c.id);
+    if (validIds.length > 0) {
+      await supabase
+        .from('launch_colorways')
+        .delete()
+        .eq('project_id', article.id)
+        .not('id', 'in', `(${validIds.join(',')})`);
+    } else {
+      await supabase.from('launch_colorways').delete().eq('project_id', article.id);
+    }
+
+    if (validColorways.length > 0) {
+      const { error } = await supabase.from('launch_colorways').upsert(
+        validColorways.map((item) => ({
+          id: item.id,
+          project_id: article.id,
+          name: item.name,
+          color_code: item.code || null,
+          hex_code: item.hex || null,
+          panel_notes: item.comboPartsNote || null,
+          status: item.isSampleColor ? 'APPROVED' : 'CANDIDATE',
+          created_by: userId,
+        })),
+        { onConflict: 'id' },
+      );
+      if (error) throw error;
+    }
   }
 
   const validSamples = (article.sampleIterations || []).filter((item) => UUID_PATTERN.test(item.id));
@@ -1260,8 +1280,12 @@ export const StorageService = {
   subscribe(onChange: () => void) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const schedule = () => {
+      // Cooldown: skip reload if a local write happened in the last 4 seconds
+      if (Date.now() - lastLocalWriteTime < 4000) {
+        return;
+      }
       if (timer) clearTimeout(timer);
-      timer = setTimeout(onChange, 180);
+      timer = setTimeout(onChange, 1500); // 1.5s debounce for query batching
     };
     const channel = supabase
       .channel('paten-workspace-realtime')
