@@ -50,52 +50,18 @@ const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
 // dengan produk nyata pernah ikut tersimpan ke artikel dan menyesatkan tim produksi.
 // Foto kini diunggah dari komputer ke Cloudinary, atau ditempel via URL asli produk.
 
-// Registered Standard Fabric Color Variants (Grouped by Material)
-const REGISTERED_RAW_MATERIAL_COLORS = [
-  // Kain WP Columbia (10 Varian Warna Terdaftar)
-  { name: 'Black Solid WP', code: 'COL-01', hex: '#121212', material: 'Kain WP Columbia' },
-  { name: 'Navy Deep WP', code: 'COL-02', hex: '#1B2A4A', material: 'Kain WP Columbia' },
-  { name: 'Olive Army WP', code: 'COL-03', hex: '#4B5320', material: 'Kain WP Columbia' },
-  { name: 'Terracotta Rust WP', code: 'COL-04', hex: '#C85A32', material: 'Kain WP Columbia' },
-  { name: 'Khaki Tan WP', code: 'COL-05', hex: '#C2B280', material: 'Kain WP Columbia' },
-  { name: 'Burgundy Crimson WP', code: 'COL-06', hex: '#800020', material: 'Kain WP Columbia' },
-  { name: 'Steel Grey WP', code: 'COL-07', hex: '#4A5568', material: 'Kain WP Columbia' },
-  { name: 'Mustard Yellow WP', code: 'COL-08', hex: '#E3A857', material: 'Kain WP Columbia' },
-  { name: 'Sage Green WP', code: 'COL-09', hex: '#6B8E78', material: 'Kain WP Columbia' },
-  { name: 'Maroon Deep WP', code: 'COL-10', hex: '#500014', material: 'Kain WP Columbia' },
-
-  // Cotton Fleece Heavyweight 330gsm
-  { name: 'Obsidian Black', code: 'BLK-01', hex: '#121212', material: 'Cotton Fleece Heavyweight 330gsm' },
-  { name: 'Navy Dark', code: 'NVY-02', hex: '#1B2A4A', material: 'Cotton Fleece Heavyweight 330gsm' },
-  { name: 'Off-White Natural', code: 'WHT-03', hex: '#F5F5ED', material: 'Cotton Fleece Heavyweight 330gsm' },
-  { name: 'Olive Forest', code: 'OLV-04', hex: '#3B4D3C', material: 'Cotton Fleece Heavyweight 330gsm' },
-  { name: 'Heather Grey', code: 'GRY-05', hex: '#9AA0A6', material: 'Cotton Fleece Heavyweight 330gsm' },
-
-  // Cordura Nylon Waterproof 600D
-  { name: 'Black Glossy', code: 'NYL-01', hex: '#121212', material: 'Cordura Nylon Waterproof 600D' },
-  { name: 'Army Green', code: 'NYL-02', hex: '#4B5320', material: 'Cordura Nylon Waterproof 600D' },
-  { name: 'Mustard Yellow', code: 'NYL-03', hex: '#E3A857', material: 'Cordura Nylon Waterproof 600D' },
-  { name: 'Coyote Tan', code: 'NYL-04', hex: '#816D55', material: 'Cordura Nylon Waterproof 600D' },
-
-  // Cotton Combed 30s
-  { name: 'Jet Black Combed', code: 'CMB-01', hex: '#0D0D0D', material: 'Cotton Combed 30s' },
-  { name: 'Midnight Navy Combed', code: 'CMB-02', hex: '#162238', material: 'Cotton Combed 30s' },
-  { name: 'White Solid Combed', code: 'CMB-03', hex: '#FFFFFF', material: 'Cotton Combed 30s' },
-  { name: 'Sage Green Combed', code: 'CMB-04', hex: '#6B8E78', material: 'Cotton Combed 30s' },
-  { name: 'Terracotta Combed', code: 'CMB-05', hex: '#C85A32', material: 'Cotton Combed 30s' },
-  { name: 'Mustard Combed', code: 'CMB-06', hex: '#E3A857', material: 'Cotton Combed 30s' },
-  { name: 'Burgundy Combed', code: 'CMB-07', hex: '#800020', material: 'Cotton Combed 30s' },
-
-  // Taslan Milky Waterproof
-  { name: 'Black Taslan Matte', code: 'TAS-01', hex: '#191919', material: 'Taslan Milky Waterproof' },
-  { name: 'Navy Taslan', code: 'TAS-02', hex: '#1E2D4A', material: 'Taslan Milky Waterproof' },
-  { name: 'Dark Green Taslan', code: 'TAS-03', hex: '#2A402D', material: 'Taslan Milky Waterproof' },
-  { name: 'Grey Metallic Taslan', code: 'TAS-04', hex: '#717D7E', material: 'Taslan Milky Waterproof' },
-
-  // Heavy Rib Cotton Spandex 1x1
-  { name: 'Black Matching Rib', code: 'RIB-01', hex: '#121212', material: 'Heavy Rib Cotton Spandex 1x1' },
-  { name: 'Navy Matching Rib', code: 'RIB-02', hex: '#1B2A4A', material: 'Heavy Rib Cotton Spandex 1x1' },
-  { name: 'Off-White Matching Rib', code: 'RIB-03', hex: '#F5F5ED', material: 'Heavy Rib Cotton Spandex 1x1' },
+// Standard WP Columbia Fallback Colors (Used only when Master Data has no registered colors yet)
+const DEFAULT_WP_COLUMBIA_COLORS = [
+  { name: 'Black Solid WP', code: 'COL-01', hex: '#121212', material: 'WP COLUMBIA' },
+  { name: 'Navy Deep WP', code: 'COL-02', hex: '#1B2A4A', material: 'WP COLUMBIA' },
+  { name: 'Olive Army WP', code: 'COL-03', hex: '#4B5320', material: 'WP COLUMBIA' },
+  { name: 'Terracotta Rust WP', code: 'COL-04', hex: '#C85A32', material: 'WP COLUMBIA' },
+  { name: 'Khaki Tan WP', code: 'COL-05', hex: '#C2B280', material: 'WP COLUMBIA' },
+  { name: 'Burgundy Crimson WP', code: 'COL-06', hex: '#800020', material: 'WP COLUMBIA' },
+  { name: 'Steel Grey WP', code: 'COL-07', hex: '#4A5568', material: 'WP COLUMBIA' },
+  { name: 'Mustard Yellow WP', code: 'COL-08', hex: '#E3A857', material: 'WP COLUMBIA' },
+  { name: 'Sage Green WP', code: 'COL-09', hex: '#6B8E78', material: 'WP COLUMBIA' },
+  { name: 'Maroon Deep WP', code: 'COL-10', hex: '#500014', material: 'WP COLUMBIA' },
 ];
 
 function getColorHexFromName(colorName: string): string {
@@ -227,10 +193,10 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     return [
       {
         id: 'col-1',
-        code: REGISTERED_RAW_MATERIAL_COLORS[0].code,
-        name: REGISTERED_RAW_MATERIAL_COLORS[0].name,
-        hex: REGISTERED_RAW_MATERIAL_COLORS[0].hex,
-        materialSource: REGISTERED_RAW_MATERIAL_COLORS[0].material,
+        code: DEFAULT_WP_COLUMBIA_COLORS[0].code,
+        name: DEFAULT_WP_COLUMBIA_COLORS[0].name,
+        hex: DEFAULT_WP_COLUMBIA_COLORS[0].hex,
+        materialSource: DEFAULT_WP_COLUMBIA_COLORS[0].material,
       },
     ];
   });
@@ -246,22 +212,16 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [customColorName, setCustomColorName] = useState('');
   const [customColorCode, setCustomColorCode] = useState('');
   const [customColorHex, setCustomColorHex] = useState('#3B82F6');
-  const [customColorMaterial, setCustomColorMaterial] = useState('Kain WP Columbia');
+  const [customColorMaterial, setCustomColorMaterial] = useState('WP COLUMBIA');
 
-  // Combined Available Colorways Catalog from Data Master + Static Preset + Custom Created (Deduplicated)
+  // Combined Available Colorways Catalog derived EXCLUSIVELY from Master Data (`materials` prop) + Custom Created
   const catalogMaterialColors = useMemo<{ name: string; code: string; hex: string; material: string }[]>(() => {
     const map = new Map<string, { name: string; code: string; hex: string; material: string }>();
 
-    // 1. Add static base catalog first
-    REGISTERED_RAW_MATERIAL_COLORS.forEach((col) => {
-      const key = `${col.material.trim().toLowerCase()}:::${col.name.trim().toLowerCase()}`;
-      map.set(key, { ...col });
-    });
-
-    // 2. Merge colors from Master Materials prop if available (deduplicated)
+    // 1. Extract colors directly from Master Materials prop (Database / Master Data Central)
     if (materials && materials.length > 0) {
       materials.forEach((mat) => {
-        if (mat.availableColors && Array.isArray(mat.availableColors)) {
+        if (mat.availableColors && Array.isArray(mat.availableColors) && mat.availableColors.length > 0) {
           mat.availableColors.forEach((colName: string, idx: number) => {
             const key = `${mat.name.trim().toLowerCase()}:::${colName.trim().toLowerCase()}`;
             if (!map.has(key)) {
@@ -277,7 +237,15 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       });
     }
 
-    // 3. Add custom created colors
+    // 2. If NO colors were registered in Master Data, fallback ONLY to WP COLUMBIA default colors
+    if (map.size === 0) {
+      DEFAULT_WP_COLUMBIA_COLORS.forEach((col) => {
+        const key = `${col.material.trim().toLowerCase()}:::${col.name.trim().toLowerCase()}`;
+        map.set(key, { ...col });
+      });
+    }
+
+    // 3. Add custom created colors during current session
     customMaterialColors.forEach((col) => {
       const key = `${col.material.trim().toLowerCase()}:::${col.name.trim().toLowerCase()}`;
       map.set(key, { ...col });
