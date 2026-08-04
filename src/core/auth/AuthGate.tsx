@@ -1,6 +1,5 @@
 import { FormEvent, useState } from 'react';
 import {
-  ArrowLeft,
   ArrowRight,
   Database,
   Eye,
@@ -10,7 +9,7 @@ import {
   Shirt,
   Users,
 } from 'lucide-react';
-import { Link, Navigate } from '@/app/router/simpleRouter';
+import { Navigate } from '@/app/router/simpleRouter';
 import { signIn, signOut, useAuth } from './useAuth';
 
 export function AuthGate() {
@@ -44,19 +43,13 @@ export function AuthGate() {
                 Gunakan akun yang sudah diberi role Product Launch oleh owner/admin, atau keluar untuk masuk dengan akun lain.
               </p>
             </div>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6">
               <button
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#087E79] px-5 text-sm font-bold text-white transition hover:bg-[#066864]"
                 onClick={() => void signOut()}
               >
                 Gunakan akun lain <ArrowRight size={18} />
               </button>
-              <Link
-                to="/"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              >
-                <ArrowLeft size={18} /> Kembali ke portal sistem
-              </Link>
             </div>
           </div>
         </div>
@@ -84,12 +77,6 @@ export function AuthGate() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,198,0.20),_transparent_18rem),radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.08),_transparent_20rem)]" />
           <div className="relative flex h-full flex-col">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Link
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/6 px-4 py-2 text-xs font-bold text-white/90 backdrop-blur transition hover:bg-white/10"
-                to="/"
-              >
-                <ArrowLeft size={16} /> Semua sistem
-              </Link>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-teal-100">
                 <ShieldCheck size={14} />
                 Workspace internal
@@ -173,13 +160,7 @@ export function AuthGate() {
             className="flex w-full flex-col rounded-[32px] border border-slate-200 bg-white/96 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur sm:p-8"
             onSubmit={submit}
           >
-            <div className="flex items-center justify-between gap-3 lg:hidden">
-              <Link
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                to="/"
-              >
-                <ArrowLeft size={16} /> Semua sistem
-              </Link>
+            <div className="flex items-center justify-end gap-3 lg:hidden">
               <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#087E79] text-sm font-black text-white">
                 GG
               </div>

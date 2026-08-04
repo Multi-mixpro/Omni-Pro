@@ -2,9 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthGate } from '@/core/auth/AuthGate';
 import { useAuth } from '@/core/auth/useAuth';
 import PatenApp from '@/modules/launch/paten/App';
-import PresensiApp from '@/modules/presensi/App';
 import { SettingsPage } from '@/modules/launch/settings/SettingsPage';
-import { SystemGateway } from '@/app/pages/SystemGateway';
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
 
 const queryClient = new QueryClient({
@@ -52,7 +50,6 @@ function ProtectedPatenApp() {
   );
 }
 
-/** Pengaturan tim & hak akses — hanya untuk admin/owner. */
 function ProtectedSettingsPage() {
   const auth = useAuth();
   if (auth.isLoading) return <BootScreen />;
@@ -85,22 +82,14 @@ function ProtectedSettingsPage() {
 function RouteView() {
   const { pathname } = useLocation();
 
-  // Gerbang masuk: pilih Product Launch OS atau Presensi.
   if (pathname === '/' || pathname === '') {
-    return <SystemGateway />;
-  }
-
-  // Presensi punya login sendiri di dalam aplikasinya, memakai schema presensi
-  // dan hak akses terpisah dari Product Launch.
-  if (pathname === '/presensi' || pathname.startsWith('/presensi/')) {
-    return <PresensiApp />;
+    return <Navigate to="/launch/login" replace />;
   }
 
   if (pathname === '/launch' || pathname === '/launch/' || pathname === '/launch/login') {
     return <AuthGate />;
   }
 
-  // Pengaturan tim dipisah dari PATEN karena memakai sistem style aplikasi utama.
   if (pathname === '/launch/app/settings' || pathname === '/launch/app/settings/') {
     return <ProtectedSettingsPage />;
   }
@@ -113,9 +102,7 @@ function RouteView() {
     return <ProtectedPatenApp />;
   }
 
-  // Rute tak dikenal dikembalikan ke gerbang masuk agar pengguna dapat memilih
-  // sistem, bukan dipaksa ke salah satunya.
-  return <Navigate to="/" replace />;
+  return <Navigate to="/launch/login" replace />;
 }
 
 export function AppRouter() {
