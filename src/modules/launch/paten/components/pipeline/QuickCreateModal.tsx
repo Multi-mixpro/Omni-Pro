@@ -2,7 +2,7 @@
  * Product Launch OS 3.0 - Quick Create Article Wizard
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   X,
   Camera,
@@ -50,19 +50,70 @@ const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
 // dengan produk nyata pernah ikut tersimpan ke artikel dan menyesatkan tim produksi.
 // Foto kini diunggah dari komputer ke Cloudinary, atau ditempel via URL asli produk.
 
-// Registered Standard Fabric Color Variants
+// Registered Standard Fabric Color Variants (Grouped by Material)
 const REGISTERED_RAW_MATERIAL_COLORS = [
-  { name: 'Obsidian Black', code: 'BLK-01', hex: '#121212', material: 'Cotton Combed 30s Heavy' },
-  { name: 'Midnight Navy', code: 'NVY-02', hex: '#1B2A4A', material: 'Cotton Combed 30s' },
-  { name: 'Off-White Natural', code: 'WHT-03', hex: '#F5F5ED', material: 'Organic Heavy Canvas' },
-  { name: 'Sage Green', code: 'GRN-04', hex: '#6B8E78', material: 'Cotton Canvas 12oz' },
-  { name: 'Steel Grey', code: 'GRY-05', hex: '#4A5568', material: 'Baby Terry Premium' },
-  { name: 'Terracotta Rust', code: 'TER-06', hex: '#C85A32', material: 'Cotton Drill Japan' },
-  { name: 'Olive Army', code: 'OLV-07', hex: '#4B5320', material: 'Ripstop Mil-Spec' },
-  { name: 'Dark Charcoal', code: 'CHR-08', hex: '#2A2A2A', material: 'Fleece Cotton 330gsm' },
-  { name: 'Muted Beige / Khaki', code: 'KHK-09', hex: '#C2B280', material: 'Chino Stretch Twill' },
-  { name: 'Burgundy Crimson', code: 'BUR-10', hex: '#800020', material: 'French Terry Premium' },
+  // Kain WP Columbia (10 Varian Warna Terdaftar)
+  { name: 'Black Solid WP', code: 'COL-01', hex: '#121212', material: 'Kain WP Columbia' },
+  { name: 'Navy Deep WP', code: 'COL-02', hex: '#1B2A4A', material: 'Kain WP Columbia' },
+  { name: 'Olive Army WP', code: 'COL-03', hex: '#4B5320', material: 'Kain WP Columbia' },
+  { name: 'Terracotta Rust WP', code: 'COL-04', hex: '#C85A32', material: 'Kain WP Columbia' },
+  { name: 'Khaki Tan WP', code: 'COL-05', hex: '#C2B280', material: 'Kain WP Columbia' },
+  { name: 'Burgundy Crimson WP', code: 'COL-06', hex: '#800020', material: 'Kain WP Columbia' },
+  { name: 'Steel Grey WP', code: 'COL-07', hex: '#4A5568', material: 'Kain WP Columbia' },
+  { name: 'Mustard Yellow WP', code: 'COL-08', hex: '#E3A857', material: 'Kain WP Columbia' },
+  { name: 'Sage Green WP', code: 'COL-09', hex: '#6B8E78', material: 'Kain WP Columbia' },
+  { name: 'Maroon Deep WP', code: 'COL-10', hex: '#500014', material: 'Kain WP Columbia' },
+
+  // Cotton Fleece Heavyweight 330gsm
+  { name: 'Obsidian Black', code: 'BLK-01', hex: '#121212', material: 'Cotton Fleece Heavyweight 330gsm' },
+  { name: 'Navy Dark', code: 'NVY-02', hex: '#1B2A4A', material: 'Cotton Fleece Heavyweight 330gsm' },
+  { name: 'Off-White Natural', code: 'WHT-03', hex: '#F5F5ED', material: 'Cotton Fleece Heavyweight 330gsm' },
+  { name: 'Olive Forest', code: 'OLV-04', hex: '#3B4D3C', material: 'Cotton Fleece Heavyweight 330gsm' },
+  { name: 'Heather Grey', code: 'GRY-05', hex: '#9AA0A6', material: 'Cotton Fleece Heavyweight 330gsm' },
+
+  // Cordura Nylon Waterproof 600D
+  { name: 'Black Glossy', code: 'NYL-01', hex: '#121212', material: 'Cordura Nylon Waterproof 600D' },
+  { name: 'Army Green', code: 'NYL-02', hex: '#4B5320', material: 'Cordura Nylon Waterproof 600D' },
+  { name: 'Mustard Yellow', code: 'NYL-03', hex: '#E3A857', material: 'Cordura Nylon Waterproof 600D' },
+  { name: 'Coyote Tan', code: 'NYL-04', hex: '#816D55', material: 'Cordura Nylon Waterproof 600D' },
+
+  // Cotton Combed 30s
+  { name: 'Jet Black Combed', code: 'CMB-01', hex: '#0D0D0D', material: 'Cotton Combed 30s' },
+  { name: 'Midnight Navy Combed', code: 'CMB-02', hex: '#162238', material: 'Cotton Combed 30s' },
+  { name: 'White Solid Combed', code: 'CMB-03', hex: '#FFFFFF', material: 'Cotton Combed 30s' },
+  { name: 'Sage Green Combed', code: 'CMB-04', hex: '#6B8E78', material: 'Cotton Combed 30s' },
+  { name: 'Terracotta Combed', code: 'CMB-05', hex: '#C85A32', material: 'Cotton Combed 30s' },
+  { name: 'Mustard Combed', code: 'CMB-06', hex: '#E3A857', material: 'Cotton Combed 30s' },
+  { name: 'Burgundy Combed', code: 'CMB-07', hex: '#800020', material: 'Cotton Combed 30s' },
+
+  // Taslan Milky Waterproof
+  { name: 'Black Taslan Matte', code: 'TAS-01', hex: '#191919', material: 'Taslan Milky Waterproof' },
+  { name: 'Navy Taslan', code: 'TAS-02', hex: '#1E2D4A', material: 'Taslan Milky Waterproof' },
+  { name: 'Dark Green Taslan', code: 'TAS-03', hex: '#2A402D', material: 'Taslan Milky Waterproof' },
+  { name: 'Grey Metallic Taslan', code: 'TAS-04', hex: '#717D7E', material: 'Taslan Milky Waterproof' },
+
+  // Heavy Rib Cotton Spandex 1x1
+  { name: 'Black Matching Rib', code: 'RIB-01', hex: '#121212', material: 'Heavy Rib Cotton Spandex 1x1' },
+  { name: 'Navy Matching Rib', code: 'RIB-02', hex: '#1B2A4A', material: 'Heavy Rib Cotton Spandex 1x1' },
+  { name: 'Off-White Matching Rib', code: 'RIB-03', hex: '#F5F5ED', material: 'Heavy Rib Cotton Spandex 1x1' },
 ];
+
+function getColorHexFromName(colorName: string): string {
+  const name = colorName.toLowerCase();
+  if (name.includes('black') || name.includes('hitam') || name.includes('jetblack')) return '#121212';
+  if (name.includes('navy') || name.includes('donker')) return '#1B2A4A';
+  if (name.includes('white') || name.includes('putih') || name.includes('natural')) return '#F5F5ED';
+  if (name.includes('sage') || name.includes('green') || name.includes('hijau')) return '#6B8E78';
+  if (name.includes('olive') || name.includes('army')) return '#4B5320';
+  if (name.includes('grey') || name.includes('abu') || name.includes('steel')) return '#4A5568';
+  if (name.includes('terracotta') || name.includes('rust')) return '#C85A32';
+  if (name.includes('khaki') || name.includes('beige') || name.includes('tan')) return '#C2B280';
+  if (name.includes('burgundy') || name.includes('maroon') || name.includes('crimson')) return '#800020';
+  if (name.includes('yellow') || name.includes('mustard') || name.includes('kuning')) return '#E3A857';
+  if (name.includes('blue') || name.includes('biru')) return '#2563EB';
+  if (name.includes('red') || name.includes('merah')) return '#DC2626';
+  return '#64748B';
+}
 
 export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   isOpen = true,
@@ -183,6 +234,96 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       },
     ];
   });
+
+  // Material Filter & Custom Color State in Step 3
+  const [selectedMaterialFilter, setSelectedMaterialFilter] = useState<string>('ALL');
+  const [customMaterialColors, setCustomMaterialColors] = useState<
+    Array<{ name: string; code: string; hex: string; material: string }>
+  >([]);
+
+  // Inline Custom Color Form State
+  const [isAddCustomColorOpen, setIsAddCustomColorOpen] = useState(false);
+  const [customColorName, setCustomColorName] = useState('');
+  const [customColorCode, setCustomColorCode] = useState('');
+  const [customColorHex, setCustomColorHex] = useState('#3B82F6');
+  const [customColorMaterial, setCustomColorMaterial] = useState('Kain WP Columbia');
+
+  // Combined Available Colorways Catalog from Data Master + Static Preset + Custom Created
+  const catalogMaterialColors = useMemo<{ name: string; code: string; hex: string; material: string }[]>(() => {
+    const list: { name: string; code: string; hex: string; material: string }[] = [
+      ...REGISTERED_RAW_MATERIAL_COLORS,
+      ...customMaterialColors,
+    ];
+
+    // Merge colors from Master Materials prop if available
+    if (materials && materials.length > 0) {
+      materials.forEach((mat) => {
+        if (mat.availableColors && Array.isArray(mat.availableColors)) {
+          mat.availableColors.forEach((colName: string, idx: number) => {
+            const exists = list.some(
+              (c) => c.name.toLowerCase() === colName.toLowerCase() && c.material.toLowerCase() === mat.name.toLowerCase()
+            );
+            if (!exists) {
+              list.push({
+                name: colName,
+                code: `${mat.code ? mat.code.slice(-3) : 'MAT'}-${(idx + 1).toString().padStart(2, '0')}`,
+                hex: getColorHexFromName(colName),
+                material: mat.name,
+              });
+            }
+          });
+        }
+      });
+    }
+    return list;
+  }, [materials, customMaterialColors]);
+
+  // List of unique Material names available in the catalog for filtering
+  const availableMaterialNames = useMemo<string[]>(() => {
+    const set = new Set<string>();
+    catalogMaterialColors.forEach((item: { material: string }) => set.add(item.material));
+    return Array.from(set);
+  }, [catalogMaterialColors]);
+
+  // Filtered catalog based on selectedMaterialFilter
+  const filteredCatalogColors = useMemo<{ name: string; code: string; hex: string; material: string }[]>(() => {
+    if (selectedMaterialFilter === 'ALL') return catalogMaterialColors;
+    return catalogMaterialColors.filter(
+      (item: { material: string }) => item.material.toLowerCase() === selectedMaterialFilter.toLowerCase()
+    );
+  }, [catalogMaterialColors, selectedMaterialFilter]);
+
+  const handleAddCustomColorway = () => {
+    if (!customColorName.trim()) {
+      setNotice('Nama varian warna tidak boleh kosong.');
+      return;
+    }
+    const code = customColorCode.trim() || `CLR-${Math.floor(10 + Math.random() * 90)}`;
+    const newColor = {
+      name: customColorName.trim(),
+      code,
+      hex: customColorHex,
+      material: customColorMaterial.trim() || 'Custom Fabric',
+    };
+    setCustomMaterialColors((prev) => [...prev, newColor]);
+
+    // Auto-select newly added colorway
+    setSelectedColorways((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        code,
+        name: newColor.name,
+        hex: newColor.hex,
+        materialSource: newColor.material,
+      },
+    ]);
+
+    setCustomColorName('');
+    setCustomColorCode('');
+    setIsAddCustomColorOpen(false);
+    setNotice(`Varian warna '${newColor.name}' (${newColor.material}) berhasil ditambahkan!`);
+  };
 
   // Boleh disimpan bila nama terisi dan kode artikel valid (tidak kosong/bentrok).
   const canSubmit = !!name.trim() && !!articleCode.trim() && !codeError;
@@ -1059,19 +1200,101 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                 </div>
               </div>
 
-              {/* SECTION: VARIANT WARNA BAHAN BAKU YANG TERDAFTAR (MULTI SELECT) */}
+              {/* SECTION: VARIANT WARNA BAHAN BAKU YANG TERDAFTAR (MULTI SELECT BY MATERIAL) */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <label className="block text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
                       <Palette className="w-4 h-4 text-[#087E79]" />
                       <span>Pilih Varian Warna Bahan Baku Terdaftar ({selectedColorways.length} Terpilih)</span>
                     </label>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Pilih beberapa varian warna langsung dari katalog bahan baku yang sudah didaftarkan.
+                      Pilih varian warna langsung berdasarkan bahan baku terdaftar (seperti Kain WP Columbia, Cotton Fleece, Cotton Combed, dll).
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsAddCustomColorOpen((prev) => !prev)}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1 shadow-2xs self-start sm:self-auto cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isAddCustomColorOpen ? 'Tutup Form Warna' : '+ Tambah Warna Custom'}</span>
+                  </button>
                 </div>
+
+                {/* Inline Form to Add Custom Colorway */}
+                {isAddCustomColorOpen && (
+                  <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-200 space-y-3 animate-fadeIn">
+                    <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Form Tambah Varian Warna Bahan Baku Baru:</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 mb-0.5">Nama Warna</label>
+                        <input
+                          type="text"
+                          value={customColorName}
+                          onChange={(e) => setCustomColorName(e.target.value)}
+                          placeholder="misal: Steel Blue WP"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 mb-0.5">Kode Warna</label>
+                        <input
+                          type="text"
+                          value={customColorCode}
+                          onChange={(e) => setCustomColorCode(e.target.value)}
+                          placeholder="misal: COL-11"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 mb-0.5">Bahan Baku</label>
+                        <select
+                          value={customColorMaterial}
+                          onChange={(e) => setCustomColorMaterial(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900"
+                        >
+                          <option value="Kain WP Columbia">Kain WP Columbia</option>
+                          <option value="Cotton Fleece Heavyweight 330gsm">Cotton Fleece 330gsm</option>
+                          <option value="Cordura Nylon Waterproof 600D">Cordura Nylon 600D</option>
+                          <option value="Cotton Combed 30s">Cotton Combed 30s</option>
+                          <option value="Taslan Milky Waterproof">Taslan Milky Waterproof</option>
+                          {materials.map((m) => (
+                            <option key={m.id} value={m.name}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 mb-0.5">Warna Swatch</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customColorHex}
+                            onChange={(e) => setCustomColorHex(e.target.value)}
+                            className="w-8 h-8 rounded cursor-pointer border border-slate-300 p-0.5"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddCustomColorway}
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-[#087E79] hover:bg-[#066561] text-white font-bold text-xs shadow-2xs"
+                          >
+                            + Tambahkan
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Selected Colorways Badges Row */}
                 <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-200 min-h-[48px]">
@@ -1086,6 +1309,11 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                       />
                       <span>{col.name}</span>
                       <span className="font-mono text-[9px] text-slate-400">({col.code})</span>
+                      {col.materialSource && (
+                        <span className="text-[9px] bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-mono">
+                          {col.materialSource}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleToggleColorway(col)}
@@ -1097,17 +1325,59 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                   ))}
                 </div>
 
-                {/* Palette Grid from Registered Raw Materials */}
+                {/* Material Selector Filter Tabs */}
                 <div className="space-y-2 pt-1">
-                  <span className="text-[11px] font-extrabold text-slate-700 block">
-                    Katalog Varian Warna Bahan Baku Tersedia:
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {REGISTERED_RAW_MATERIAL_COLORS.map((rawColor) => {
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-[11px] font-extrabold text-slate-700 block">
+                      Filter Varian Warna Berdasarkan Bahan Baku Terdaftar:
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      Menampilkan {filteredCatalogColors.length} varian warna
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMaterialFilter('ALL')}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                        selectedMaterialFilter === 'ALL'
+                          ? 'bg-[#087E79] text-white shadow-2xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      ✨ Semua Bahan Baku ({catalogMaterialColors.length})
+                    </button>
+
+                    {availableMaterialNames.map((matName: string) => {
+                      const count = catalogMaterialColors.filter(
+                        (c: { material: string }) => c.material.toLowerCase() === matName.toLowerCase()
+                      ).length;
+                      const isSelected = selectedMaterialFilter.toLowerCase() === matName.toLowerCase();
+                      return (
+                        <button
+                          key={matName}
+                          type="button"
+                          onClick={() => setSelectedMaterialFilter(matName)}
+                          className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#087E79] text-white shadow-2xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {matName} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Palette Grid from Filtered Catalog Colors */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {filteredCatalogColors.map((rawColor: { name: string; code: string; hex: string; material: string }) => {
                       const isSelected = selectedColorways.some((c) => c.name === rawColor.name);
                       return (
                         <button
-                          key={rawColor.code}
+                          key={`${rawColor.material}-${rawColor.code}`}
                           type="button"
                           onClick={() => handleToggleColorway(rawColor)}
                           className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
@@ -1118,17 +1388,21 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                         >
                           <div className="flex items-center gap-2.5">
                             <span
-                              className="w-4 h-4 rounded-full border border-slate-300 shrink-0 shadow-2xs"
+                              className="w-4.5 h-4.5 rounded-full border border-slate-300 shrink-0 shadow-2xs"
                               style={{ backgroundColor: rawColor.hex }}
                             />
                             <div>
                               <div className="text-xs font-bold leading-tight">{rawColor.name}</div>
-                              <div className="text-[10px] text-slate-500 font-mono">{rawColor.material}</div>
+                              <div className="text-[10px] text-emerald-700 font-extrabold flex items-center gap-1 mt-0.5">
+                                <span>{rawColor.material}</span>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
-                            <span className="font-mono text-[10px] text-slate-400">{rawColor.code}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
+                              {rawColor.code}
+                            </span>
                             {isSelected && <Check className="w-4 h-4 text-[#087E79]" />}
                           </div>
                         </button>
