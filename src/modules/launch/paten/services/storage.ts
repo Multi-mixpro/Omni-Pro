@@ -138,8 +138,11 @@ function rowsFor<T extends { id: string }>(
 }
 
 function mapBusinessUnit(row: Row): BusinessUnit {
+  const name = row.business_unit?.name;
+  if (name) return name;
   const code = String(row.business_unit?.code || row.business_unit_code || '').toUpperCase();
-  if (code === 'GUDSKUY') return 'Streetwear Co';
+  if (code === 'GUDSKUY') return 'GUDSKUY';
+  if (code === 'GG_SUPPLY') return 'GG Supply';
   if (code === 'ACTIVEWEAR') return 'Activewear Lab';
   return 'Mainline Studio';
 }
@@ -719,8 +722,10 @@ async function ensureProjects(articles: Article[], newIds: Set<string>) {
   if (!userId) throw new Error('Sesi pengguna berakhir. Silakan masuk kembali.');
 
   for (const article of candidates) {
-    const unitCode = article.businessUnit === 'Streetwear Co' ? 'GUDSKUY' : 'GG_SUPPLY';
-    const unit = businessUnits.find((item: any) => item.code === unitCode) || businessUnits[0];
+    const unit = businessUnits.find((item: any) =>
+      item.name?.toUpperCase() === article.businessUnit?.toUpperCase() ||
+      item.code?.toUpperCase() === article.businessUnit?.toUpperCase()
+    ) || businessUnits[0];
     if (!unit) throw new Error('Business unit belum tersedia di database.');
     const { error } = await supabase.from('launch_projects').upsert({
       id: article.id,

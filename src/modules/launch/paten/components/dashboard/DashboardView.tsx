@@ -36,7 +36,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   pendingApprovals = [],
   decisions = [],
   blockers = [],
-  activeBusinessUnit = 'Mainline Studio',
+  activeBusinessUnit = 'Semua Unit Bisnis',
   onOpenArticle,
   onSelectTab,
   onOpenQuickCreate,

@@ -76,7 +76,7 @@ function getColorHexFromName(colorName: string): string {
 export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   isOpen = true,
   onClose,
-  activeBusinessUnit = 'Mainline Studio',
+  activeBusinessUnit = 'Semua Unit Bisnis',
   materials = [],
   ownerName = 'Pengguna Aktif',
   onCreateArticle,

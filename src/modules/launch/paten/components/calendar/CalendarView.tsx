@@ -21,7 +21,7 @@ import {
   CalendarCheck2,
 } from 'lucide-react';
 import { Article, BusinessUnit, TaskItem, ScheduleHealth } from '../../types';
-import { isAllBusinessUnits } from '../../services/businessUnits';
+import { isAllBusinessUnits, loadStoredBusinessUnits } from '../../services/businessUnits';
 
 interface CalendarViewProps {
   articles: Article[];
@@ -215,13 +215,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
     tasks.forEach((t) => {
       if (t.dueDate) {
+        const matchingArt = articles.find((a) => a.id === t.articleId || a.code === t.articleCode);
         events.push({
           id: `task-${t.id}`,
           articleId: t.articleId || 'art-101',
           articleCode: t.articleCode || 'ART',
           articleName: t.articleTitle || t.title,
           stage: t.stage,
-          businessUnit: 'Mainline Studio',
+          businessUnit: matchingArt?.businessUnit || 'GUDSKUY',
           type: 'task',
           typeLabel: 'Task Operational',
           title: `Task: ${t.title}`,
@@ -507,9 +508,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               className="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-[11px] text-slate-800 font-bold focus:outline-none focus:border-[#087E79] shrink-0"
             >
               <option value="Semua">Semua Brand / BU</option>
-              <option value="Mainline Studio">Mainline Studio</option>
-              <option value="Streetwear Co">Streetwear Co</option>
-              <option value="Activewear Lab">Activewear Lab</option>
+              {loadStoredBusinessUnits().map((bu) => (
+                <option key={bu.id} value={bu.name}>
+                  {bu.name}
+                </option>
+              ))}
             </select>
 
             <select
