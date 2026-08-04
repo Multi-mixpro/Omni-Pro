@@ -122,6 +122,63 @@ const PROCESS_PHASES: ProcessPhaseConfig[] = [
   },
 ];
 
+/** Status pengisian satu panel, dihitung dari data artikel yang sebenarnya. */
+type PanelTone = 'complete' | 'partial' | 'empty';
+interface PanelState {
+  label: string;
+  tone: PanelTone;
+}
+
+function getPanelState(key: string, article: Article): PanelState {
+  const count = (n?: number) => n ?? 0;
+  switch (key) {
+    case 'brief': {
+      const filled = [article.briefIntent, article.targetUserDescription, article.acceptanceCriteria]
+        .filter((t) => t && t.trim()).length;
+      if (filled >= 2) return { label: 'Lengkap', tone: 'complete' };
+      if (filled >= 1) return { label: 'Sebagian', tone: 'partial' };
+      return { label: 'Perlu diisi', tone: 'empty' };
+    }
+    case 'colors':
+      return count(article.colorways?.length) > 0
+        ? { label: `${article.colorways.length} warna`, tone: 'complete' }
+        : { label: 'Perlu diisi', tone: 'empty' };
+    case 'sizes': {
+      const sizes = count(article.sizeSet?.length);
+      const chart = count(article.sizeChart?.length);
+      if (sizes > 0 && chart > 0) return { label: `${sizes} size · chart siap`, tone: 'complete' };
+      if (sizes > 0) return { label: 'Chart belum diisi', tone: 'partial' };
+      return { label: 'Perlu diisi', tone: 'empty' };
+    }
+    case 'materials':
+      return count(article.materials?.length) > 0
+        ? { label: `${article.materials.length} item BOM`, tone: 'complete' }
+        : { label: 'Perlu diisi', tone: 'empty' };
+    case 'suppliers': {
+      const withSup = (article.materials ?? []).filter((m) => m.supplierId).length;
+      return withSup > 0
+        ? { label: `${withSup} tersumber`, tone: 'complete' }
+        : { label: 'Perlu diisi', tone: 'empty' };
+    }
+    case 'pattern':
+      return article.patternSpecification
+        ? { label: 'Terisi', tone: 'complete' }
+        : { label: 'Perlu diisi', tone: 'empty' };
+    case 'sampling':
+      return count(article.sampleIterations?.length) > 0
+        ? { label: `${article.sampleIterations.length} iterasi`, tone: 'complete' }
+        : { label: 'Perlu diisi', tone: 'empty' };
+    default:
+      return { label: 'Aktif', tone: 'partial' };
+  }
+}
+
+const PANEL_TONE_CLASS: Record<PanelTone, string> = {
+  complete: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  partial: 'bg-amber-50 text-amber-700 border-amber-200',
+  empty: 'bg-slate-100 text-slate-500 border-slate-200',
+};
+
 export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
   article,
   masterMaterials,
@@ -309,6 +366,50 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
           </div>
         </div>
 
+        {/* Indicator Strip — 5 indikator utama artikel (konsisten dgn kartu Pipeline) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-3 border-t border-slate-100">
+          {/* Workflow progress */}
+          <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/60">
+            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Workflow</div>
+            <div className="text-sm font-extrabold text-slate-900">{article.workflowProgressPercent}%</div>
+            <div className="mt-1 h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+              <div className="h-full rounded-full bg-[#087E79]" style={{ width: `${article.workflowProgressPercent}%` }} />
+            </div>
+          </div>
+          {/* Data completeness */}
+          <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/60">
+            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Kelengkapan Data</div>
+            <div className="text-sm font-extrabold text-slate-900">{article.dataCompletenessPercent}%</div>
+            <div className="mt-1 h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+              <div className="h-full rounded-full bg-indigo-600" style={{ width: `${article.dataCompletenessPercent}%` }} />
+            </div>
+          </div>
+          {/* Schedule health */}
+          <div className={`p-2.5 rounded-xl border ${
+            article.scheduleHealth === 'On Track' ? 'bg-emerald-50 border-emerald-200'
+              : article.scheduleHealth === 'At Risk' ? 'bg-amber-50 border-amber-200'
+              : article.scheduleHealth === 'Overdue' || article.scheduleHealth === 'Blocked' ? 'bg-rose-50 border-rose-200'
+              : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Jadwal</div>
+            <div className="text-[11px] font-extrabold text-slate-900 mt-0.5 leading-tight">{article.scheduleHealth}</div>
+          </div>
+          {/* Cost confidence */}
+          <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/60">
+            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Kepercayaan Biaya</div>
+            <div className="text-[11px] font-extrabold text-slate-900 mt-0.5 leading-tight">{article.costConfidence}</div>
+          </div>
+          {/* Production readiness */}
+          <div className={`p-2.5 rounded-xl border ${
+            article.productionReadiness === 'Approved' || article.productionReadiness === 'Ready' ? 'bg-emerald-50 border-emerald-200'
+              : article.productionReadiness === 'Conditional' ? 'bg-amber-50 border-amber-200'
+              : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Kesiapan Produksi</div>
+            <div className="text-[11px] font-extrabold text-slate-900 mt-0.5 leading-tight">{article.productionReadiness}</div>
+          </div>
+        </div>
+
         {/* Article Stage Bar */}
         <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
           <span className="text-slate-500 font-bold">Ubah Stage Development:</span>
@@ -354,6 +455,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
                 {phasePanels.map((p) => {
                   const Icon = p.icon;
                   const isOpen = !!openPanels[p.key];
+                  const panelState = getPanelState(p.key, article);
 
                   return (
                     <div
@@ -384,9 +486,13 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-white/80 px-2 py-0.5 rounded-full border border-slate-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Aktif</span>
+                          <span className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${PANEL_TONE_CLASS[panelState.tone]}`}>
+                            {panelState.tone === 'complete' ? (
+                              <CheckCircle2 className="w-3 h-3" />
+                            ) : (
+                              <span className={`w-1.5 h-1.5 rounded-full ${panelState.tone === 'partial' ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                            )}
+                            <span>{panelState.label}</span>
                           </span>
 
                           {isOpen ? (

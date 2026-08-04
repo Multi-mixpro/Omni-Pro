@@ -125,6 +125,54 @@ const IMPLEMENTATION_PHASES: ImplementationPhaseConfig[] = [
   },
 ];
 
+/** Status pengisian panel implementasi, dihitung dari data artikel. */
+type ImplTone = 'complete' | 'partial' | 'empty';
+function getImplPanelState(key: string, article: Article): { label: string; tone: ImplTone } {
+  switch (key) {
+    case 'hpp':
+      return (article.calculatedHPP ?? 0) > 0
+        ? { label: 'HPP terkalkulasi', tone: 'complete' }
+        : { label: 'Perlu diisi', tone: 'empty' };
+    case 'readiness': {
+      const done = (article.readinessChecklist ?? []).filter((r) => r.isCompleted).length;
+      const total = (article.readinessChecklist ?? []).length;
+      if (total > 0 && done >= total) return { label: 'Gate lolos', tone: 'complete' };
+      if (done > 0) return { label: `${done}/${total} checklist`, tone: 'partial' };
+      return { label: 'Perlu diisi', tone: 'empty' };
+    }
+    case 'stock': {
+      const hasPlan = (article.scenarios ?? []).some((s) => s.isSelectedPlan);
+      if (hasPlan) return { label: 'Rencana dipilih', tone: 'complete' };
+      return (article.scenarios ?? []).length > 0
+        ? { label: 'Draf skenario', tone: 'partial' }
+        : { label: 'Perlu diisi', tone: 'empty' };
+    }
+    case 'production':
+      return (article.batches ?? []).length > 0
+        ? { label: `${article.batches.length} batch`, tone: 'complete' }
+        : { label: 'Belum ada batch', tone: 'empty' };
+    case 'launch':
+      return (article.copywriting && article.copywriting.trim()) || (article.sellingPoints ?? []).length > 0
+        ? { label: 'Materi siap', tone: 'complete' }
+        : { label: 'Perlu diisi', tone: 'empty' };
+    case 'files': {
+      const fileCount = (article.files ?? []).length;
+      return fileCount > 0
+        ? { label: `${fileCount} berkas`, tone: 'complete' }
+        : { label: 'Belum ada berkas', tone: 'empty' };
+    }
+    case 'tasks':
+    default:
+      return { label: 'Aktif', tone: 'partial' };
+  }
+}
+
+const IMPL_TONE_CLASS: Record<ImplTone, string> = {
+  complete: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  partial: 'bg-amber-50 text-amber-700 border-amber-200',
+  empty: 'bg-slate-100 text-slate-500 border-slate-200',
+};
+
 export const ArticleImplementationView: React.FC<ArticleImplementationViewProps> = ({
   articles,
   selectedArticleId,
@@ -418,6 +466,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
                 {phasePanels.map((p) => {
                   const Icon = p.icon;
                   const isOpen = !!openPanels[p.key];
+                  const panelState = getImplPanelState(p.key, article);
 
                   return (
                     <div
@@ -446,9 +495,13 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-white/80 px-2 py-0.5 rounded-full border border-slate-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Siap Dikelola</span>
+                          <span className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${IMPL_TONE_CLASS[panelState.tone]}`}>
+                            {panelState.tone === 'complete' ? (
+                              <CheckCircle2 className="w-3 h-3" />
+                            ) : (
+                              <span className={`w-1.5 h-1.5 rounded-full ${panelState.tone === 'partial' ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                            )}
+                            <span>{panelState.label}</span>
                           </span>
 
                           {isOpen ? (
