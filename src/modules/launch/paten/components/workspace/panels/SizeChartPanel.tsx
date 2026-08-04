@@ -505,9 +505,8 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
         </span>
       </div>
 
-      {/* Full Matrix View (Ultra-Dense Compact Layout) */}
-      {mobileMode === 'full_matrix' && (
-        <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-300 shadow-2xs bg-white">
+      {/* Full Matrix View (Ultra-Dense Compact Layout) - Always Visible on Desktop (sm:block) */}
+      <div className={`overflow-x-auto rounded-xl border border-slate-300 shadow-2xs bg-white ${mobileMode === 'full_matrix' ? 'block' : 'hidden sm:block'}`}>
           {currentChart.length > 0 ? (
             <table className="w-full text-left text-[10px] sm:text-[11px] border-collapse">
               <thead>
@@ -725,7 +724,6 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
             </div>
           )}
         </div>
-      )}
 
       {/* Modal: Kelola & Pilih Variabel Pengukuran */}
       {showManageModal && (
