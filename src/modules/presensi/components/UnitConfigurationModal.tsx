@@ -25,6 +25,9 @@ import {
   Utensils,
   Layers,
   MessageCircle,
+  Trash2,
+  Search,
+  Crosshair,
 } from 'lucide-react';
 import { BusinessUnit, UnitType } from '../types';
 import { getWhatsAppLink, WA_TEMPLATES } from '../utils/whatsapp';
@@ -34,6 +37,7 @@ interface UnitConfigurationModalProps {
   onClose: () => void;
   units: BusinessUnit[];
   onUpdateUnit: (updatedUnit: BusinessUnit) => void;
+  onDeleteUnit?: (unitId: string) => void;
   selectedUnitId?: UnitType;
 }
 
@@ -42,15 +46,34 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
   onClose,
   units,
   onUpdateUnit,
+  onDeleteUnit,
   selectedUnitId = 'GG_SUPPLY',
 }) => {
+  // Deduplicate units to prevent duplicate tab pills
+  const uniqueUnits = units.filter(
+    (u, index, self) => index === self.findIndex((t) => t.id === u.id)
+  );
+
   // Active unit inside modal
   const initialUnitId = selectedUnitId === 'ALL' ? 'GG_SUPPLY' : selectedUnitId;
   const [activeUnitId, setActiveUnitId] = useState<Exclude<UnitType, 'ALL'>>(
     initialUnitId as Exclude<UnitType, 'ALL'>
   );
 
-  const currentUnit = units.find((u) => u.id === activeUnitId) || units[0];
+  const currentUnit = uniqueUnits.find((u) => u.id === activeUnitId) || uniqueUnits[0] || {
+    id: 'GG_SUPPLY',
+    name: 'GG Supply',
+    tagline: 'Logistik & Distribusi',
+    category: 'Logistik & Armada',
+    iconName: 'Truck',
+    color: '#3B82F6',
+    address: 'Jl. TB Simatupang No. 88',
+    latitude: -6.2915,
+    longitude: 106.8123,
+    radiusMeters: 80,
+    allowOutsideGeofence: false,
+    requireBiometric: true,
+  };
 
   // Editable form state for current unit
   const [formData, setFormData] = useState<BusinessUnit>({ ...currentUnit });
@@ -58,12 +81,25 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
   // Notice Toast
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Google Maps Link Parser State
+  const [mapsInputText, setMapsInputText] = useState<string>('');
+
+  // Interactive Visual Map Picker Modal State
+  const [isVisualMapOpen, setIsVisualMapOpen] = useState<boolean>(false);
+  const [tempLat, setTempLat] = useState<number>(formData.latitude || -6.2915);
+  const [tempLng, setTempLng] = useState<number>(formData.longitude || 106.8123);
+
+  // Delete Unit Confirm Dialog State
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
+
   // Sync state when active unit tab changes
   const handleSelectUnitTab = (unitId: Exclude<UnitType, 'ALL'>) => {
     setActiveUnitId(unitId);
-    const found = units.find((u) => u.id === unitId);
+    const found = uniqueUnits.find((u) => u.id === unitId);
     if (found) {
       setFormData({ ...found });
+      setTempLat(found.latitude || -6.2915);
+      setTempLng(found.longitude || 106.8123);
     }
   };
 
@@ -71,46 +107,118 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
 
   const showToast = (msg: string) => {
     setNotice(msg);
-    setTimeout(() => setNotice(null), 2500);
+    setTimeout(() => setNotice(null), 3000);
   };
 
   const handleFetchCurrentGps = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          const lat = Number(pos.coords.latitude.toFixed(6));
+          const lng = Number(pos.coords.longitude.toFixed(6));
           setFormData((prev) => ({
             ...prev,
-            latitude: Number(pos.coords.latitude.toFixed(6)),
-            longitude: Number(pos.coords.longitude.toFixed(6)),
+            latitude: lat,
+            longitude: lng,
           }));
-          showToast('Koordinat GPS berhasil disinkronkan dari lokasi perangkat!');
+          setTempLat(lat);
+          setTempLng(lng);
+          showToast('📌 Koordinat GPS berhasil disinkronkan dari lokasi perangkat Anda!');
         },
         () => {
           // Fallback simulation with slight variation
           const offsetLat = (Math.random() - 0.5) * 0.002;
           const offsetLng = (Math.random() - 0.5) * 0.002;
+          const lat = Number(((formData.latitude || -6.2915) + offsetLat).toFixed(6));
+          const lng = Number(((formData.longitude || 106.8123) + offsetLng).toFixed(6));
           setFormData((prev) => ({
             ...prev,
-            latitude: Number((prev.latitude + offsetLat).toFixed(6)),
-            longitude: Number((prev.longitude + offsetLng).toFixed(6)),
+            latitude: lat,
+            longitude: lng,
           }));
-          showToast('Koordinat GPS berhasil diperbarui (Simulasi)!');
+          setTempLat(lat);
+          setTempLng(lng);
+          showToast('📌 Koordinat GPS diperbarui via Simulasi!');
         }
       );
+    }
+  };
+
+  // Extract Coordinates from Google Maps Link / String
+  const handleParseGoogleMapsInput = () => {
+    if (!mapsInputText.trim()) {
+      showToast('⚠️ Tempel link atau string koordinat Google Maps terlebih dahulu.');
+      return;
+    }
+
+    const text = mapsInputText.trim();
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    // Pattern 1: @-6.9082,107.6189
+    const matchAt = text.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (matchAt) {
+      lat = parseFloat(matchAt[1]);
+      lng = parseFloat(matchAt[2]);
+    }
+
+    // Pattern 2: q=-6.9082,107.6189 or ll=-6.9082,107.6189
+    if (!lat) {
+      const matchQ = text.match(/(?:q|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (matchQ) {
+        lat = parseFloat(matchQ[1]);
+        lng = parseFloat(matchQ[2]);
+      }
+    }
+
+    // Pattern 3: Direct Lat, Lng string (e.g. -6.9082, 107.6189 or -6.9082 107.6189)
+    if (!lat) {
+      const matchDirect = text.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+      if (matchDirect) {
+        lat = parseFloat(matchDirect[1]);
+        lng = parseFloat(matchDirect[2]);
+      }
+    }
+
+    if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
+      setFormData((prev) => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng,
+      }));
+      setTempLat(lat);
+      setTempLng(lng);
+      setMapsInputText('');
+      showToast(`✅ Berhasil mengekstrak koordinat GPS: (${lat}, ${lng})!`);
+    } else {
+      showToast('⚠️ Format link/koordinat tidak terdeteksi. Gunakan format "-6.2915, 106.8123" atau link Google Maps.');
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onUpdateUnit(formData);
-    showToast(`Konfigurasi lokasi & geofence ${formData.name} berhasil disimpan!`);
+    showToast(`✅ Konfigurasi lokasi & geofence ${formData.name} berhasil disimpan!`);
   };
 
-  const googleMapsUrl = `https://www.google.com/maps?q=${formData.latitude},${formData.longitude}`;
+  const handleDeleteCurrentUnit = () => {
+    if (onDeleteUnit) {
+      onDeleteUnit(formData.id);
+      setIsDeleteConfirmOpen(false);
+      showToast(`🗑️ Unit usaha ${formData.name} telah berhasil dihapus.`);
+      onClose();
+    }
+  };
+
+  // Valid Google Maps URL fallback
+  const googleMapsUrl =
+    formData.latitude && formData.longitude && formData.latitude !== 0
+      ? `https://www.google.com/maps/search/?api=1&query=${formData.latitude},${formData.longitude}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.address || formData.name)}`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    showToast(`${label} tersalin ke clipboard!`);
+    showToast(`📋 ${label} tersalin ke clipboard!`);
   };
 
   const getUnitIcon = (iconName: string) => {
@@ -136,6 +244,140 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
         </div>
       )}
 
+      {/* Delete Unit Confirmation Modal */}
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full border border-red-200 dark:border-red-900/50 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/80 text-red-600 dark:text-red-400 flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                Hapus Unit Usaha '{formData.name}'?
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Tindakan ini akan menghapus konfigurasi unit usaha ini secara permanen dari database. Seluruh karyawan dan shift di bawah unit ini perlu dipindahkan.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteCurrentUnit}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-500/20"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Ya, Hapus Unit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Visual Map Picker Modal */}
+      {isVisualMapOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0c162c] rounded-3xl w-full max-w-3xl max-h-[85vh] border border-slate-200 dark:border-[#1a2847] shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-[#0f1a30]">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-blue-500" />
+                <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                  Pilih Koordinat Presensi di Peta Visual
+                </h4>
+              </div>
+              <button
+                onClick={() => setIsVisualMapOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 flex-1 flex flex-col space-y-3 overflow-hidden">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Peta di bawah ini berpusat di titik koordinat <code className="font-mono font-bold text-blue-600">({tempLat}, {tempLng})</code>. Anda dapat menggeser/zoom peta atau memasukkan koordinat baru di bawah.
+              </p>
+
+              {/* Embedded OpenStreetMap / Leaflet Map Frame */}
+              <div className="flex-1 rounded-2xl overflow-hidden border border-slate-300 dark:border-slate-700 min-h-[300px] relative">
+                <iframe
+                  title="Google Maps Location Picker"
+                  width="100%"
+                  height="100%"
+                  className="w-full h-full border-0"
+                  loading="lazy"
+                  src={`https://maps.google.com/maps?q=${tempLat},${tempLng}&z=16&output=embed`}
+                />
+                <div className="absolute top-3 left-3 bg-slate-900/90 text-white px-3 py-1.5 rounded-xl text-[11px] font-mono font-bold shadow-lg backdrop-blur-sm border border-slate-700 flex items-center gap-2">
+                  <Crosshair className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+                  <span>Center: {tempLat}, {tempLng}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Latitude Temp
+                  </label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={tempLat}
+                    onChange={(e) => setTempLat(parseFloat(e.target.value) || 0)}
+                    className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono font-bold text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Longitude Temp
+                  </label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={tempLng}
+                    onChange={(e) => setTempLng(parseFloat(e.target.value) || 0)}
+                    className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono font-bold text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-[#0f1a30] flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsVisualMapOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    latitude: tempLat,
+                    longitude: tempLng,
+                  }));
+                  setIsVisualMapOpen(false);
+                  showToast(`✅ Titik koordinat (${tempLat}, ${tempLng}) berhasil diterapkan ke form!`);
+                }}
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md"
+              >
+                <Check className="w-4 h-4" />
+                <span>Gunakan Koordinat Ini</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Modal Container */}
       <div className="bg-white/95 dark:bg-[#0c162c] rounded-3xl w-full max-w-4xl max-h-[90vh] border border-slate-200 dark:border-[#1a2847] shadow-2xl flex flex-col overflow-hidden">
         {/* Modal Header */}
         <div className="p-5 border-b border-slate-100 dark:border-[#1a2847] flex items-center justify-between bg-slate-50/50 dark:bg-[#0f1a30] shrink-0">
@@ -166,14 +408,15 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
           </button>
         </div>
 
-        {/* Business Unit Tabs Selector */}
+        {/* Business Unit Tabs Selector (Deduplicated) */}
         <div className="px-6 py-3 bg-slate-100/60 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-2 overflow-x-auto shrink-0">
-          {units.map((unit) => {
+          {uniqueUnits.map((unit) => {
             const IconComponent = getUnitIcon(unit.iconName);
             const isSelected = activeUnitId === unit.id;
             return (
               <button
                 key={unit.id}
+                type="button"
                 onClick={() => handleSelectUnitTab(unit.id as Exclude<UnitType, 'ALL'>)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap ${
                   isSelected
@@ -313,7 +556,7 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
                 <span>2. Titik Koordinat GPS & Radius Presensi Geofence</span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleFetchCurrentGps}
@@ -321,6 +564,15 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Ambil GPS Device</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsVisualMapOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-sm transition-all"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Peta Visual Map</span>
                 </button>
 
                 <a
@@ -332,6 +584,31 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
                   <ExternalLink className="w-3.5 h-3.5 text-blue-500" />
                   <span>Google Maps</span>
                 </a>
+              </div>
+            </div>
+
+            {/* Google Maps Link / Coordinate Extractor Tool */}
+            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-blue-200 dark:border-blue-900/50 space-y-2">
+              <label className="block font-bold text-slate-800 dark:text-slate-200 text-[11px] flex items-center gap-1.5">
+                <Search className="w-3.5 h-3.5 text-blue-500" />
+                <span>Tempel Link / String Koordinat Google Maps (Ekstraksi Otomatis):</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={mapsInputText}
+                  onChange={(e) => setMapsInputText(e.target.value)}
+                  placeholder="Tempel link Google Maps (misal: https://maps.google.com/?q=-6.9082,107.6189 atau -6.9082, 107.6189)"
+                  className="flex-1 p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleParseGoogleMapsInput}
+                  className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 shadow-sm shrink-0"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Ekstrak Koordinat</span>
+                </button>
               </div>
             </div>
 
@@ -616,19 +893,32 @@ export const UnitConfigurationModal: React.FC<UnitConfigurationModalProps> = ({
             </div>
           </div>
 
-          {/* Bottom Action Submit Button */}
-          <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-2xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold transition-all"
-            >
-              Batal
-            </button>
+          {/* Bottom Action Submit & Delete Unit Button */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-2xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold transition-all"
+              >
+                Batal
+              </button>
+
+              {onDeleteUnit && (
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                  className="px-4 py-2.5 rounded-2xl bg-red-100 hover:bg-red-200 dark:bg-red-950/60 dark:hover:bg-red-900 text-red-600 dark:text-red-400 font-bold flex items-center gap-1.5 transition-all text-xs"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Hapus Unit Usaha</span>
+                </button>
+              )}
+            </div>
 
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all text-xs"
             >
               <Save className="w-4 h-4" />
               <span>Simpan Konfigurasi Unit {formData.name}</span>

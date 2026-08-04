@@ -21,7 +21,8 @@ export const UnitTabNavigation: React.FC<UnitTabNavigationProps> = ({
 }) => {
   // Data referensi nyata dari schema presensi (menggantikan konstanta mock).
   const BUSINESS_UNITS = useBusinessUnits();
-  const units = unitsProp ?? BUSINESS_UNITS;
+  const rawUnits = unitsProp ?? BUSINESS_UNITS;
+  const units = rawUnits.filter((u, index, self) => index === self.findIndex((t) => t.id === u.id));
   const getIcon = (iconName: string) => {
     switch (iconName) {
       case 'Truck':

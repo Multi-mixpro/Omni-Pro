@@ -244,6 +244,16 @@ export const presensiRepository = {
     }
   },
 
+  async deleteUnit(unitId: string): Promise<RepoResult<boolean>> {
+    try {
+      const { error } = await supabase.from('business_units').delete().eq('id', unitId);
+      if (error) return { data: false, error: error.message };
+      return { data: true };
+    } catch (reason) {
+      return { data: false, error: errorText(reason) };
+    }
+  },
+
   async saveEmployee(emp: Partial<Employee> & { id?: string; name: string; employeeCode: string; unitId: string; role: string }): Promise<RepoResult<boolean>> {
     try {
       const id = emp.id || `EMP_${Date.now()}`;

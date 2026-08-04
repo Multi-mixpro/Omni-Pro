@@ -207,12 +207,30 @@ export default function App() {
     loadSupabaseData();
   }, []);
 
-  // Unit Configuration Update Handler (Persistent to Supabase)
+  // Unit Configuration Update & Delete Handlers (Persistent to Supabase & LocalStorage)
   const handleUpdateUnit = async (updatedUnit: BusinessUnit) => {
-    setBusinessUnits((prev) => prev.map((u) => (u.id === updatedUnit.id ? updatedUnit : u)));
+    setBusinessUnits((prev) => {
+      const next = prev.map((u) => (u.id === updatedUnit.id ? updatedUnit : u));
+      localStorage.setItem('presensi_units', JSON.stringify(next));
+      return next;
+    });
     const res = await presensiRepository.saveUnit(updatedUnit);
     if (res.error) {
       console.error('Gagal menyimpan unit ke Supabase:', res.error);
+    } else {
+      await loadSupabaseData();
+    }
+  };
+
+  const handleDeleteUnit = async (unitId: string) => {
+    setBusinessUnits((prev) => {
+      const next = prev.filter((u) => u.id !== unitId);
+      localStorage.setItem('presensi_units', JSON.stringify(next));
+      return next;
+    });
+    const res = await presensiRepository.deleteUnit(unitId);
+    if (res.error) {
+      console.error('Gagal menghapus unit dari Supabase:', res.error);
     } else {
       await loadSupabaseData();
     }
@@ -563,6 +581,7 @@ export default function App() {
           onClose={() => setIsUnitConfigModalOpen(false)}
           units={businessUnits}
           onUpdateUnit={handleUpdateUnit}
+          onDeleteUnit={handleDeleteUnit}
         />
 
         {/* Global Right Notification Drawer */}
