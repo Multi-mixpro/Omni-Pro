@@ -324,6 +324,13 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
+  const articlesRef = useRef(articles);
+  articlesRef.current = articles;
+  const onUpdateArticleRef = useRef(onUpdateArticle);
+  onUpdateArticleRef.current = onUpdateArticle;
+  const soundMutedRef = useRef(soundMuted);
+  soundMutedRef.current = soundMuted;
+
   // Switch channel when selected article changes from parent (matches ID or Code)
   useEffect(() => {
     if (selectedArticleId) {
@@ -492,10 +499,11 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
               return [...prev, incoming];
             });
           } else if (incoming.projectId) {
-            const targetArt = articles.find((a) => a.id === incoming.projectId || a.code === incoming.projectId);
+            const arts = articlesRef.current;
+            const targetArt = arts.find((a) => a.id === incoming.projectId || a.code === incoming.projectId);
             if (targetArt) {
               if (!(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
-                onUpdateArticle({
+                onUpdateArticleRef.current({
                   ...targetArt,
                   teamComments: [...(targetArt.teamComments || []), incoming],
                   lastUpdated: new Date().toISOString(),
@@ -505,7 +513,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
           }
 
           if (!isFromMe) {
-            playNotificationChime(soundMuted);
+            playNotificationChime(soundMutedRef.current);
             triggerToastNotification(incoming);
           }
         }
@@ -541,7 +549,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
 
           const projectId = newRow.project_id ? String(newRow.project_id) : null;
 
-          const incoming: ArticleComment & { projectId?: string } = {
+          const incoming: ArticleComment & { projectId?: string; _sourceLabel?: string } = {
             id: String(newRow.id),
             authorName,
             authorAvatar,
@@ -550,24 +558,32 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
             projectId: projectId || 'global',
           };
 
-          if (projectId) {
-            const targetArt = articles.find((a) => a.id === projectId || a.code === projectId);
-            if (targetArt && !(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
-              onUpdateArticle({
-                ...targetArt,
-                teamComments: [...(targetArt.teamComments || []), incoming],
-                lastUpdated: new Date().toISOString(),
+          try {
+            if (projectId) {
+              const arts = articlesRef.current;
+              const targetArt = arts.find((a) => a.id === projectId || a.code === projectId);
+              if (targetArt) {
+                incoming._sourceLabel = targetArt.code || targetArt.name;
+                if (!(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
+                  onUpdateArticleRef.current({
+                    ...targetArt,
+                    teamComments: [...(targetArt.teamComments || []), incoming],
+                    lastUpdated: new Date().toISOString(),
+                  });
+                }
+              }
+            } else {
+              setGlobalComments((prev) => {
+                if (prev.some((c) => c.id === incoming.id)) return prev;
+                return [...prev, incoming];
               });
             }
-          } else {
-            setGlobalComments((prev) => {
-              if (prev.some((c) => c.id === incoming.id)) return prev;
-              return [...prev, incoming];
-            });
+          } catch (err) {
+            console.warn('[Chat Realtime] Error processing message:', err);
           }
 
           if (!isFromMe) {
-            playNotificationChime(soundMuted);
+            playNotificationChime(soundMutedRef.current);
             triggerToastNotification(incoming);
           }
         }
@@ -580,7 +596,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       }
       supabase.removeChannel(supabaseChannel);
     };
-  }, [articles, currentUser?.id, currentUser?.name, onUpdateArticle, soundMuted]);
+  }, [currentUser?.id, currentUser?.name]);
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
