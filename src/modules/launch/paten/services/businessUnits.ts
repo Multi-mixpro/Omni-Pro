@@ -13,13 +13,12 @@ export interface BusinessUnitItem {
 export const INITIAL_BUSINESS_UNITS: BusinessUnitItem[] = [
   { id: 'bu-1', name: 'GUDSKUY', code: 'GUDSKUY', description: 'Unit Bisnis utama koleksi streetwear & merchandise.', status: 'Aktif Utama' },
   { id: 'bu-2', name: 'GG Supply', code: 'GG_SUPPLY', description: 'Unit Bisnis divisi supply, apparel & manufacturing.', status: 'Aktif Utama' },
-  { id: 'bu-3', name: 'Mainline Studio', code: 'MAINLINE', description: 'Unit Bisnis studio rilis lini utama.', status: 'Aktif' },
-  { id: 'bu-4', name: 'Streetwear Co', code: 'STREETWEAR', description: 'Lini koleksi spesialis streetwear.', status: 'Aktif' },
-  { id: 'bu-5', name: 'Activewear Lab', code: 'ACTIVEWEAR', description: 'Lini koleksi sportswear & activewear.', status: 'Aktif' },
 ];
 
 /** Nilai sentinel untuk filter "tampilkan semua unit bisnis". */
 export const ALL_BUSINESS_UNITS = 'Semua Unit Bisnis';
+
+const LEGACY_UNITS_TO_REMOVE = new Set(['Mainline Studio', 'Streetwear Co', 'Activewear Lab']);
 
 /**
  * True bila filter unit sedang dalam mode "tampilkan semua".
@@ -41,7 +40,14 @@ export function loadStoredBusinessUnits(): BusinessUnitItem[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Strip legacy demo units if stored in device localStorage
+        const cleaned = parsed.filter((u: BusinessUnitItem) => u && !LEGACY_UNITS_TO_REMOVE.has(u?.name));
+        if (cleaned.length > 0) {
+          if (cleaned.length !== parsed.length) {
+            saveStoredBusinessUnits(cleaned);
+          }
+          return cleaned;
+        }
       }
     }
   } catch (err) {

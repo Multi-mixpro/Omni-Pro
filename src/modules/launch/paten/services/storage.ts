@@ -139,8 +139,7 @@ function mapBusinessUnit(row: Row): BusinessUnit {
   const code = String(row.business_unit?.code || row.business_unit_code || '').toUpperCase();
   if (code === 'GUDSKUY') return 'GUDSKUY';
   if (code === 'GG_SUPPLY') return 'GG Supply';
-  if (code === 'ACTIVEWEAR') return 'Activewear Lab';
-  return 'Mainline Studio';
+  return 'GUDSKUY';
 }
 
 function mapStage(stage: unknown): ArticleStage {

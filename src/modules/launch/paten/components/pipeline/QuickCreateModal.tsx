@@ -113,7 +113,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   // "Semua Unit Bisnis" adalah filter tampilan, bukan unit nyata — jangan
   // dipakai sebagai unit artikel baru. Jatuhkan ke unit terdaftar pertama.
   const defaultBusinessUnit: BusinessUnit = isAllBusinessUnits(activeBusinessUnit)
-    ? (loadStoredBusinessUnits()[0]?.name ?? 'Mainline Studio')
+    ? (loadStoredBusinessUnits()[0]?.name ?? 'GUDSKUY')
     : activeBusinessUnit;
   const [businessUnit, setBusinessUnit] = useState<BusinessUnit>(editArticle?.businessUnit ?? defaultBusinessUnit);
   const [genderTarget, setGenderTarget] = useState<'Men' | 'Women' | 'Unisex' | 'Kids'>(
