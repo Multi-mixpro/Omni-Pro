@@ -12,9 +12,13 @@ import {
   Sparkles,
   Bookmark,
   AlertTriangle,
+  Volume2,
+  VolumeX,
+  CheckCheck,
 } from 'lucide-react';
 import type { Article, ArticleComment } from '../../types';
-import { addArticleComment } from '../../services/collaboration';
+import { addArticleComment, broadcastNewMessage } from '../../services/collaboration';
+import { supabase } from '@/integrations/supabase/client';
 
 type ChatChannel = 'all_feed' | 'global' | string;
 
@@ -27,6 +31,43 @@ interface FloatingChatBubbleProps {
 
 const STORAGE_KEY_GLOBAL_COMMENTS = 'mix_pro_launch_global_comments_v1';
 const STORAGE_KEY_CHAT_POS = 'mix_pro_launch_chat_pos_v1';
+const STORAGE_KEY_READ_IDS = 'mix_pro_chat_read_ids_v1';
+const STORAGE_KEY_MUTED = 'mix_pro_chat_sound_muted_v1';
+
+/** Web Audio API Synthesizer — Produces a loud, crisp, pleasant incoming message chime sound */
+function playNotificationChime(muted = false) {
+  if (muted) return;
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    const playNote = (freq: number, start: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+
+      // Envelope: sharp attack, smooth ringing decay
+      gain.gain.setValueAtTime(0.01, start);
+      gain.gain.exponentialRampToValueAtTime(0.35, start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + duration);
+    };
+
+    // Double chime: 880Hz (A5) -> 1320Hz (E6)
+    playNote(880, now, 0.18);
+    playNote(1320, now + 0.1, 0.35);
+  } catch (err) {
+    console.warn('Audio chime skipped by browser policy:', err);
+  }
+}
 
 export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   articles,
@@ -43,6 +84,26 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [searchCategory, setSearchCategory] = useState<'all' | 'keputusan' | 'blocker' | 'global' | 'articles'>('all');
+
+  // Sound mute state
+  const [soundMuted, setSoundMuted] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_MUTED) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Track read comment IDs to calculate unread badge
+  const [readCommentIds, setReadCommentIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_READ_IDS);
+      if (saved) return new Set(JSON.parse(saved));
+    } catch {
+      /* ignore */
+    }
+    return new Set();
+  });
 
   // Saved bubble position or default { x: 0, y: 0 } (bottom-right)
   const [bubblePosition, setBubblePosition] = useState<{ x: number; y: number }>(() => {
@@ -74,7 +135,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     ];
   });
 
-  // Save global comments & bubble position locally
+  // Persist state locally
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_GLOBAL_COMMENTS, JSON.stringify(globalComments));
@@ -90,6 +151,22 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       /* ignore */
     }
   }, [bubblePosition]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_READ_IDS, JSON.stringify(Array.from(readCommentIds)));
+    } catch {
+      /* ignore */
+    }
+  }, [readCommentIds]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_MUTED, String(soundMuted));
+    } catch {
+      /* ignore */
+    }
+  }, [soundMuted]);
 
   const isDragging = useRef(false);
   const dragStart = useRef({ px: 0, py: 0, ox: 0, oy: 0 });
@@ -164,7 +241,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
 
   const rawComments = getDisplayComments();
 
-  // Cross-system comments pool for broad searching
+  // Cross-system comments pool for broad searching & unread calculation
   const allSystemComments: (ArticleComment & { _sourceLabel: string; _articleName?: string })[] = [
     ...globalComments.map((c) => ({ ...c, _sourceLabel: 'Umum' })),
     ...articles.flatMap((a) =>
@@ -175,6 +252,17 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       }))
     ),
   ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  // Calculate unread comment count dynamically (does NOT accumulate endlessly)
+  const isCommentUnread = useCallback((c: ArticleComment) => {
+    if (readCommentIds.has(c.id)) return false;
+    const author = c.authorName?.trim() || '';
+    const myName = (currentUser?.name || 'Tim Launch').trim();
+    if (author === myName || author === 'Anda') return false;
+    return true;
+  }, [readCommentIds, currentUser?.name]);
+
+  const totalUnreadCount = allSystemComments.filter(isCommentUnread).length;
 
   const isSearchActive = searchQuery.trim().length > 0 || searchCategory !== 'all';
   const commentsToSearch = isSearchActive ? allSystemComments : rawComments;
@@ -195,7 +283,110 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     return queryTokens.every((token) => searchableText.includes(token));
   });
 
-  const totalCommentCount = globalComments.length + articles.reduce((sum, a) => sum + (a.teamComments?.length || 0), 0);
+  // Automatically mark displayed comments as READ when panel is OPEN
+  useEffect(() => {
+    if (!isOpen || rawComments.length === 0) return;
+    const newRead = new Set(readCommentIds);
+    let updated = false;
+
+    for (const c of rawComments) {
+      if (!newRead.has(c.id)) {
+        newRead.add(c.id);
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      setReadCommentIds(newRead);
+    }
+  }, [isOpen, channel, rawComments, readCommentIds]);
+
+  // Realtime Subscriptions (BroadcastChannel + Supabase Realtime)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    const bc = new BroadcastChannel('mix_pro_chat_realtime_channel');
+
+    const handleBroadcastMsg = (event: MessageEvent) => {
+      if (event.data?.type === 'NEW_MESSAGE' && event.data.comment) {
+        const incoming: ArticleComment & { projectId?: string } = event.data.comment;
+        const isFromMe = incoming.authorName === (currentUser?.name || 'Tim Launch') || incoming.authorName === 'Anda';
+
+        if (incoming.projectId === 'global') {
+          setGlobalComments((prev) => {
+            if (prev.some((c) => c.id === incoming.id)) return prev;
+            return [...prev, incoming];
+          });
+        } else if (incoming.projectId) {
+          const targetArt = articles.find((a) => a.id === incoming.projectId);
+          if (targetArt) {
+            if (!(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
+              onUpdateArticle({
+                ...targetArt,
+                teamComments: [...(targetArt.teamComments || []), incoming],
+                lastUpdated: new Date().toISOString(),
+              });
+            }
+          }
+        }
+
+        // Play loud chime sound if incoming message is from someone else
+        if (!isFromMe) {
+          playNotificationChime(soundMuted);
+        }
+      }
+    };
+
+    bc.addEventListener('message', handleBroadcastMsg);
+
+    // Supabase Realtime Subscription fallback
+    const supabaseChannel = supabase
+      .channel('public:launch_comments')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'launch_comments' },
+        (payload) => {
+          const newRow = payload.new;
+          if (newRow && newRow.body) {
+            const incoming: ArticleComment & { projectId?: string } = {
+              id: String(newRow.id),
+              authorName: 'Tim Launch',
+              authorAvatar: '',
+              body: String(newRow.body),
+              createdAt: String(newRow.created_at || new Date().toISOString()),
+              projectId: String(newRow.project_id || 'global'),
+            };
+
+            const isFromMe = incoming.authorName === (currentUser?.name || 'Tim Launch');
+            if (incoming.projectId === 'global') {
+              setGlobalComments((prev) => {
+                if (prev.some((c) => c.id === incoming.id)) return prev;
+                return [...prev, incoming];
+              });
+            } else {
+              const targetArt = articles.find((a) => a.id === incoming.projectId);
+              if (targetArt && !(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
+                onUpdateArticle({
+                  ...targetArt,
+                  teamComments: [...(targetArt.teamComments || []), incoming],
+                  lastUpdated: new Date().toISOString(),
+                });
+              }
+            }
+
+            if (!isFromMe) {
+              playNotificationChime(soundMuted);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      bc.removeEventListener('message', handleBroadcastMsg);
+      bc.close();
+      supabase.removeChannel(supabaseChannel);
+    };
+  }, [articles, currentUser?.name, onUpdateArticle, soundMuted]);
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -222,29 +413,37 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     setError(null);
 
     const textToSend = commentText.trim();
+    const targetProjectId = channel === 'global' || channel === 'all_feed' ? 'global' : (currentArticle?.id || 'global');
 
     try {
       if (channel === 'global') {
-        // Global chat logic
         const newComment = await addArticleComment('global', textToSend);
         if (currentUser?.name) newComment.authorName = currentUser.name;
+
+        // Auto mark sent comment as read by author
+        setReadCommentIds((prev) => new Set([...prev, newComment.id]));
         setGlobalComments((prev) => [...prev, newComment]);
+        broadcastNewMessage({ ...newComment, projectId: 'global' });
         setCommentText('');
       } else if (currentArticle) {
-        // Article specific chat logic
         const newComment = await addArticleComment(currentArticle.id, textToSend);
         if (currentUser?.name) newComment.authorName = currentUser.name;
+
+        setReadCommentIds((prev) => new Set([...prev, newComment.id]));
         onUpdateArticle({
           ...currentArticle,
           teamComments: [...(currentArticle.teamComments || []), newComment],
           lastUpdated: new Date().toISOString(),
         });
+        broadcastNewMessage({ ...newComment, projectId: currentArticle.id });
         setCommentText('');
       } else if (channel === 'all_feed') {
-        // Default to posting into global chat if in combined feed mode
         const newComment = await addArticleComment('global', textToSend);
         if (currentUser?.name) newComment.authorName = currentUser.name;
+
+        setReadCommentIds((prev) => new Set([...prev, newComment.id]));
         setGlobalComments((prev) => [...prev, newComment]);
+        broadcastNewMessage({ ...newComment, projectId: 'global' });
         setCommentText('');
       }
     } catch (reason) {
@@ -368,17 +567,17 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
                 <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
                   <MessageCircle className="w-4 h-4 text-teal-300" />
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900"></span>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900 animate-pulse"></span>
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="text-xs font-bold leading-tight tracking-wide">Diskusi Tim</p>
-                  <span className="text-[9px] px-1.5 py-0.2 bg-teal-500/20 text-teal-200 rounded-full font-medium border border-teal-400/30">
-                    Realtime
+                  <span className="text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-200 rounded-full font-medium border border-emerald-400/30">
+                    Realtime Active
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-300 leading-tight truncate">
-                  {currentUser?.name || 'Tim Launch'} · {totalCommentCount} pesan
+                  {currentUser?.name || 'Tim Launch'} · {totalUnreadCount > 0 ? `${totalUnreadCount} belum dibaca` : 'Semua dibaca'}
                 </p>
               </div>
             </div>
@@ -388,6 +587,19 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
               className="flex items-center gap-1"
               onPointerDown={(e) => e.stopPropagation()}
             >
+              <button
+                id="chat-sound-toggle-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSoundMuted(!soundMuted);
+                }}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                  soundMuted ? 'bg-rose-500/20 text-rose-300' : 'hover:bg-white/10 text-slate-300 hover:text-white'
+                }`}
+                title={soundMuted ? 'Bunyi Pesan: Matikan' : 'Bunyi Pesan: Nyala'}
+              >
+                {soundMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+              </button>
               <button
                 id="chat-search-toggle-btn"
                 onClick={(e) => {
@@ -650,6 +862,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
               <div className="space-y-3 py-1">
                 {filteredComments.map((c) => {
                   const isMe = c.authorName === (currentUser?.name || 'Tim Launch') || c.authorName === 'Anda';
+                  const isRead = readCommentIds.has(c.id);
                   return (
                     <div key={c.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
                       {!isMe && (
@@ -683,9 +896,14 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
                           {c.body}
                         </div>
 
-                        <span className={`text-[9.5px] text-slate-400 mt-0.5 px-1 ${isMe ? 'text-right' : ''}`}>
-                          {formatTime(c.createdAt)}
-                        </span>
+                        <div className={`flex items-center gap-1 mt-0.5 px-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                          <span className="text-[9.5px] text-slate-400">
+                            {formatTime(c.createdAt)}
+                          </span>
+                          {isMe && (
+                            <CheckCheck className={`w-3 h-3 ${isRead ? 'text-teal-600' : 'text-slate-300'}`} />
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -799,16 +1017,16 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
         >
           <MessageCircle className="w-6 h-6 transition-transform group-hover:scale-110" />
 
-          {/* Badge count */}
-          {totalCommentCount > 0 && (
+          {/* DYNAMIC UNREAD BADGE COUNT (ONLY SHOWS UNREAD MESSAGES, DECREASES WHEN READ) */}
+          {totalUnreadCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 bg-rose-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center shadow-md border-2 border-white animate-pulse">
-              {totalCommentCount > 99 ? '99+' : totalCommentCount}
+              {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
             </span>
           )}
 
           {/* Tooltip */}
           <span className="absolute -top-9 right-0 bg-slate-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg border border-slate-700">
-            Diskusi Tim
+            Diskusi Tim {totalUnreadCount > 0 ? `(${totalUnreadCount} baru)` : ''}
           </span>
         </button>
       )}

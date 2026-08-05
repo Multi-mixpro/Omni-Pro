@@ -57,3 +57,15 @@ export async function addArticleComment(
     createdAt: new Date().toISOString(),
   };
 }
+
+export function broadcastNewMessage(comment: ArticleComment & { projectId: string }) {
+  try {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      const channel = new BroadcastChannel('mix_pro_chat_realtime_channel');
+      channel.postMessage({ type: 'NEW_MESSAGE', comment });
+      channel.close();
+    }
+  } catch (err) {
+    console.warn('BroadcastChannel message send skipped:', err);
+  }
+}
