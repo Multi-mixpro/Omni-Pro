@@ -16,8 +16,8 @@ import {
   VolumeX,
   CheckCheck,
   BellRing,
-  Users,
   Radio,
+  Bell,
 } from 'lucide-react';
 import type { Article, ArticleComment } from '../../types';
 import { addArticleComment, broadcastNewMessage } from '../../services/collaboration';
@@ -145,6 +145,12 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   const [showSearch, setShowSearch] = useState(false);
   const [searchCategory, setSearchCategory] = useState<'all' | 'keputusan' | 'blocker' | 'global' | 'articles'>('all');
   const [incomingToast, setIncomingToast] = useState<ToastNotification | null>(null);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'default';
+  });
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sound mute state
@@ -207,6 +213,22 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       },
     ];
   });
+
+  // Storage Event Listener for Cross-Tab Sync Fallback
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY_GLOBAL_COMMENTS && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setGlobalComments(parsed);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   // Unlock AudioContext on first user interaction
   useEffect(() => {
@@ -335,10 +357,14 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Switch channel when selected article changes from parent
+  // Switch channel when selected article changes from parent (matches ID or Code)
   useEffect(() => {
-    if (selectedArticleId) setChannel(selectedArticleId);
-  }, [selectedArticleId]);
+    if (selectedArticleId) {
+      const art = articles.find((a) => a.id === selectedArticleId || a.code === selectedArticleId);
+      if (art) setChannel(art.id);
+      else setChannel(selectedArticleId);
+    }
+  }, [selectedArticleId, articles]);
 
   // Clamp helper for closed bubble (56x56) with Mobile BottomNav & Top Navbar guards
   const getClampedBubblePos = useCallback((posX: number, posY: number) => {
@@ -373,8 +399,9 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     ? getClampedPanelPos(bubblePosition.x, bubblePosition.y)
     : getClampedBubblePos(bubblePosition.x, bubblePosition.y);
 
+  // Match current article by BOTH id and code
   const currentArticle = channel !== 'global' && channel !== 'all_feed'
-    ? articles.find((a) => a.id === channel)
+    ? articles.find((a) => a.id === channel || a.code === channel)
     : null;
 
   // Retrieve channel comments
@@ -481,41 +508,44 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
 
   // Realtime Subscriptions (BroadcastChannel + Supabase Realtime)
   useEffect(() => {
-    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
-    const bc = new BroadcastChannel('mix_pro_chat_realtime_channel');
+    if (typeof window === 'undefined') return;
 
-    const handleBroadcastMsg = (event: MessageEvent) => {
-      if (event.data?.type === 'NEW_MESSAGE' && event.data.comment) {
-        const incoming: ArticleComment & { projectId?: string } = event.data.comment;
-        const isFromMe = incoming.authorName === (currentUser?.name || 'Tim Launch') || incoming.authorName === 'Anda';
+    let bc: BroadcastChannel | null = null;
+    if ('BroadcastChannel' in window) {
+      bc = new BroadcastChannel('mix_pro_chat_realtime_channel');
 
-        if (incoming.projectId === 'global') {
-          setGlobalComments((prev) => {
-            if (prev.some((c) => c.id === incoming.id)) return prev;
-            return [...prev, incoming];
-          });
-        } else if (incoming.projectId) {
-          const targetArt = articles.find((a) => a.id === incoming.projectId);
-          if (targetArt) {
-            if (!(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
-              onUpdateArticle({
-                ...targetArt,
-                teamComments: [...(targetArt.teamComments || []), incoming],
-                lastUpdated: new Date().toISOString(),
-              });
+      const handleBroadcastMsg = (event: MessageEvent) => {
+        if (event.data?.type === 'NEW_MESSAGE' && event.data.comment) {
+          const incoming: ArticleComment & { projectId?: string } = event.data.comment;
+          const isFromMe = incoming.authorName === (currentUser?.name || 'Tim Launch') || incoming.authorName === 'Anda';
+
+          if (incoming.projectId === 'global') {
+            setGlobalComments((prev) => {
+              if (prev.some((c) => c.id === incoming.id)) return prev;
+              return [...prev, incoming];
+            });
+          } else if (incoming.projectId) {
+            const targetArt = articles.find((a) => a.id === incoming.projectId || a.code === incoming.projectId);
+            if (targetArt) {
+              if (!(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
+                onUpdateArticle({
+                  ...targetArt,
+                  teamComments: [...(targetArt.teamComments || []), incoming],
+                  lastUpdated: new Date().toISOString(),
+                });
+              }
             }
           }
-        }
 
-        // Play loud chime sound and show Toast if incoming message is from someone else
-        if (!isFromMe) {
-          playNotificationChime(soundMuted);
-          triggerToastNotification(incoming);
+          if (!isFromMe) {
+            playNotificationChime(soundMuted);
+            triggerToastNotification(incoming);
+          }
         }
-      }
-    };
+      };
 
-    bc.addEventListener('message', handleBroadcastMsg);
+      bc.addEventListener('message', handleBroadcastMsg);
+    }
 
     // Supabase Realtime Subscription fallback
     const supabaseChannel = supabase
@@ -542,7 +572,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
                 return [...prev, incoming];
               });
             } else {
-              const targetArt = articles.find((a) => a.id === incoming.projectId);
+              const targetArt = articles.find((a) => a.id === incoming.projectId || a.code === incoming.projectId);
               if (targetArt && !(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
                 onUpdateArticle({
                   ...targetArt,
@@ -562,8 +592,9 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       .subscribe();
 
     return () => {
-      bc.removeEventListener('message', handleBroadcastMsg);
-      bc.close();
+      if (bc) {
+        bc.close();
+      }
       supabase.removeChannel(supabaseChannel);
     };
   }, [articles, currentUser?.name, onUpdateArticle, soundMuted]);
@@ -593,9 +624,10 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     setError(null);
 
     const textToSend = commentText.trim();
+    const targetProjectId = channel === 'global' || channel === 'all_feed' ? 'global' : (currentArticle?.id || channel);
 
     try {
-      if (channel === 'global') {
+      if (channel === 'global' || channel === 'all_feed') {
         const newComment = await addArticleComment('global', textToSend);
         if (currentUser?.name) newComment.authorName = currentUser.name;
 
@@ -616,19 +648,24 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
         });
         broadcastNewMessage({ ...newComment, projectId: currentArticle.id });
         setCommentText('');
-      } else if (channel === 'all_feed') {
-        const newComment = await addArticleComment('global', textToSend);
-        if (currentUser?.name) newComment.authorName = currentUser.name;
-
-        setReadCommentIds((prev) => new Set([...prev, newComment.id]));
-        setGlobalComments((prev) => [...prev, newComment]);
-        broadcastNewMessage({ ...newComment, projectId: 'global' });
-        setCommentText('');
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Gagal mengirim pesan.');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const requestSystemNotifPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      const perm = await Notification.requestPermission();
+      setNotifPermission(perm);
+      if (perm === 'granted') {
+        showAndroidSystemNotification(
+          '🔔 Notifikasi Android Aktif!',
+          'Anda sekarang akan menerima pemberitahuan pesan masuk langsung di layar kunci HP.'
+        );
+      }
     }
   };
 
@@ -875,6 +912,22 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
               </div>
             </div>
 
+            {/* Notification Permission Request Banner */}
+            {notifPermission === 'default' && (
+              <div className="bg-amber-500/10 border-b border-amber-500/20 px-3 py-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-amber-700 text-[11px] font-medium min-w-0">
+                  <Bell className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 animate-bounce" />
+                  <span className="truncate">Aktifkan Notifikasi HP Android di Lock Screen</span>
+                </div>
+                <button
+                  onClick={() => void requestSystemNotifPermission()}
+                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors flex-shrink-0"
+                >
+                  Aktifkan
+                </button>
+              </div>
+            )}
+
             {/* Broad Search Bar if toggled */}
             {showSearch && (
               <div className="bg-slate-100/90 border-b border-slate-200 p-2.5 space-y-2">
@@ -1059,7 +1112,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
                             setShowChannelPicker(false);
                           }}
                           className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 transition-colors ${
-                            channel === a.id ? 'bg-[#087E79]/10 text-[#087E79]' : ''
+                            channel === a.id || channel === a.code ? 'bg-[#087E79]/10 text-[#087E79]' : ''
                           }`}
                         >
                           <Hash className="w-3.5 h-3.5 text-slate-400" />
@@ -1264,7 +1317,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
             )}
 
             {/* Tooltip */}
-            <span className="absolute -top-9 right-0 bg-slate-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg border border-slate-700">
+            <span className="absolute -top-9 right-0 bg-slate-900 text-[#ffffff] text-[10px] font-semibold px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg border border-slate-700">
               Diskusi Tim {totalUnreadCount > 0 ? `(${totalUnreadCount} baru)` : ''}
             </span>
           </button>
