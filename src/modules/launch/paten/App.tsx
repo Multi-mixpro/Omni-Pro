@@ -8,6 +8,7 @@ import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
 import { ArticleStickyHeader } from './components/article/ArticleStickyHeader';
+import { FloatingChatBubble } from './components/shared/FloatingChatBubble';
 
 const DashboardView = React.lazy(() => import('./components/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 const ArticlePipelineView = React.lazy(() => import('./components/pipeline/ArticlePipelineView').then(m => ({ default: m.ArticlePipelineView })));
@@ -778,6 +779,14 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
         />
       )}
       </Suspense>
+
+      {/* Floating Chat Bubble */}
+      <FloatingChatBubble
+        articles={articles}
+        selectedArticleId={selectedArticleId}
+        onUpdateArticle={handleUpdateArticle}
+        currentUserName={currentUser?.name}
+      />
     </div>
   );
 }
