@@ -28,6 +28,7 @@ import { StorageService } from './services/storage';
 import { isAllBusinessUnits } from './services/businessUnits';
 import { uploadArticleMedia } from './services/media';
 import { compressImageForUpload } from './utils/cloudinary';
+import { initOrRefreshSession } from './services/sessionManager';
 import { deriveArticleIndicators } from './utils/calculations';
 import { useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut } from '@/core/auth/useAuth';
@@ -154,8 +155,11 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     );
   };
 
-  useEffect(() => () => {
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+  useEffect(() => {
+    initOrRefreshSession();
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
   }, []);
 
   const tabUrl = (tab: PatenTab, articleId = selectedArticleId) => {
