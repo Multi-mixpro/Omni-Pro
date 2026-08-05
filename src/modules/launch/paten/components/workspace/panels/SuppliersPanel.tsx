@@ -18,7 +18,7 @@ interface SuppliersPanelProps {
 export const SuppliersPanel: React.FC<SuppliersPanelProps> = ({
   article,
   masterSuppliers = [],
-  masterMaterials = [],
+  masterMaterials: _masterMaterials = [],
 }) => {
   // Collect suppliers mapped in BOM.
   // Nilai lead time / MOQ / quality hanya diisi bila supplier benar-benar tertaut

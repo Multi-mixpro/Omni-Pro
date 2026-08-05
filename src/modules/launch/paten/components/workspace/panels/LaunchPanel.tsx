@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { Rocket, FileText, CheckSquare, Plus, Trash2, Tag } from 'lucide-react';
+import { Rocket, FileText, Plus, Trash2, Tag } from 'lucide-react';
 import { Article } from '../../../types';
 
 interface LaunchPanelProps {

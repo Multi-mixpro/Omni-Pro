@@ -3,17 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import {
-  Grid,
-  DollarSign,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
-  Copy,
-  Layers,
-  Sparkles,
-} from 'lucide-react';
-import { Article, MatrixCell, ProductionScenario } from '../../../types';
+import { Article, ProductionScenario } from '../../../types';
 import { formatIDR, calculateMatrixTotals } from '../../../utils/calculations';
 
 interface StockMatrixPanelProps {

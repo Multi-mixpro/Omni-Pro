@@ -6,7 +6,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Search,
   X,
-  Camera,
   Plus,
   Trash2,
   Check,
@@ -150,7 +149,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     return existing.length > 0 ? existing : [''];
   });
   const [briefIntent, setBriefIntent] = useState(editArticle?.briefIntent ?? '');
-  const [targetUserDescription, setTargetUserDescription] = useState(editArticle?.targetUserDescription ?? '');
+  const [targetUserDescription] = useState(editArticle?.targetUserDescription ?? '');
 
   // Form State: Step 3 - Targets & Colorways & Complete Sizes (XS - 5XL)
   const [targetSampleDate, setTargetSampleDate] = useState(() => {
@@ -251,10 +250,10 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [isAddCustomColorOpen, setIsAddCustomColorOpen] = useState(false);
   const [customColorName, setCustomColorName] = useState('');
   const [customColorCode, setCustomColorCode] = useState('');
-  const [customColorHex, setCustomColorHex] = useState('#3B82F6');
-  const [customColorMaterial, setCustomColorMaterial] = useState('WP COLUMBIA');
+  const [customColorHex] = useState('#3B82F6');
+  const [customColorMaterial] = useState('WP COLUMBIA');
   const [isCombination, setIsCombination] = useState(false);
-  const [customSecondaryHex, setCustomSecondaryHex] = useState('#E2E8F0');
+  const [customSecondaryHex] = useState('#E2E8F0');
   const [customComboNotes, setCustomComboNotes] = useState('');
 
   // Combined Available Colorways Catalog derived EXCLUSIVELY from Master Data (`materials` prop) + Custom Created
@@ -933,7 +932,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
 
                 {/* Grid Gallery of Product Photos */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                  {productPhotos.map((photo, idx) => (
+                  {productPhotos.map((photo, _idx) => (
                     <div
                       key={photo.id}
                       className={`group relative rounded-xl overflow-hidden border-2 bg-white transition-all shadow-2xs ${

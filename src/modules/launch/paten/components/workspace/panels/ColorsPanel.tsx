@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { Palette, Plus, Check, Sparkles, Edit2, Layers, X } from 'lucide-react';
+import { Palette, Plus, Sparkles, Edit2, X } from 'lucide-react';
 import { Article, Colorway } from '../../../types';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
 
@@ -20,7 +20,7 @@ export const ColorsPanel: React.FC<ColorsPanelProps> = ({ article, onUpdateArtic
   const [newSecondaryHex, setNewSecondaryHex] = useState('#E2E8F0');
   const [comboNotes, setComboNotes] = useState('');
   const [newPantone, setNewPantone] = useState('');
-  const [isSampleColor, setIsSampleColor] = useState(false);
+  const [isSampleColor, _setIsSampleColor] = useState(false);
 
   // Edit State
   const [editingCwId, setEditingCwId] = useState<string | null>(null);

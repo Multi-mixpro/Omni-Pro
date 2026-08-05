@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { Factory, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Article, ProductionBatch } from '../../../types';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
 

@@ -8,21 +8,15 @@ import React, { useState } from 'react';
 import {
   Package,
   Plus,
-  AlertTriangle,
   CheckCircle2,
-  ExternalLink,
   Search,
-  DollarSign,
   Building2,
   Lock,
   Unlock,
   RefreshCw,
-  Check,
-  Filter,
   CheckSquare,
   Square,
   Layers,
-  Sparkles,
   X,
   Ruler,
 } from 'lucide-react';
@@ -106,7 +100,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({
         (sizeSet.length ? sizeSet : ['M']).forEach((s) => { seed[s] = mat.netConsumption || 0; });
         return { ...mat, consumptionBySize: seed };
       }
-      const { consumptionBySize: _drop, ...rest } = mat;
+      const { consumptionBySize: _unused, ...rest } = mat;
       return rest as ArticleBOMItem;
     });
     onUpdateArticle({ ...article, materials: updatedMaterials, lastUpdated: new Date().toISOString() });

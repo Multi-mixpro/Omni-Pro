@@ -4,13 +4,7 @@
 
 import React, { useState } from 'react';
 import {
-  CheckSquare,
-  Plus,
   Send,
-  MessageSquare,
-  AlertTriangle,
-  User,
-  Clock,
 } from 'lucide-react';
 import { Article, ProgressUpdate } from '../../../types';
 

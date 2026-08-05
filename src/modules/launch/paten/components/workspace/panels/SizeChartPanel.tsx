@@ -4,7 +4,6 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Ruler,
   Plus,
   X,
   ChevronRight,
@@ -76,7 +75,6 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
 
   // Auto-detect: variabel yang relevan dengan kategori artikel ini
   const categoryFields = measurementFieldsForCategory(article.category);
-  const otherCategoryFields = MEASUREMENT_FIELDS.filter((f) => f.category !== article.category);
   const categoryTemplateFields = requiredFieldsForCategory(article.category);
   const hasCategoryTemplate = categoryTemplateFields.length > 0;
 
@@ -116,6 +114,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
         });
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on id/category/sizes to avoid infinite update loop
   }, [article.id, article.category, sizes.join(',')]);
 
   /** Jumlah sel yang sudah dibakukan tim di seluruh size chart. */

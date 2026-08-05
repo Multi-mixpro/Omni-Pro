@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { listProjects } from '../data/launchRepository';
 
-export const launchKeys = {
+const launchKeys = {
   projects: (status = 'ALL') => ['launch-projects', status] as const,
 };
 

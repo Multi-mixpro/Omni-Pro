@@ -182,6 +182,7 @@ export function SettingsPage() {
     void purgeOrphanedProfiles().then(() => {
       refreshTeam();
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
 
   async function handlePurgeOrphaned() {

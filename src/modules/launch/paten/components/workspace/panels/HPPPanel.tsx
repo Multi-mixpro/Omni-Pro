@@ -4,14 +4,9 @@
 
 import React, { useState } from 'react';
 import {
-  DollarSign,
   Plus,
   Lock,
   Unlock,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
-  Info,
   Sparkles,
 } from 'lucide-react';
 import { Article, CostComponent, ServiceMaster } from '../../../types';
