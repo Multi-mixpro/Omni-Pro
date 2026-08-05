@@ -13,48 +13,46 @@ export async function addArticleComment(
 
   const isRealUuid = PROJECT_ID_PATTERN.test(projectId);
 
-  try {
-    const { data: auth, error: authError } = await supabase.auth.getUser();
-    if (!authError && auth?.user && isRealUuid) {
-      const [{ data: profile }, insertResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('full_name, avatar_url')
-          .eq('id', auth.user.id)
-          .maybeSingle(),
-        supabase
-          .from('launch_comments')
-          .insert({
-            project_id: projectId,
-            author_id: auth.user.id,
-            body: text,
-            is_decision_request: false,
-          })
-          .select('id, created_at')
-          .single(),
-      ]);
-
-      if (!insertResult.error && insertResult.data) {
-        return {
-          id: String(insertResult.data.id),
-          authorName: String(profile?.full_name || auth.user.email || 'Tim'),
-          authorAvatar: String(profile?.avatar_url || ''),
-          body: text,
-          createdAt: String(insertResult.data.created_at || new Date().toISOString()),
-        };
-      }
-    }
-  } catch (err) {
-    console.warn('Supabase comment insert bypassed, using local comment state:', err);
+  if (!isRealUuid) {
+    return {
+      id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      authorName: '',
+      authorAvatar: '',
+      body: text,
+      createdAt: new Date().toISOString(),
+    };
   }
 
-  // Local/Demo or Global fallback comment object
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) {
+    throw new Error('Sesi tidak tersedia. Silakan masuk kembali.');
+  }
+
+  const [{ data: profile }, insertResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('full_name, avatar_url')
+      .eq('id', auth.user.id)
+      .maybeSingle(),
+    supabase
+      .from('launch_comments')
+      .insert({
+        project_id: projectId,
+        author_id: auth.user.id,
+        body: text,
+        is_decision_request: false,
+      })
+      .select('id, created_at')
+      .single(),
+  ]);
+
+  if (insertResult.error) throw insertResult.error;
   return {
-    id: `local-comment-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-    authorName: 'Tim Launch',
-    authorAvatar: '',
+    id: String(insertResult.data.id),
+    authorName: String(profile?.full_name || auth.user.email || 'Tim'),
+    authorAvatar: String(profile?.avatar_url || ''),
     body: text,
-    createdAt: new Date().toISOString(),
+    createdAt: String(insertResult.data.created_at || new Date().toISOString()),
   };
 }
 

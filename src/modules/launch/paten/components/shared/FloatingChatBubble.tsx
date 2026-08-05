@@ -694,12 +694,9 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     if (!isDragging.current) return;
     const dx = dragStart.current.px - e.clientX;
     const dy = dragStart.current.py - e.clientY;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) wasDragged.current = true;
-
-    const rawX = dragStart.current.ox + dx;
-    const rawY = dragStart.current.oy + dy;
-
-    setBubblePosition({ x: rawX, y: rawY });
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    wasDragged.current = true;
+    setBubblePosition({ x: dragStart.current.ox + dx, y: dragStart.current.oy + dy });
   }, []);
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
@@ -1293,12 +1290,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
           <button
             id="floating-chat-bubble-btn"
             aria-label="Buka Diskusi Tim"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={(e) => {
-              onPointerUp(e);
-              if (!wasDragged.current) setIsOpen(true);
-            }}
+            onClick={() => setIsOpen(true)}
             className="group relative w-14 h-14 rounded-2xl text-white flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 shadow-xl select-none"
             style={{
               touchAction: 'none',
