@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ArticleComment } from '../types';
 
-const PROJECT_ID_PATTERN =
+const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function addArticleComment(
@@ -11,22 +11,12 @@ export async function addArticleComment(
   const text = body.trim();
   if (!text) throw new Error('Komentar tidak boleh kosong.');
 
-  const isRealUuid = PROJECT_ID_PATTERN.test(projectId);
-
-  if (!isRealUuid) {
-    return {
-      id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      authorName: '',
-      authorAvatar: '',
-      body: text,
-      createdAt: new Date().toISOString(),
-    };
-  }
-
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError || !auth.user) {
     throw new Error('Sesi tidak tersedia. Silakan masuk kembali.');
   }
+
+  const isArticle = UUID_RE.test(projectId);
 
   const [{ data: profile }, insertResult] = await Promise.all([
     supabase
@@ -37,7 +27,7 @@ export async function addArticleComment(
     supabase
       .from('launch_comments')
       .insert({
-        project_id: projectId,
+        project_id: isArticle ? projectId : null,
         author_id: auth.user.id,
         body: text,
         is_decision_request: false,
@@ -54,6 +44,24 @@ export async function addArticleComment(
     body: text,
     createdAt: String(insertResult.data.created_at || new Date().toISOString()),
   };
+}
+
+export async function loadGlobalComments(): Promise<ArticleComment[]> {
+  const { data, error } = await supabase
+    .from('launch_comments')
+    .select('id, body, created_at, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)')
+    .is('project_id', null)
+    .order('created_at', { ascending: true })
+    .limit(100);
+
+  if (error) throw error;
+  return (data || []).map((row: any) => ({
+    id: String(row.id),
+    authorName: String(row.author?.full_name || 'Tim'),
+    authorAvatar: String(row.author?.avatar_url || ''),
+    body: String(row.body),
+    createdAt: String(row.created_at),
+  }));
 }
 
 export function broadcastNewMessage(comment: ArticleComment & { projectId: string }) {

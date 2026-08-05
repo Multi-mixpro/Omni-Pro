@@ -20,7 +20,7 @@ import {
   Bell,
 } from 'lucide-react';
 import type { Article, ArticleComment } from '../../types';
-import { addArticleComment, broadcastNewMessage } from '../../services/collaboration';
+import { addArticleComment, broadcastNewMessage, loadGlobalComments } from '../../services/collaboration';
 import { supabase } from '@/integrations/supabase/client';
 
 type ChatChannel = 'all_feed' | 'global' | string;
@@ -46,7 +46,6 @@ interface ToastNotification {
   channelId: string;
 }
 
-const STORAGE_KEY_GLOBAL_COMMENTS = 'mix_pro_launch_global_comments_v1';
 const STORAGE_KEY_CHAT_POS = 'mix_pro_launch_chat_pos_v1';
 const STORAGE_KEY_READ_IDS = 'mix_pro_chat_read_ids_v1';
 const STORAGE_KEY_MUTED = 'mix_pro_chat_sound_muted_v1';
@@ -195,39 +194,16 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     return { x: 0, y: 0 };
   });
 
-  // Global chat comments (outside individual articles)
-  const [globalComments, setGlobalComments] = useState<ArticleComment[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_GLOBAL_COMMENTS);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      /* ignore */
-    }
-    return [
-      {
-        id: 'init-global-1',
-        authorName: 'Sistem Launch OS',
-        authorAvatar: '',
-        body: 'Selamat datang di Diskusi Tim! Gunakan saluran ini untuk koordinasi umum di luar artikel spesifik.',
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-      },
-    ];
-  });
+  // Global chat comments loaded from Supabase (project_id IS NULL)
+  const [globalComments, setGlobalComments] = useState<ArticleComment[]>([]);
+  const globalLoaded = useRef(false);
 
-  // Storage Event Listener for Cross-Tab Sync Fallback
   useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY_GLOBAL_COMMENTS && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          setGlobalComments(parsed);
-        } catch {
-          /* ignore */
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    if (globalLoaded.current) return;
+    globalLoaded.current = true;
+    loadGlobalComments()
+      .then(setGlobalComments)
+      .catch((err) => console.warn('Failed to load global comments:', err));
   }, []);
 
   // Unlock AudioContext on first user interaction
@@ -315,15 +291,6 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   );
   const onlineCount = Math.max(1, activeOnlineUsers.length);
   const onlineUserNames = activeOnlineUsers.map((u) => u.name).join(', ') || 'Gugun Gunawan';
-
-  // Persist state locally
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_GLOBAL_COMMENTS, JSON.stringify(globalComments));
-    } catch {
-      /* ignore */
-    }
-  }, [globalComments]);
 
   useEffect(() => {
     try {
@@ -572,17 +539,19 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
             if (profile?.avatar_url) authorAvatar = profile.avatar_url;
           }
 
+          const projectId = newRow.project_id ? String(newRow.project_id) : null;
+
           const incoming: ArticleComment & { projectId?: string } = {
             id: String(newRow.id),
             authorName,
             authorAvatar,
             body: String(newRow.body),
             createdAt: String(newRow.created_at || new Date().toISOString()),
-            projectId: String(newRow.project_id || ''),
+            projectId: projectId || 'global',
           };
 
-          if (incoming.projectId) {
-            const targetArt = articles.find((a) => a.id === incoming.projectId || a.code === incoming.projectId);
+          if (projectId) {
+            const targetArt = articles.find((a) => a.id === projectId || a.code === projectId);
             if (targetArt && !(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
               onUpdateArticle({
                 ...targetArt,
@@ -590,6 +559,11 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
                 lastUpdated: new Date().toISOString(),
               });
             }
+          } else {
+            setGlobalComments((prev) => {
+              if (prev.some((c) => c.id === incoming.id)) return prev;
+              return [...prev, incoming];
+            });
           }
 
           if (!isFromMe) {
