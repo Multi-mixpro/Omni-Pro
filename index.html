@@ -3,19 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#087E79" />
+
+    <!-- PWA Mobile Web App Capable Meta Tags for Android & iOS -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Launch OS" />
+    <meta name="application-name" content="Launch OS" />
+
     <meta name="description" content="Product Launch OS — workspace terpadu untuk riset, sourcing, sampling, HPP, spesifikasi, QC, dan persetujuan artikel baru." />
     <meta property="og:title" content="GG Indo Apparel · Product Launch OS" />
     <meta property="og:description" content="Workspace terpadu untuk Product Launch dari brief hingga produksi massal." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="GG Indo Apparel · Product Launch OS" />
-    <meta name="twitter:description" content="Workspace terpadu untuk Product Launch dari brief hingga produksi massal." />
+    <meta name="twitter:description" content="Workspace terpadu me-launch produk baru." />
     <title>GG Indo Apparel · Product Launch OS</title>
   </head>
   <body class="bg-gray-50 text-gray-900 font-sans antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Register PWA Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('PWA ServiceWorker ready:', reg.scope))
+            .catch((err) => console.warn('PWA ServiceWorker error:', err));
+        });
+      }
+    </script>
   </body>
 </html>

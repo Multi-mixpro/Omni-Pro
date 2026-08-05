@@ -18,6 +18,7 @@ import {
   Calendar,
   Settings,
   LogOut,
+  Smartphone,
 } from 'lucide-react';
 import { BusinessUnit } from '../../types';
 import { loadStoredBusinessUnits } from '../../services/businessUnits';
@@ -44,8 +45,35 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   canCreate = false,
 }) => {
   const [showMoreSheet, setShowMoreSheet] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showIosGuide, setShowIosGuide] = useState(false);
 
   const [buList, setBuList] = useState(() => loadStoredBusinessUnits());
+
+  useEffect(() => {
+    const handlePrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
+    } else {
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      if (isIos) {
+        setShowIosGuide(!showIosGuide);
+      } else {
+        alert(
+          'Untuk memasang di HP / Laptop:\n1. Klik menu browser (titik 3 di kanan atas)\n2. Pilih "Tambah ke Layar Utama" / "Install Aplikasi"'
+        );
+      }
+    }
+  };
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -252,6 +280,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
               <button
                 type="button"
+                onClick={handleInstallClick}
+                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-teal-50 border border-teal-200 text-left text-xs font-bold text-[#087E79]"
+              >
+                <Smartphone className="w-4 h-4 text-[#087E79]" />
+                <span>Install App ke HP</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   setShowMoreSheet(false);
                   onSignOut();
@@ -263,6 +300,18 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               </button>
 
             </div>
+
+            {/* iOS / PWA Guide Modal */}
+            {showIosGuide && (
+              <div className="mt-3 p-3 bg-teal-50 border border-teal-200 rounded-xl text-xs space-y-1 text-[#087E79]">
+                <p className="font-bold">Cara Pasang Pintasan di iPhone / iOS:</p>
+                <ol className="list-decimal list-inside text-[11px] space-y-0.5 text-slate-700">
+                  <li>Tekan tombol <strong>Bagikan / Share (ikon kotak panah ke atas)</strong> di bagian bawah Safari.</li>
+                  <li>Gulir ke bawah dan pilih <strong>"Tambah ke Layar Utama" (Add to Home Screen)</strong>.</li>
+                  <li>Tekan <strong>Tambah (Add)</strong> di kanan atas.</li>
+                </ol>
+              </div>
+            )}
           </div>
         </div>
       )}
