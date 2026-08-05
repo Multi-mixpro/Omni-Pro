@@ -256,16 +256,8 @@
   border-radius: 3px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-}
-
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
 }
 
 /* Compact Table Density Utilities */
@@ -288,12 +280,6 @@
   white-space: nowrap;
 }
 
-.dark .hd-table th {
-  background-color: #0f172a;
-  color: #94a3b8;
-  border-bottom-color: #1e293b;
-}
-
 .hd-table td {
   padding: 6px 10px;
   border-bottom: 1px solid #f1f5f9;
@@ -301,17 +287,8 @@
   white-space: nowrap;
 }
 
-.dark .hd-table td {
-  border-bottom-color: #1e293b;
-  color: #e2e8f0;
-}
-
 .hd-table tr:hover td {
   background-color: #f1f5f9;
-}
-
-.dark .hd-table tr:hover td {
-  background-color: #1e293b;
 }
 
 /* High Density Compact Inputs */
@@ -324,12 +301,6 @@
   color: #0f172a;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.dark .hd-input {
-  border-color: #334155;
-  background-color: #0f172a;
-  color: #f8fafc;
 }
 
 .hd-input:focus {

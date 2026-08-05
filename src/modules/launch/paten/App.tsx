@@ -785,7 +785,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
         articles={articles}
         selectedArticleId={selectedArticleId}
         onUpdateArticle={handleUpdateArticle}
-        currentUserName={currentUser?.name}
+        currentUser={currentUser}
       />
     </div>
   );
