@@ -553,39 +553,48 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'launch_comments' },
-        (payload) => {
+        async (payload) => {
           const newRow = payload.new;
-          if (newRow && newRow.body) {
-            const incoming: ArticleComment & { projectId?: string } = {
-              id: String(newRow.id),
-              authorName: 'Tim Launch',
-              authorAvatar: '',
-              body: String(newRow.body),
-              createdAt: String(newRow.created_at || new Date().toISOString()),
-              projectId: String(newRow.project_id || 'global'),
-            };
+          if (!newRow || !newRow.body) return;
 
-            const isFromMe = incoming.authorName === (currentUser?.name || 'Tim Launch');
-            if (incoming.projectId === 'global') {
-              setGlobalComments((prev) => {
-                if (prev.some((c) => c.id === incoming.id)) return prev;
-                return [...prev, incoming];
+          const authorId = String(newRow.author_id || '');
+          const isFromMe = authorId === currentUser?.id;
+
+          let authorName = 'Tim';
+          let authorAvatar = '';
+          if (authorId) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', authorId)
+              .maybeSingle();
+            if (profile?.full_name) authorName = profile.full_name;
+            if (profile?.avatar_url) authorAvatar = profile.avatar_url;
+          }
+
+          const incoming: ArticleComment & { projectId?: string } = {
+            id: String(newRow.id),
+            authorName,
+            authorAvatar,
+            body: String(newRow.body),
+            createdAt: String(newRow.created_at || new Date().toISOString()),
+            projectId: String(newRow.project_id || ''),
+          };
+
+          if (incoming.projectId) {
+            const targetArt = articles.find((a) => a.id === incoming.projectId || a.code === incoming.projectId);
+            if (targetArt && !(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
+              onUpdateArticle({
+                ...targetArt,
+                teamComments: [...(targetArt.teamComments || []), incoming],
+                lastUpdated: new Date().toISOString(),
               });
-            } else {
-              const targetArt = articles.find((a) => a.id === incoming.projectId || a.code === incoming.projectId);
-              if (targetArt && !(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
-                onUpdateArticle({
-                  ...targetArt,
-                  teamComments: [...(targetArt.teamComments || []), incoming],
-                  lastUpdated: new Date().toISOString(),
-                });
-              }
             }
+          }
 
-            if (!isFromMe) {
-              playNotificationChime(soundMuted);
-              triggerToastNotification(incoming);
-            }
+          if (!isFromMe) {
+            playNotificationChime(soundMuted);
+            triggerToastNotification(incoming);
           }
         }
       )
@@ -597,7 +606,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       }
       supabase.removeChannel(supabaseChannel);
     };
-  }, [articles, currentUser?.name, onUpdateArticle, soundMuted]);
+  }, [articles, currentUser?.id, currentUser?.name, onUpdateArticle, soundMuted]);
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
