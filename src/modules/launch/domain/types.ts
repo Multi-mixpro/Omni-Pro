@@ -23,6 +23,7 @@ export interface Profile {
   job_title: string | null;
   avatar_url: string | null;
   is_active: boolean;
+  last_seen_at?: string | null;
 }
 
 export interface BusinessUnit {

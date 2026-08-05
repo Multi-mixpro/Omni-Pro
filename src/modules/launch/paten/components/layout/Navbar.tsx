@@ -12,9 +12,12 @@ import {
   ChevronDown,
   Command,
   LogOut,
+  Users,
+  Circle,
 } from 'lucide-react';
 import { BusinessUnit, ApprovalGate } from '../../types';
 import { loadStoredBusinessUnits } from '../../services/businessUnits';
+import { useTeamActivity, TeamMemberActivity } from '../../hooks/useTeamActivity';
 
 interface NavbarProps {
   activeBusinessUnit: BusinessUnit;
@@ -26,6 +29,7 @@ interface NavbarProps {
   onSignOut: () => void;
   activeTab: string;
   currentUser?: {
+    id?: string;
     name: string;
     jobTitle?: string | null;
     avatarUrl?: string | null;
@@ -33,6 +37,50 @@ interface NavbarProps {
   canCreate?: boolean;
   syncHealthy?: boolean;
 }
+
+function formatLastSeen(dateStr: string | null): string {
+  if (!dateStr) return 'Belum pernah';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'Baru saja';
+  if (mins < 60) return `${mins} menit lalu`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} jam lalu`;
+  const days = Math.floor(hours / 24);
+  return `${days} hari lalu`;
+}
+
+const TeamMemberRow: React.FC<{ member: TeamMemberActivity; isMe: boolean }> = ({ member, isMe }) => (
+  <div className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors ${isMe ? 'bg-[#DDF4F1]/40' : 'hover:bg-slate-50'}`}>
+    <div className="relative flex-shrink-0">
+      {member.avatar_url ? (
+        <img src={member.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200" />
+      ) : (
+        <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-mono font-bold text-[10px] border border-slate-200">
+          {(member.full_name || 'U').slice(0, 1).toUpperCase()}
+        </div>
+      )}
+      <Circle
+        className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${member.is_online ? 'text-emerald-500 fill-emerald-500' : 'text-slate-300 fill-slate-300'}`}
+      />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-[11px] font-bold text-slate-900 truncate">
+        {member.full_name}{isMe ? ' (Anda)' : ''}
+      </p>
+      <p className="text-[10px] text-slate-400 truncate">
+        {member.job_title || member.username}
+      </p>
+    </div>
+    <div className="flex-shrink-0 text-right">
+      {member.is_online ? (
+        <span className="text-[10px] font-bold text-emerald-600">Online</span>
+      ) : (
+        <span className="text-[10px] text-slate-400">{formatLastSeen(member.last_seen_at)}</span>
+      )}
+    </div>
+  </div>
+);
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeBusinessUnit,
@@ -50,6 +98,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showBuDropdown, setShowBuDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
+
+  const { members: teamMembers, onlineCount } = useTeamActivity(currentUser?.id);
 
   const [buList, setBuList] = useState(() => loadStoredBusinessUnits());
 
@@ -92,7 +143,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Business Unit Switcher */}
         <div className="relative">
           <button
-            onClick={() => setShowBuDropdown(!showBuDropdown)}
+            onClick={() => {
+              setShowBuDropdown(!showBuDropdown);
+              setShowTeamDropdown(false);
+              setShowNotifications(false);
+              setShowProfileMenu(false);
+            }}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors border border-slate-200"
           >
             <Layers className="w-3.5 h-3.5 text-[#087E79]" />
@@ -167,10 +223,57 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>{syncHealthy ? 'Realtime aktif' : 'Perlu sinkronisasi'}</span>
         </div>
 
+        {/* Team Activity Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setShowTeamDropdown(!showTeamDropdown);
+              setShowNotifications(false);
+              setShowProfileMenu(false);
+            }}
+            className="relative flex items-center gap-1.5 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+            title="Tim aktif"
+          >
+            <Users className="w-4 h-4" />
+            {onlineCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-emerald-500 text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center">
+                {onlineCount}
+              </span>
+            )}
+          </button>
+
+          {showTeamDropdown && (
+            <div className="absolute top-full right-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-3">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                <h3 className="font-bold text-xs text-slate-900 font-mono">
+                  TIM ({teamMembers.length})
+                </h3>
+                <span className="text-[10px] font-mono text-emerald-600 font-bold">
+                  {onlineCount} online
+                </span>
+              </div>
+
+              {teamMembers.length === 0 ? (
+                <p className="text-xs text-slate-500 py-3 text-center">Memuat data tim...</p>
+              ) : (
+                <div className="space-y-0.5 max-h-72 overflow-y-auto">
+                  {teamMembers.map((member) => (
+                    <TeamMemberRow key={member.id} member={member} isMe={member.id === currentUser?.id} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Notifications Popup */}
         <div className="relative">
           <button
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={() => {
+              setShowNotifications(!showNotifications);
+              setShowTeamDropdown(false);
+              setShowProfileMenu(false);
+            }}
             className="relative p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
             title="Notifikasi"
           >
@@ -247,7 +350,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="relative flex items-center gap-2 pl-1 border-l border-slate-200 ml-0.5">
           <button
             type="button"
-            onClick={() => setShowProfileMenu(value => !value)}
+            onClick={() => {
+              setShowProfileMenu(value => !value);
+              setShowTeamDropdown(false);
+              setShowNotifications(false);
+            }}
             className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-slate-100 transition-colors"
             title="Menu profil"
           >
