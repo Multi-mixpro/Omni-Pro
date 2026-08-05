@@ -55,3 +55,20 @@ self.addEventListener('fetch', (event) => {
       })
   );
 });
+
+// Handle Push & System Notification clicks on Android
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes('/launch/') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow('/launch/app/today');
+      }
+    })
+  );
+});

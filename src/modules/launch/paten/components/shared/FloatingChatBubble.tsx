@@ -103,6 +103,32 @@ function playNotificationChime(muted = false) {
   }
 }
 
+/** Triggers Android System Notification Shade & Lockscreen Notification */
+function showAndroidSystemNotification(title: string, body: string) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.showNotification(title, {
+            body,
+            icon: '/pwa-192.png',
+            badge: '/pwa-192.png',
+            vibrate: [200, 100, 200],
+            tag: 'chat-msg-' + Date.now(),
+          } as any);
+        });
+      } else {
+        new Notification(title, { body, icon: '/pwa-192.png' });
+      }
+    } catch (err) {
+      console.warn('System notification error:', err);
+    }
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission();
+  }
+}
+
 export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   articles,
   selectedArticleId,
@@ -444,6 +470,9 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       channelId: incoming.projectId || 'global',
     });
 
+    // Send native Android System Notification (Lock Screen & Notification Shade)
+    showAndroidSystemNotification(`💬 Pesan Baru dari ${incoming.authorName || 'Tim'} (${label})`, incoming.body);
+
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => {
       setIncomingToast(null);
@@ -783,9 +812,13 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     playNotificationChime(false);
+                    showAndroidSystemNotification(
+                      '🔔 Tes Notifikasi Launch OS',
+                      'Notifikasi sistem Android dan PWA aktif dengan sukses!'
+                    );
                   }}
                   className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 text-amber-300 hover:text-amber-200 transition-colors"
-                  title="Tes Dering Notifikasi 🔔"
+                  title="Tes Dering & Notifikasi Android 🔔"
                 >
                   <BellRing className="w-3.5 h-3.5" />
                 </button>
