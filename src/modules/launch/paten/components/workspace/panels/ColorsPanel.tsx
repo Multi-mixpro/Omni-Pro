@@ -2,17 +2,19 @@
  * Product Launch OS 3.0 - Colors, Colorways & Variant SKU Panel
  */
 
-import React, { useState } from 'react';
-import { Palette, Plus, Sparkles, Edit2, X } from 'lucide-react';
-import { Article, Colorway } from '../../../types';
+import React, { useMemo, useState } from 'react';
+import { Palette, Plus, Sparkles, Edit2, X, PackagePlus, Check } from 'lucide-react';
+import { Article, Colorway, MaterialMaster } from '../../../types';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
+import { getColorHexFromName } from '../../../utils/colorUtils';
 
 interface ColorsPanelProps {
   article: Article;
   onUpdateArticle: (updated: Article) => void;
+  masterMaterials?: MaterialMaster[];
 }
 
-export const ColorsPanel: React.FC<ColorsPanelProps> = ({ article, onUpdateArticle }) => {
+export const ColorsPanel: React.FC<ColorsPanelProps> = ({ article, onUpdateArticle, masterMaterials = [] }) => {
   const [newColorName, setNewColorName] = useState('');
   const [newColorCode, setNewColorCode] = useState('');
   const [newColorHex, setNewColorHex] = useState('#1E293B');
@@ -21,10 +23,94 @@ export const ColorsPanel: React.FC<ColorsPanelProps> = ({ article, onUpdateArtic
   const [comboNotes, setComboNotes] = useState('');
   const [newPantone, setNewPantone] = useState('');
   const [isSampleColor, _setIsSampleColor] = useState(false);
+  const [selectedMaterialFilter, setSelectedMaterialFilter] = useState('ALL');
 
   // Edit State
   const [editingCwId, setEditingCwId] = useState<string | null>(null);
   const [editCw, setEditCw] = useState<Partial<Colorway>>({});
+
+  const existingColorNames = useMemo(
+    () => new Set((article.colorways || []).map((c) => c.name.trim().toLowerCase())),
+    [article.colorways],
+  );
+
+  const assignedMaterialIds = useMemo(
+    () => new Set((article.materials || []).map((m) => m.materialId)),
+    [article.materials],
+  );
+
+  const catalogColors = useMemo(() => {
+    const result: { name: string; hex: string; materialName: string; materialCode: string }[] = [];
+    const seen = new Set<string>();
+
+    const mats = assignedMaterialIds.size > 0
+      ? masterMaterials.filter((m) => assignedMaterialIds.has(m.id))
+      : [];
+
+    for (const mat of mats) {
+      if (!mat.availableColors?.length) continue;
+      for (const colorName of mat.availableColors) {
+        const key = colorName.trim().toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push({
+          name: colorName.trim(),
+          hex: getColorHexFromName(colorName),
+          materialName: mat.name,
+          materialCode: mat.code || '',
+        });
+      }
+    }
+    return result;
+  }, [masterMaterials, assignedMaterialIds]);
+
+  const materialNames = useMemo(() => {
+    const set = new Set<string>();
+    catalogColors.forEach((c) => set.add(c.materialName));
+    return Array.from(set);
+  }, [catalogColors]);
+
+  const filteredCatalog = useMemo(() => {
+    if (selectedMaterialFilter === 'ALL') return catalogColors;
+    return catalogColors.filter((c) => c.materialName === selectedMaterialFilter);
+  }, [catalogColors, selectedMaterialFilter]);
+
+  const handleAddFromCatalog = (color: { name: string; hex: string; materialCode: string }) => {
+    if (existingColorNames.has(color.name.trim().toLowerCase())) return;
+    const idx = (article.colorways?.length || 0) + 1;
+    const newCw: Colorway = {
+      id: crypto.randomUUID(),
+      code: `${color.materialCode.slice(-3) || 'CW'}-${idx.toString().padStart(2, '0')}`,
+      name: color.name,
+      hex: color.hex,
+      pantone: '',
+      isSampleColor: false,
+    };
+    onUpdateArticle({
+      ...article,
+      colorways: [...(article.colorways || []), newCw],
+      lastUpdated: new Date().toISOString(),
+    });
+  };
+
+  const handleBulkAddAll = () => {
+    const toAdd = filteredCatalog.filter((c) => !existingColorNames.has(c.name.trim().toLowerCase()));
+    if (!toAdd.length) return;
+    const base = article.colorways?.length || 0;
+    const newCws: Colorway[] = toAdd.map((c, i) => ({
+      id: crypto.randomUUID(),
+      code: `${c.materialCode.slice(-3) || 'CW'}-${(base + i + 1).toString().padStart(2, '0')}`,
+      name: c.name,
+      hex: c.hex,
+      pantone: '',
+      isSampleColor: false,
+    }));
+    onUpdateArticle({
+      ...article,
+      colorways: [...(article.colorways || []), ...newCws],
+      lastUpdated: new Date().toISOString(),
+    });
+  };
 
   const handleAddColorway = () => {
     if (!newColorName.trim()) return;
@@ -84,6 +170,7 @@ export const ColorsPanel: React.FC<ColorsPanelProps> = ({ article, onUpdateArtic
   };
 
   const totalSKUs = (article.colorways?.length || 0) * (article.sizeSet?.length || 0);
+  const availableToAdd = filteredCatalog.filter((c) => !existingColorNames.has(c.name.trim().toLowerCase()));
 
   return (
     <div className="space-y-4 text-xs text-slate-900">
@@ -98,6 +185,87 @@ export const ColorsPanel: React.FC<ColorsPanelProps> = ({ article, onUpdateArtic
           <span>{totalSKUs} SKU Kombinasi Terbentuk ({article.sizeSet?.length || 0} Size)</span>
         </div>
       </div>
+
+      {/* Sync from Master Material Colors */}
+      {catalogColors.length > 0 && (
+        <div className="p-3.5 bg-gradient-to-r from-teal-50/80 to-emerald-50/40 rounded-xl border border-teal-200/60 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-bold text-[#087E79] flex items-center gap-1.5">
+              <PackagePlus className="w-4 h-4" />
+              <span>Palet Warna dari Data Master Bahan Baku ({catalogColors.length})</span>
+            </h4>
+            {availableToAdd.length > 0 && (
+              <button
+                onClick={handleBulkAddAll}
+                className="px-3 py-1.5 rounded-lg bg-[#087E79] text-white font-bold text-[11px] flex items-center gap-1 hover:bg-[#066864] transition-colors shadow-sm"
+              >
+                <Plus className="w-3 h-3" />
+                Tambah Semua ({availableToAdd.length})
+              </button>
+            )}
+          </div>
+
+          {materialNames.length > 1 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setSelectedMaterialFilter('ALL')}
+                className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${
+                  selectedMaterialFilter === 'ALL'
+                    ? 'bg-[#087E79] text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:border-[#087E79]'
+                }`}
+              >
+                Semua Bahan
+              </button>
+              {materialNames.map((name) => (
+                <button
+                  key={name}
+                  onClick={() => setSelectedMaterialFilter(name)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${
+                    selectedMaterialFilter === name
+                      ? 'bg-[#087E79] text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:border-[#087E79]'
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            {filteredCatalog.map((color) => {
+              const alreadyAdded = existingColorNames.has(color.name.trim().toLowerCase());
+              return (
+                <button
+                  key={`${color.materialName}-${color.name}`}
+                  onClick={() => !alreadyAdded && handleAddFromCatalog(color)}
+                  disabled={alreadyAdded}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                    alreadyAdded
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-300 cursor-default'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:border-[#087E79] hover:shadow-sm cursor-pointer active:scale-95'
+                  }`}
+                  title={alreadyAdded ? 'Sudah ditambahkan' : `Klik untuk tambah ${color.name}`}
+                >
+                  <span
+                    className="w-3.5 h-3.5 rounded-full border border-slate-300 flex-shrink-0"
+                    style={{ backgroundColor: color.hex }}
+                  />
+                  <span>{color.name}</span>
+                  {alreadyAdded && <Check className="w-3 h-3 text-emerald-600" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {materialNames.length > 0 && (
+            <p className="text-[10px] text-teal-600/80 italic">
+              Sumber: {materialNames.join(', ')} — klik warna untuk menambahkan ke artikel, atau gunakan "Tambah Semua"
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Existing Colorways Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

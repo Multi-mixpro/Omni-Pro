@@ -246,7 +246,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
       title: '2. Warna & Varian (SKU)',
       subtitle: 'Varian warna, Pantone, swatch & kombinasi SKU',
       icon: Palette,
-      component: <ColorsPanel article={article} onUpdateArticle={onUpdateArticle} />,
+      component: <ColorsPanel article={article} onUpdateArticle={onUpdateArticle} masterMaterials={masterMaterials} />,
     },
     {
       key: 'sizes',

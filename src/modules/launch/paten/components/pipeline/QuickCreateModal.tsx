@@ -24,6 +24,7 @@ import { loadStoredBusinessUnits, isAllBusinessUnits } from '../../services/busi
 import { formatIDR } from '../../utils/calculations';
 import { optimizedImageUrl } from '../../utils/cloudinary';
 import { buildCategoryDefaultSizeChart } from '../../data/measurementFields';
+import { getColorHexFromName } from '../../utils/colorUtils';
 
 interface QuickCreateModalProps {
   isOpen?: boolean;
@@ -52,25 +53,6 @@ const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
 // Catatan: preset foto stok (Unsplash) dihapus. Foto stok yang tidak berhubungan
 // dengan produk nyata pernah ikut tersimpan ke artikel dan menyesatkan tim produksi.
 // Foto kini diunggah dari komputer ke Cloudinary, atau ditempel via URL asli produk.
-
-// Standard Color Hex Helper for Material Master Colors
-
-function getColorHexFromName(colorName: string): string {
-  const name = colorName.toLowerCase();
-  if (name.includes('black') || name.includes('hitam') || name.includes('jetblack')) return '#121212';
-  if (name.includes('navy') || name.includes('donker')) return '#1B2A4A';
-  if (name.includes('white') || name.includes('putih') || name.includes('natural')) return '#F5F5ED';
-  if (name.includes('sage') || name.includes('green') || name.includes('hijau')) return '#6B8E78';
-  if (name.includes('olive') || name.includes('army')) return '#4B5320';
-  if (name.includes('grey') || name.includes('abu') || name.includes('steel')) return '#4A5568';
-  if (name.includes('terracotta') || name.includes('rust')) return '#C85A32';
-  if (name.includes('khaki') || name.includes('beige') || name.includes('tan')) return '#C2B280';
-  if (name.includes('burgundy') || name.includes('maroon') || name.includes('crimson')) return '#800020';
-  if (name.includes('yellow') || name.includes('mustard') || name.includes('kuning')) return '#E3A857';
-  if (name.includes('blue') || name.includes('biru')) return '#2563EB';
-  if (name.includes('red') || name.includes('merah')) return '#DC2626';
-  return '#64748B';
-}
 
 export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   isOpen = true,
