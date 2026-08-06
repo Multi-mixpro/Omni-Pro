@@ -65,6 +65,16 @@ const errorListeners = new Set<(message: string | null) => void>();
 let persistenceQueue: Promise<void> = Promise.resolve();
 let lastLocalWriteTime = 0;
 
+// Master data cache — these tables rarely change and don't need realtime reload
+let masterDataCache: {
+  profiles: Row[];
+  suppliers: Row[];
+  materials: Row[];
+  materialLinks: Row[];
+  costComponents: Row[];
+} | null = null;
+let lastReloadTime = 0;
+
 function reportError(reason: unknown) {
   const message =
     reason instanceof Error
@@ -478,20 +488,33 @@ function mapService(row: Row): ServiceMaster {
 
 let activeLoadWorkspacePromise: Promise<WorkspaceSnapshot> | null = null;
 
+async function loadMasterData() {
+  if (masterDataCache) return masterDataCache;
+  const [profiles, suppliers, materials, materialLinks, costComponents] = await Promise.all([
+    rows(supabase.from('profiles').select('*')),
+    rows(supabase.from('suppliers').select('*')),
+    rows(supabase.from('materials').select('*')),
+    rows(supabase.from('material_suppliers').select('*')),
+    rows(supabase.from('cost_components').select('*')),
+  ]);
+  masterDataCache = { profiles, suppliers, materials, materialLinks, costComponents };
+  return masterDataCache;
+}
+
+export function invalidateMasterData() {
+  masterDataCache = null;
+}
+
 export function loadWorkspace(): Promise<WorkspaceSnapshot> {
   if (activeLoadWorkspacePromise) {
     return activeLoadWorkspacePromise;
   }
   activeLoadWorkspacePromise = (async () => {
     try {
-      const queries = await Promise.all([
+      const [master, ...queries] = await Promise.all([
+        loadMasterData(),
         rows(supabase.from('paten_records').select('*')),
         rows(supabase.from('launch_projects').select('*, business_unit:business_units(*), owner:profiles!launch_projects_owner_id_fkey(*)').order('updated_at', { ascending: false })),
-    rows(supabase.from('profiles').select('*')),
-    rows(supabase.from('suppliers').select('*')),
-    rows(supabase.from('materials').select('*')),
-    rows(supabase.from('material_suppliers').select('*')),
-    rows(supabase.from('cost_components').select('*')),
     rows(supabase.from('launch_tasks').select('*')),
     rows(supabase.from('launch_blockers').select('*')),
     rows(supabase.from('launch_comments').select('*, author:profiles!launch_comments_author_id_fkey(*)')),
@@ -517,35 +540,35 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
   const mock = allowDemoData ? await loadMock() : null;
   const bridge = value(0);
   const projects = value(1);
-  const profiles = value(2);
-  const suppliersRaw = value(3);
-  const materialsRaw = value(4);
-  const materialLinks = value(5);
-  const servicesRaw = value(6);
-  const tasksRaw = value(7);
-  const blockersRaw = value(8);
-  const commentsRaw = value(9);
-  const approvalsRaw = value(10);
-  const updatesRaw = value(11);
+  const profiles = master.profiles;
+  const suppliersRaw = master.suppliers;
+  const materialsRaw = master.materials;
+  const materialLinks = master.materialLinks;
+  const servicesRaw = master.costComponents;
+  const tasksRaw = value(2);
+  const blockersRaw = value(3);
+  const commentsRaw = value(4);
+  const approvalsRaw = value(5);
+  const updatesRaw = value(6);
   const profileMap = new Map(profiles.map((profile) => [String(profile.id), profile]));
   const projectMap = new Map(projects.map((project) => [String(project.id), project]));
   const supplierBase = suppliersRaw.map(mapSupplier);
   const supplierMap = new Map(supplierBase.map((supplier) => [supplier.id, supplier]));
 
   const related = {
-    references: value(12),
-    candidates: value(13),
-    quotes: value(14),
-    colorways: value(15),
-    samples: value(16),
-    hppVersions: value(17),
-    hppLines: value(18),
-    sizeCharts: value(19),
-    measurements: value(20),
-    batches: value(21),
-    releasePlans: value(22),
-    variantRows: value(23),
-    mediaAssets: value(24),
+    references: value(7),
+    candidates: value(8),
+    quotes: value(9),
+    colorways: value(10),
+    samples: value(11),
+    hppVersions: value(12),
+    hppLines: value(13),
+    sizeCharts: value(14),
+    measurements: value(15),
+    batches: value(16),
+    releasePlans: value(17),
+    variantRows: value(18),
+    mediaAssets: value(19),
     comments: commentsRaw,
     blockers: blockersRaw,
     approvals: approvalsRaw,
@@ -1272,9 +1295,9 @@ export const StorageService = {
   loadWorkspace,
 
   saveArticles(values: Article[]) { return save('article', values); },
-  saveSuppliers(values: Supplier[]) { return save('supplier', values); },
-  saveMaterials(values: MaterialMaster[]) { return save('material', values); },
-  saveServices(values: ServiceMaster[]) { return save('service', values); },
+  saveSuppliers(values: Supplier[]) { invalidateMasterData(); return save('supplier', values); },
+  saveMaterials(values: MaterialMaster[]) { invalidateMasterData(); return save('material', values); },
+  saveServices(values: ServiceMaster[]) { invalidateMasterData(); return save('service', values); },
   saveTasks(values: TaskItem[]) { return save('task', values); },
   saveBlockers(values: BlockerItem[]) { return save('blocker', values); },
   saveDecisions(values: DecisionRequest[]) { return save('decision', values); },
@@ -1286,30 +1309,25 @@ export const StorageService = {
 
   subscribe(onChange: () => void) {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const DEBOUNCE_MS = 5000;
+    const THROTTLE_MS = 15000;
     const schedule = () => {
-      // Cooldown: skip reload if a local write happened in the last 4 seconds
-      if (Date.now() - lastLocalWriteTime < 4000) {
-        return;
-      }
+      if (Date.now() - lastLocalWriteTime < 4000) return;
+      if (Date.now() - lastReloadTime < THROTTLE_MS) return;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(onChange, 1500); // 1.5s debounce for query batching
+      timer = setTimeout(() => {
+        lastReloadTime = Date.now();
+        onChange();
+      }, DEBOUNCE_MS);
     };
     const channel = supabase
       .channel('paten-workspace-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'paten_records' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_projects' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_tasks' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_blockers' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_approvals' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_progress_updates' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_references' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'media_assets' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_colorways' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_samples' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_hpp_versions' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_variant_matrix' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_production_batches' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_release_plans' }, schedule)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'media_assets' }, schedule)
       .subscribe();
     return () => {
       if (timer) clearTimeout(timer);
