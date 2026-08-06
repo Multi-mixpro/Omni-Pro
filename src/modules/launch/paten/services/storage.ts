@@ -1300,7 +1300,6 @@ export const StorageService = {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_projects' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_tasks' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_blockers' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_comments' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_approvals' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_progress_updates' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_references' }, schedule)

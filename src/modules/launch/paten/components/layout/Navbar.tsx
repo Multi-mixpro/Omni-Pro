@@ -100,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
 
-  const { members: teamMembers, onlineCount } = useTeamActivity(currentUser?.id);
+  const { members: teamMembers, onlineCount, onOpen: onOpenTeam } = useTeamActivity(currentUser?.id);
 
   const [buList, setBuList] = useState(() => loadStoredBusinessUnits());
 
@@ -227,7 +227,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="relative">
           <button
             onClick={() => {
-              setShowTeamDropdown(!showTeamDropdown);
+              const willOpen = !showTeamDropdown;
+              setShowTeamDropdown(willOpen);
+              if (willOpen) onOpenTeam();
               setShowNotifications(false);
               setShowProfileMenu(false);
             }}

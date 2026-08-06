@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface TeamMemberActivity {
@@ -11,35 +11,16 @@ export interface TeamMemberActivity {
   is_online: boolean;
 }
 
-const HEARTBEAT_INTERVAL = 60_000; // 1 min
-const ONLINE_THRESHOLD = 3 * 60_000; // 3 min
+const HEARTBEAT_INTERVAL = 5 * 60_000; // 5 min
+const ONLINE_THRESHOLD = 10 * 60_000; // 10 min
 
 export function useTeamActivity(currentUserId?: string) {
   const [members, setMembers] = useState<TeamMemberActivity[]>([]);
   const heartbeatRef = useRef<ReturnType<typeof setInterval>>();
+  const hasFetched = useRef(false);
 
   useEffect(() => {
     if (!currentUserId) return;
-
-    async function fetchMembers() {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, username, job_title, avatar_url, last_seen_at')
-        .eq('is_active', true)
-        .order('last_seen_at', { ascending: false, nullsFirst: false });
-
-      if (data) {
-        const now = Date.now();
-        setMembers(
-          data.map((m: any) => ({
-            ...m,
-            is_online: m.last_seen_at
-              ? now - new Date(m.last_seen_at).getTime() < ONLINE_THRESHOLD
-              : false,
-          })),
-        );
-      }
-    }
 
     async function heartbeat() {
       await supabase
@@ -49,19 +30,43 @@ export function useTeamActivity(currentUserId?: string) {
     }
 
     heartbeat();
-    fetchMembers();
-
-    heartbeatRef.current = setInterval(() => {
-      heartbeat();
-      fetchMembers();
-    }, HEARTBEAT_INTERVAL);
+    heartbeatRef.current = setInterval(heartbeat, HEARTBEAT_INTERVAL);
 
     return () => {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     };
   }, [currentUserId]);
 
+  const fetchMembers = useCallback(async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, username, job_title, avatar_url, last_seen_at')
+      .eq('is_active', true)
+      .order('last_seen_at', { ascending: false, nullsFirst: false });
+
+    if (data) {
+      const now = Date.now();
+      setMembers(
+        data.map((m: any) => ({
+          ...m,
+          is_online: m.last_seen_at
+            ? now - new Date(m.last_seen_at).getTime() < ONLINE_THRESHOLD
+            : false,
+        })),
+      );
+    }
+  }, []);
+
+  const onOpen = useCallback(() => {
+    if (!hasFetched.current) {
+      hasFetched.current = true;
+      fetchMembers();
+    } else {
+      fetchMembers();
+    }
+  }, [fetchMembers]);
+
   const onlineCount = members.filter((m) => m.is_online).length;
 
-  return { members, onlineCount };
+  return { members, onlineCount, onOpen };
 }

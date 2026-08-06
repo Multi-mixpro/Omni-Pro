@@ -32,12 +32,6 @@ interface FloatingChatBubbleProps {
   currentUser?: { id: string; name: string; avatarUrl?: string | null };
 }
 
-interface PresenceUser {
-  id: string;
-  name: string;
-  lastSeen: number;
-}
-
 interface ToastNotification {
   id: string;
   authorName: string;
@@ -49,7 +43,8 @@ interface ToastNotification {
 const STORAGE_KEY_CHAT_POS = 'mix_pro_launch_chat_pos_v1';
 const STORAGE_KEY_READ_IDS = 'mix_pro_chat_read_ids_v1';
 const STORAGE_KEY_MUTED = 'mix_pro_chat_sound_muted_v1';
-const STORAGE_KEY_PRESENCE = 'mix_pro_presence_users_v1';
+
+const authorProfileCache = new Map<string, { name: string; avatar: string }>();
 
 // Shared Web Audio API Context
 let sharedAudioCtx: AudioContext | null = null;
@@ -172,17 +167,6 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     return new Set();
   });
 
-  // Online Team Members Presence State
-  const [presenceUsers, setPresenceUsers] = useState<Record<string, PresenceUser>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PRESENCE);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      /* ignore */
-    }
-    return {};
-  });
-
   // Saved bubble position or default { x: 0, y: 0 } (bottom-right)
   const [bubblePosition, setBubblePosition] = useState<{ x: number; y: number }>(() => {
     try {
@@ -220,77 +204,6 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       window.removeEventListener('keydown', unlock);
     };
   }, []);
-
-  // Presence Heartbeat Loop (Broadcast presence every 15s)
-  useEffect(() => {
-    const myId = currentUser?.id || 'guest-' + Math.random().toString(36).substring(2, 6);
-    const myName = currentUser?.name || 'Gugun Gunawan';
-
-    const sendHeartbeat = () => {
-      const now = Date.now();
-      const heartbeatData: PresenceUser = { id: myId, name: myName, lastSeen: now };
-
-      // Update local storage presence map
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY_PRESENCE);
-        const map: Record<string, PresenceUser> = raw ? JSON.parse(raw) : {};
-        map[myId] = heartbeatData;
-
-        // Clean up stale users (> 45s inactive)
-        const cleanedMap: Record<string, PresenceUser> = {};
-        for (const [uid, u] of Object.entries(map)) {
-          if (now - u.lastSeen < 45000) {
-            cleanedMap[uid] = u;
-          }
-        }
-        localStorage.setItem(STORAGE_KEY_PRESENCE, JSON.stringify(cleanedMap));
-        setPresenceUsers(cleanedMap);
-      } catch {
-        /* ignore */
-      }
-
-      // Broadcast heartbeat to other windows/tabs
-      try {
-        if ('BroadcastChannel' in window) {
-          const bc = new BroadcastChannel('mix_pro_presence_channel');
-          bc.postMessage({ type: 'PRESENCE_HEARTBEAT', user: heartbeatData });
-          bc.close();
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-
-    sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 15000);
-
-    // Listen to presence broadcasts from other tabs
-    let presenceBc: BroadcastChannel | null = null;
-    if ('BroadcastChannel' in window) {
-      presenceBc = new BroadcastChannel('mix_pro_presence_channel');
-      presenceBc.onmessage = (event) => {
-        if (event.data?.type === 'PRESENCE_HEARTBEAT' && event.data.user) {
-          const u: PresenceUser = event.data.user;
-          setPresenceUsers((prev) => ({
-            ...prev,
-            [u.id]: u,
-          }));
-        }
-      };
-    }
-
-    return () => {
-      clearInterval(interval);
-      if (presenceBc) presenceBc.close();
-    };
-  }, [currentUser?.id, currentUser?.name]);
-
-  // Count active online users (seen in last 45s)
-  const activeOnlineUsers = Object.values(presenceUsers).filter(
-    (u) => Date.now() - u.lastSeen < 45000
-  );
-  const onlineCount = Math.max(1, activeOnlineUsers.length);
-  const onlineUserNames = activeOnlineUsers.map((u) => u.name).join(', ') || 'Gugun Gunawan';
 
   useEffect(() => {
     try {
@@ -538,13 +451,20 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
           let authorName = 'Tim';
           let authorAvatar = '';
           if (authorId) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name, avatar_url')
-              .eq('id', authorId)
-              .maybeSingle();
-            if (profile?.full_name) authorName = profile.full_name;
-            if (profile?.avatar_url) authorAvatar = profile.avatar_url;
+            const cached = authorProfileCache.get(authorId);
+            if (cached) {
+              authorName = cached.name;
+              authorAvatar = cached.avatar;
+            } else {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name, avatar_url')
+                .eq('id', authorId)
+                .maybeSingle();
+              if (profile?.full_name) authorName = profile.full_name;
+              if (profile?.avatar_url) authorAvatar = profile.avatar_url;
+              authorProfileCache.set(authorId, { name: authorName, avatar: authorAvatar });
+            }
           }
 
           const projectId = newRow.project_id ? String(newRow.project_id) : null;
@@ -821,11 +741,10 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
                   <div className="flex items-center gap-1.5">
                     <p className="text-xs font-bold leading-tight tracking-wide">Diskusi Tim</p>
                     <span
-                      title={`Tim Online: ${onlineUserNames}`}
-                      className="text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-200 rounded-full font-medium border border-emerald-400/30 flex items-center gap-1 cursor-help"
+                      className="text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-200 rounded-full font-medium border border-emerald-400/30 flex items-center gap-1"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                      {onlineCount} Online
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Live
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-300 leading-tight truncate">
