@@ -16,24 +16,31 @@ AS $$
   );
 $$;
 
--- Reduce Realtime publication to only tables that need realtime sync.
--- Removes 16 tables that either rarely change or don't need live updates.
--- This reduces WAL processing by ~73% and eliminates millions of
--- unnecessary RLS evaluations (which caused 117M+ transaction rollbacks).
+-- Remove ALL tables from Realtime publication.
+-- Supabase Realtime WAL processing was the #1 CPU consumer: 15,774 seconds
+-- of CPU time across 346K calls, causing 117M+ transaction rollbacks from
+-- RLS evaluations. App now uses 30s polling instead of Realtime subscriptions.
+-- This eliminates Realtime WAL processing overhead entirely.
 ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS
   cost_components,
   material_suppliers,
   materials,
   suppliers,
   paten_records,
+  launch_approvals,
+  launch_blockers,
+  launch_colorways,
   launch_comments,
   launch_hpp_versions,
+  launch_production_batches,
   launch_progress_updates,
+  launch_projects,
   launch_qc_checks,
   launch_references,
   launch_release_plans,
   launch_samples,
   launch_size_chart_measurements,
   launch_size_charts,
+  launch_tasks,
   launch_variant_matrix,
-  launch_production_batches;
+  media_assets;

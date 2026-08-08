@@ -1308,31 +1308,14 @@ export const StorageService = {
   },
 
   subscribe(onChange: () => void) {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const DEBOUNCE_MS = 5000;
-    const THROTTLE_MS = 15000;
-    const schedule = () => {
+    const POLL_INTERVAL = 30_000;
+    const poll = () => {
       if (Date.now() - lastLocalWriteTime < 4000) return;
-      if (Date.now() - lastReloadTime < THROTTLE_MS) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        lastReloadTime = Date.now();
-        onChange();
-      }, DEBOUNCE_MS);
+      lastReloadTime = Date.now();
+      onChange();
     };
-    const channel = supabase
-      .channel('paten-workspace-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_projects' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_tasks' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_blockers' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_approvals' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'launch_colorways' }, schedule)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'media_assets' }, schedule)
-      .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      void supabase.removeChannel(channel);
-    };
+    const interval = setInterval(poll, POLL_INTERVAL);
+    return () => clearInterval(interval);
   },
 
   subscribeErrors(listener: (message: string | null) => void) {

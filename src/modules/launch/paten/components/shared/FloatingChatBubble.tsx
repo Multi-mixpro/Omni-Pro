@@ -435,46 +435,33 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       bc.addEventListener('message', handleBroadcastMsg);
     }
 
-    // Supabase Realtime Subscription fallback
-    const supabaseChannel = supabase
-      .channel('public:launch_comments')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'launch_comments' },
-        async (payload) => {
-          const newRow = payload.new;
-          if (!newRow || !newRow.body) return;
+    // Poll for new comments every 10 seconds (replaces Realtime to reduce CPU)
+    let lastPollTime = new Date().toISOString();
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data: newRows } = await supabase
+          .from('launch_comments')
+          .select('*, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)')
+          .gt('created_at', lastPollTime)
+          .order('created_at', { ascending: true });
 
-          const authorId = String(newRow.author_id || '');
+        if (!newRows?.length) return;
+        lastPollTime = new Date().toISOString();
+
+        for (const row of newRows) {
+          const authorId = String(row.author_id || '');
           const isFromMe = authorId === currentUser?.id;
+          const authorName = row.author?.full_name || 'Tim';
+          const authorAvatar = row.author?.avatar_url || '';
+          if (authorId) authorProfileCache.set(authorId, { name: authorName, avatar: authorAvatar });
 
-          let authorName = 'Tim';
-          let authorAvatar = '';
-          if (authorId) {
-            const cached = authorProfileCache.get(authorId);
-            if (cached) {
-              authorName = cached.name;
-              authorAvatar = cached.avatar;
-            } else {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('full_name, avatar_url')
-                .eq('id', authorId)
-                .maybeSingle();
-              if (profile?.full_name) authorName = profile.full_name;
-              if (profile?.avatar_url) authorAvatar = profile.avatar_url;
-              authorProfileCache.set(authorId, { name: authorName, avatar: authorAvatar });
-            }
-          }
-
-          const projectId = newRow.project_id ? String(newRow.project_id) : null;
-
+          const projectId = row.project_id ? String(row.project_id) : null;
           const incoming: ArticleComment & { projectId?: string; _sourceLabel?: string } = {
-            id: String(newRow.id),
+            id: String(row.id),
             authorName,
             authorAvatar,
-            body: String(newRow.body),
-            createdAt: String(newRow.created_at || new Date().toISOString()),
+            body: String(row.body),
+            createdAt: String(row.created_at || new Date().toISOString()),
             projectId: projectId || 'global',
           };
 
@@ -499,7 +486,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
               });
             }
           } catch (err) {
-            console.warn('[Chat Realtime] Error processing message:', err);
+            console.warn('[Chat Poll] Error processing message:', err);
           }
 
           if (!isFromMe) {
@@ -507,14 +494,14 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
             triggerToastNotification(incoming);
           }
         }
-      )
-      .subscribe();
+      } catch {
+        // silently skip poll errors
+      }
+    }, 10_000);
 
     return () => {
-      if (bc) {
-        bc.close();
-      }
-      supabase.removeChannel(supabaseChannel);
+      if (bc) bc.close();
+      clearInterval(pollInterval);
     };
   }, [currentUser?.id, currentUser?.name]);
 
