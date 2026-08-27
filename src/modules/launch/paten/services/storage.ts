@@ -73,7 +73,6 @@ let masterDataCache: {
   materialLinks: Row[];
   costComponents: Row[];
 } | null = null;
-let lastReloadTime = 0;
 
 function reportError(reason: unknown) {
   const message =
@@ -513,8 +512,8 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
     try {
       const [master, ...queries] = await Promise.all([
         loadMasterData(),
-        rows(supabase.from('paten_records').select('*')),
-        rows(supabase.from('launch_projects').select('*, business_unit:business_units(*), owner:profiles!launch_projects_owner_id_fkey(*)').order('updated_at', { ascending: false })),
+        rows(supabase.from('paten_records').select('record_type, record_id, project_id, payload, is_deleted, revision')),
+        rows(supabase.from('launch_projects').select('id, code, category, reference_image_url, current_stage, status, progress, concept, source_notes, production_notes, target_date, updated_at, created_at, business_unit:business_units(name, code), owner:profiles!launch_projects_owner_id_fkey(full_name)').order('updated_at', { ascending: false })),
     rows(supabase.from('launch_tasks').select('*')),
     rows(supabase.from('launch_blockers').select('*')),
     rows(supabase.from('launch_comments').select('*, author:profiles!launch_comments_author_id_fkey(*)')),
@@ -1308,14 +1307,26 @@ export const StorageService = {
   },
 
   subscribe(onChange: () => void) {
-    const POLL_INTERVAL = 30_000;
+    // Full-workspace sync is intentionally infrequent: this endpoint reads
+    // several operational tables. Refresh immediately when the user returns
+    // to the app, but never consume bandwidth from a background tab.
+    const POLL_INTERVAL = 5 * 60_000;
     const poll = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       if (Date.now() - lastLocalWriteTime < 4000) return;
-      lastReloadTime = Date.now();
       onChange();
     };
+    const refreshWhenVisible = () => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') poll();
+    };
     const interval = setInterval(poll, POLL_INTERVAL);
-    return () => clearInterval(interval);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
+    };
   },
 
   subscribeErrors(listener: (message: string | null) => void) {

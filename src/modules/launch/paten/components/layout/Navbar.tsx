@@ -220,7 +220,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             : 'bg-amber-50 text-amber-700 border-amber-200'
         }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${syncHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-          <span>{syncHealthy ? 'Realtime aktif' : 'Perlu sinkronisasi'}</span>
+          <span>{syncHealthy ? 'Sinkronisasi aktif' : 'Perlu sinkronisasi'}</span>
         </div>
 
         {/* Team Activity Dropdown */}

@@ -28,7 +28,6 @@ type ChatChannel = 'all_feed' | 'global' | string;
 interface FloatingChatBubbleProps {
   articles: Article[];
   selectedArticleId: string;
-  onUpdateArticle: (updated: Article) => void;
   currentUser?: { id: string; name: string; avatarUrl?: string | null };
 }
 
@@ -126,7 +125,6 @@ function showAndroidSystemNotification(title: string, body: string) {
 export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   articles,
   selectedArticleId,
-  onUpdateArticle,
   currentUser,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -180,7 +178,11 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
 
   // Global chat comments loaded from Supabase (project_id IS NULL)
   const [globalComments, setGlobalComments] = useState<ArticleComment[]>([]);
+  // Keep newly received article comments local to chat. A chat message must
+  // never cause a full article document to be written back to Supabase.
+  const [articleComments, setArticleComments] = useState<Record<string, ArticleComment[]>>({});
   const globalLoaded = useRef(false);
+  const chatCursorRef = useRef(new Date().toISOString());
 
   useEffect(() => {
     if (globalLoaded.current) return;
@@ -239,10 +241,16 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
 
   const articlesRef = useRef(articles);
   articlesRef.current = articles;
-  const onUpdateArticleRef = useRef(onUpdateArticle);
-  onUpdateArticleRef.current = onUpdateArticle;
   const soundMutedRef = useRef(soundMuted);
   soundMutedRef.current = soundMuted;
+
+  const appendArticleComment = useCallback((projectId: string, comment: ArticleComment) => {
+    setArticleComments((previous) => {
+      const existing = previous[projectId] || [];
+      if (existing.some((item) => item.id === comment.id)) return previous;
+      return { ...previous, [projectId]: [...existing, comment] };
+    });
+  }, []);
 
   // Switch channel when selected article changes from parent (matches ID or Code)
   useEffect(() => {
@@ -291,6 +299,13 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     ? articles.find((a) => a.id === channel || a.code === channel)
     : null;
 
+  const commentsForArticle = (article: Article): ArticleComment[] => {
+    const merged = new Map<string, ArticleComment>();
+    [...(article.teamComments || []), ...(articleComments[article.id] || [])]
+      .forEach((comment) => merged.set(comment.id, comment));
+    return Array.from(merged.values());
+  };
+
   // Retrieve channel comments
   const getDisplayComments = (): (ArticleComment & { _sourceLabel?: string; _articleName?: string })[] => {
     if (channel === 'global') {
@@ -305,8 +320,8 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
     }
-    return currentArticle?.teamComments
-      ? [...currentArticle.teamComments]
+    return currentArticle
+      ? commentsForArticle(currentArticle)
           .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
           .map((c) => ({ ...c, _sourceLabel: currentArticle.code, _articleName: currentArticle.name }))
       : [];
@@ -318,7 +333,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   const allSystemComments: (ArticleComment & { _sourceLabel: string; _articleName?: string })[] = [
     ...globalComments.map((c) => ({ ...c, _sourceLabel: 'Umum' })),
     ...articles.flatMap((a) =>
-      (a.teamComments || []).map((c) => ({
+      commentsForArticle(a).map((c) => ({
         ...c,
         _sourceLabel: a.code,
         _articleName: a.name,
@@ -415,13 +430,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
             const arts = articlesRef.current;
             const targetArt = arts.find((a) => a.id === incoming.projectId || a.code === incoming.projectId);
             if (targetArt) {
-              if (!(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
-                onUpdateArticleRef.current({
-                  ...targetArt,
-                  teamComments: [...(targetArt.teamComments || []), incoming],
-                  lastUpdated: new Date().toISOString(),
-                });
-              }
+              appendArticleComment(targetArt.id, incoming);
             }
           }
 
@@ -435,18 +444,20 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       bc.addEventListener('message', handleBroadcastMsg);
     }
 
-    // Poll for new comments every 10 seconds (replaces Realtime to reduce CPU)
-    let lastPollTime = new Date().toISOString();
-    const pollInterval = setInterval(async () => {
+    // The chat can update more frequently than the workspace, but it does not
+    // poll in background tabs. An open chat is refreshed faster than a closed
+    // one to preserve a responsive discussion flow without constant egress.
+    const pollComments = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const { data: newRows } = await supabase
           .from('launch_comments')
-          .select('*, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)')
-          .gt('created_at', lastPollTime)
+          .select('id, project_id, author_id, body, created_at, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)')
+          .gt('created_at', chatCursorRef.current)
           .order('created_at', { ascending: true });
 
         if (!newRows?.length) return;
-        lastPollTime = new Date().toISOString();
+        chatCursorRef.current = String(newRows[newRows.length - 1].created_at || chatCursorRef.current);
 
         for (const row of newRows) {
           const authorId = String(row.author_id || '');
@@ -471,13 +482,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
               const targetArt = arts.find((a) => a.id === projectId || a.code === projectId);
               if (targetArt) {
                 incoming._sourceLabel = targetArt.code || targetArt.name;
-                if (!(targetArt.teamComments || []).some((c) => c.id === incoming.id)) {
-                  onUpdateArticleRef.current({
-                    ...targetArt,
-                    teamComments: [...(targetArt.teamComments || []), incoming],
-                    lastUpdated: new Date().toISOString(),
-                  });
-                }
+                appendArticleComment(targetArt.id, incoming);
               }
             } else {
               setGlobalComments((prev) => {
@@ -497,13 +502,22 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
       } catch {
         // silently skip poll errors
       }
-    }, 10_000);
+    };
+
+    const pollInterval = setInterval(() => void pollComments(), isOpen ? 30_000 : 120_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void pollComments();
+    };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
 
     return () => {
       if (bc) bc.close();
       clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
     };
-  }, [currentUser?.id, currentUser?.name]);
+  }, [appendArticleComment, currentUser?.id, currentUser?.name, isOpen]);
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -547,11 +561,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
         if (currentUser?.name) newComment.authorName = currentUser.name;
 
         setReadCommentIds((prev) => new Set([...prev, newComment.id]));
-        onUpdateArticle({
-          ...currentArticle,
-          teamComments: [...(currentArticle.teamComments || []), newComment],
-          lastUpdated: new Date().toISOString(),
-        });
+        appendArticleComment(currentArticle.id, newComment);
         broadcastNewMessage({ ...newComment, projectId: currentArticle.id });
         setCommentText('');
       }
@@ -1005,7 +1015,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
                       </span>
                     </p>
                     {articles.map((a) => {
-                      const cCount = a.teamComments?.length || 0;
+                      const cCount = commentsForArticle(a).length;
                       return (
                         <button
                           key={a.id}

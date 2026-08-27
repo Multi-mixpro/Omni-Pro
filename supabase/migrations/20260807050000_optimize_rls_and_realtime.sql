@@ -21,26 +21,48 @@ $$;
 -- of CPU time across 346K calls, causing 117M+ transaction rollbacks from
 -- RLS evaluations. App now uses 30s polling instead of Realtime subscriptions.
 -- This eliminates Realtime WAL processing overhead entirely.
-ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS
-  cost_components,
-  material_suppliers,
-  materials,
-  suppliers,
-  paten_records,
-  launch_approvals,
-  launch_blockers,
-  launch_colorways,
-  launch_comments,
-  launch_hpp_versions,
-  launch_production_batches,
-  launch_progress_updates,
-  launch_projects,
-  launch_qc_checks,
-  launch_references,
-  launch_release_plans,
-  launch_samples,
-  launch_size_chart_measurements,
-  launch_size_charts,
-  launch_tasks,
-  launch_variant_matrix,
-  media_assets;
+-- ALTER PUBLICATION does not support `DROP TABLE IF EXISTS`. Remove each
+-- table only when it is still present, so this migration is safe to rerun.
+DO $$
+DECLARE
+  table_name text;
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    FOREACH table_name IN ARRAY ARRAY[
+      'cost_components',
+      'material_suppliers',
+      'materials',
+      'suppliers',
+      'paten_records',
+      'launch_approvals',
+      'launch_blockers',
+      'launch_colorways',
+      'launch_comments',
+      'launch_hpp_versions',
+      'launch_production_batches',
+      'launch_progress_updates',
+      'launch_projects',
+      'launch_qc_checks',
+      'launch_references',
+      'launch_release_plans',
+      'launch_samples',
+      'launch_size_chart_measurements',
+      'launch_size_charts',
+      'launch_tasks',
+      'launch_variant_matrix',
+      'media_assets'
+    ]
+    LOOP
+      IF EXISTS (
+        SELECT 1
+        FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime'
+          AND schemaname = 'public'
+          AND tablename = table_name
+      ) THEN
+        EXECUTE format('ALTER PUBLICATION supabase_realtime DROP TABLE public.%I', table_name);
+      END IF;
+    END LOOP;
+  END IF;
+END;
+$$;

@@ -187,7 +187,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     if (next.articleId) setSelectedArticleId(next.articleId);
   }, [location.pathname, location.search]);
 
-  // Load Supabase data and keep every PATEN screen in realtime sync.
+  // Load Supabase data, then refresh periodically and when the user returns.
   useEffect(() => {
     let active = true;
 
@@ -788,7 +788,6 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
       <FloatingChatBubble
         articles={articles}
         selectedArticleId={selectedArticleId}
-        onUpdateArticle={handleUpdateArticle}
         currentUser={currentUser}
       />
     </div>
