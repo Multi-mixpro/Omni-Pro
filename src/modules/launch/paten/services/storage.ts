@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { createPollGate } from './polling';
 import {
   ApprovalGate,
   Article,
@@ -516,7 +517,7 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
         rows(supabase.from('launch_projects').select('id, code, category, reference_image_url, current_stage, status, progress, concept, source_notes, production_notes, target_date, updated_at, created_at, business_unit:business_units(name, code), owner:profiles!launch_projects_owner_id_fkey(full_name)').order('updated_at', { ascending: false })),
     rows(supabase.from('launch_tasks').select('*')),
     rows(supabase.from('launch_blockers').select('*')),
-    rows(supabase.from('launch_comments').select('*, author:profiles!launch_comments_author_id_fkey(*)')),
+    rows(supabase.from('launch_comments').select('id, project_id, body, created_at, is_decision_request, decision_deadline, decision_status, decision_note, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)').or('project_id.not.is.null,is_decision_request.eq.true')),
     rows(supabase.from('launch_approvals').select('*')),
     rows(supabase.from('launch_progress_updates').select('*')),
     rows(supabase.from('launch_references').select('*')),
@@ -1306,15 +1307,16 @@ export const StorageService = {
     return queue(() => resolveDecision(decisionId, choice));
   },
 
-  subscribe(onChange: () => void) {
+  subscribe(onChange: () => void | Promise<void>) {
     // Full-workspace sync is intentionally infrequent: this endpoint reads
     // several operational tables. Refresh immediately when the user returns
     // to the app, but never consume bandwidth from a background tab.
     const POLL_INTERVAL = 5 * 60_000;
+    const runPoll = createPollGate(POLL_INTERVAL, true);
     const poll = () => {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       if (Date.now() - lastLocalWriteTime < 4000) return;
-      onChange();
+      void runPoll(onChange);
     };
     const refreshWhenVisible = () => {
       if (typeof document === 'undefined' || document.visibilityState === 'visible') poll();

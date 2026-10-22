@@ -51,11 +51,11 @@ export async function loadGlobalComments(): Promise<ArticleComment[]> {
     .from('launch_comments')
     .select('id, body, created_at, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)')
     .is('project_id', null)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(100);
 
   if (error) throw error;
-  return (data || []).map((row: any) => ({
+  return (data || []).reverse().map((row: any) => ({
     id: String(row.id),
     authorName: String(row.author?.full_name || 'Tim'),
     authorAvatar: String(row.author?.avatar_url || ''),

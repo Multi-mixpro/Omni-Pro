@@ -218,7 +218,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     };
 
     void reload();
-    const unsubscribeRealtime = StorageService.subscribe(() => void reload());
+    const unsubscribeRealtime = StorageService.subscribe(reload);
     const unsubscribeErrors = StorageService.subscribeErrors(setSyncError);
 
     return () => {

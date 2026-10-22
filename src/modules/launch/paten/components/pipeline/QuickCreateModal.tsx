@@ -350,6 +350,10 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   // Handler for Photos
   const handleAddPhoto = (urlToAdd: string, labelToAdd: string = 'Sisi Lain') => {
     if (!urlToAdd.trim()) return;
+    if (/^data:/i.test(urlToAdd.trim())) {
+      setUploadError('Gunakan URL foto atau unggah berkas. Gambar Base64 terlalu besar untuk disimpan dalam data artikel.');
+      return;
+    }
     if (productPhotos.length >= MAX_PHOTOS) {
       setNotice(`Maksimal ${MAX_PHOTOS} foto produk untuk menampilkan detail dari semua sisi.`);
       return;
@@ -365,16 +369,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     setNewPhotoUrl('');
   };
 
-  const readFileAsDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string || '');
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(file);
-    });
-  };
-
-  /** Unggah satu atau beberapa berkas foto dari komputer / HP ke Cloudinary / Local Base64. */
+  /** Store hosted photo URLs so workspace refreshes never download image bytes. */
   const handleUploadFiles = async (files: FileList | Array<File> | null) => {
     if (!files || files.length === 0) return;
 
@@ -389,16 +384,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     setUploadError(null);
     try {
       for (const file of queue) {
-        let url = '';
-        if (onUploadPhoto) {
-          try {
-            url = await onUploadPhoto(file);
-          } catch {
-            url = await readFileAsDataUrl(file);
-          }
-        } else {
-          url = await readFileAsDataUrl(file);
-        }
+        if (!onUploadPhoto) throw new Error('Layanan unggah foto belum tersedia. Gunakan URL foto atau coba lagi nanti.');
+        const url = await onUploadPhoto(file);
 
         if (!url) continue;
 

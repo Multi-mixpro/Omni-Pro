@@ -22,6 +22,7 @@ import {
 import type { Article, ArticleComment } from '../../types';
 import { addArticleComment, broadcastNewMessage, loadGlobalComments } from '../../services/collaboration';
 import { supabase } from '@/integrations/supabase/client';
+import { createPollGate } from '../../services/polling';
 
 type ChatChannel = 'all_feed' | 'global' | string;
 
@@ -183,6 +184,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
   const [articleComments, setArticleComments] = useState<Record<string, ArticleComment[]>>({});
   const globalLoaded = useRef(false);
   const chatCursorRef = useRef(new Date().toISOString());
+  const runChatPoll = useRef(createPollGate(30_000));
 
   useEffect(() => {
     if (globalLoaded.current) return;
@@ -313,7 +315,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     }
     if (channel === 'all_feed') {
       const articleCmts = articles.flatMap((a) =>
-        (a.teamComments || []).map((c) => ({ ...c, _sourceLabel: a.code, _articleName: a.name }))
+        commentsForArticle(a).map((c) => ({ ...c, _sourceLabel: a.code, _articleName: a.name }))
       );
       const globalCmts = globalComments.map((c) => ({ ...c, _sourceLabel: 'Umum' }));
       return [...articleCmts, ...globalCmts].sort(
@@ -408,7 +410,7 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     }, 5000);
   };
 
-  // Realtime Subscriptions (BroadcastChannel + Supabase Realtime)
+  // Local tab broadcasts plus incremental HTTP polling.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -447,61 +449,65 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     // The chat can update more frequently than the workspace, but it does not
     // poll in background tabs. An open chat is refreshed faster than a closed
     // one to preserve a responsive discussion flow without constant egress.
+    let disposed = false;
     const pollComments = async () => {
       if (document.visibilityState !== 'visible') return;
-      try {
-        const { data: newRows } = await supabase
-          .from('launch_comments')
-          .select('id, project_id, author_id, body, created_at, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)')
-          .gt('created_at', chatCursorRef.current)
-          .order('created_at', { ascending: true });
+      await runChatPoll.current(async () => {
+        try {
+          const { data: newRows, error: pollError } = await supabase
+            .from('launch_comments')
+            .select('id, project_id, author_id, body, created_at, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)')
+            .gt('created_at', chatCursorRef.current)
+            .order('created_at', { ascending: true });
 
-        if (!newRows?.length) return;
-        chatCursorRef.current = String(newRows[newRows.length - 1].created_at || chatCursorRef.current);
+          if (disposed || pollError || !newRows?.length) return;
+          chatCursorRef.current = String(newRows[newRows.length - 1].created_at || chatCursorRef.current);
 
-        for (const row of newRows) {
-          const authorId = String(row.author_id || '');
-          const isFromMe = authorId === currentUser?.id;
-          const authorName = row.author?.full_name || 'Tim';
-          const authorAvatar = row.author?.avatar_url || '';
-          if (authorId) authorProfileCache.set(authorId, { name: authorName, avatar: authorAvatar });
+          for (const row of newRows) {
+            const authorId = String(row.author_id || '');
+            const isFromMe = authorId === currentUser?.id;
+            const author = Array.isArray(row.author) ? row.author[0] : row.author;
+            const authorName = author?.full_name || 'Tim';
+            const authorAvatar = author?.avatar_url || '';
+            if (authorId) authorProfileCache.set(authorId, { name: authorName, avatar: authorAvatar });
 
-          const projectId = row.project_id ? String(row.project_id) : null;
-          const incoming: ArticleComment & { projectId?: string; _sourceLabel?: string } = {
-            id: String(row.id),
-            authorName,
-            authorAvatar,
-            body: String(row.body),
-            createdAt: String(row.created_at || new Date().toISOString()),
-            projectId: projectId || 'global',
-          };
+            const projectId = row.project_id ? String(row.project_id) : null;
+            const incoming: ArticleComment & { projectId?: string; _sourceLabel?: string } = {
+              id: String(row.id),
+              authorName,
+              authorAvatar,
+              body: String(row.body),
+              createdAt: String(row.created_at || new Date().toISOString()),
+              projectId: projectId || 'global',
+            };
 
-          try {
-            if (projectId) {
-              const arts = articlesRef.current;
-              const targetArt = arts.find((a) => a.id === projectId || a.code === projectId);
-              if (targetArt) {
-                incoming._sourceLabel = targetArt.code || targetArt.name;
-                appendArticleComment(targetArt.id, incoming);
+            try {
+              if (projectId) {
+                const arts = articlesRef.current;
+                const targetArt = arts.find((a) => a.id === projectId || a.code === projectId);
+                if (targetArt) {
+                  incoming._sourceLabel = targetArt.code || targetArt.name;
+                  appendArticleComment(targetArt.id, incoming);
+                }
+              } else {
+                setGlobalComments((prev) => {
+                  if (prev.some((c) => c.id === incoming.id)) return prev;
+                  return [...prev, incoming];
+                });
               }
-            } else {
-              setGlobalComments((prev) => {
-                if (prev.some((c) => c.id === incoming.id)) return prev;
-                return [...prev, incoming];
-              });
+            } catch (err) {
+              console.warn('[Chat Poll] Error processing message:', err);
             }
-          } catch (err) {
-            console.warn('[Chat Poll] Error processing message:', err);
-          }
 
-          if (!isFromMe) {
-            playNotificationChime(soundMutedRef.current);
-            triggerToastNotification(incoming);
+            if (!isFromMe) {
+              playNotificationChime(soundMutedRef.current);
+              triggerToastNotification(incoming);
+            }
           }
+        } catch {
+          // silently skip poll errors
         }
-      } catch {
-        // silently skip poll errors
-      }
+      });
     };
 
     const pollInterval = setInterval(() => void pollComments(), isOpen ? 30_000 : 120_000);
@@ -510,8 +516,10 @@ export const FloatingChatBubble: React.FC<FloatingChatBubbleProps> = ({
     };
     document.addEventListener('visibilitychange', refreshWhenVisible);
     window.addEventListener('focus', refreshWhenVisible);
+    if (isOpen) void pollComments();
 
     return () => {
+      disposed = true;
       if (bc) bc.close();
       clearInterval(pollInterval);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
