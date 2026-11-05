@@ -22,7 +22,7 @@ export function AuthGate() {
 
   const hasLaunchAccess = auth.data?.permissions.includes('launch.view') || auth.data?.permissions.includes('launch.admin');
 
-  if (auth.data?.session && auth.data.profile && hasLaunchAccess) return <Navigate to="/launch/app/today" replace />;
+  if (auth.data?.session && auth.data.profile?.is_active && hasLaunchAccess) return <Navigate to="/launch/app" replace />;
 
   if (auth.data?.session && auth.data.profile && !hasLaunchAccess) {
     return (

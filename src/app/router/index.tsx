@@ -1,9 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { lazy, Suspense } from 'react';
 import { AuthGate } from '@/core/auth/AuthGate';
 import { useAuth } from '@/core/auth/useAuth';
 import PatenApp from '@/modules/launch/paten/App';
 import { SettingsPage } from '@/modules/launch/settings/SettingsPage';
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
+import { WorkspacePicker } from './WorkspacePicker';
+
+const CreativeWorkspace = lazy(() => import('@/modules/launch/creative/CreativeWorkspace'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,9 +97,12 @@ function RouteView() {
   if (pathname === '/launch/app/settings' || pathname === '/launch/app/settings/') {
     return <ProtectedSettingsPage />;
   }
+  if (pathname === '/launch/app/creative' || pathname === '/launch/app/creative/') {
+    return <ProtectedCreativeWorkspace />;
+  }
 
   if (pathname === '/launch/app' || pathname === '/launch/app/') {
-    return <Navigate to="/launch/app/today" replace />;
+    return <ProtectedWorkspacePicker />;
   }
 
   if (pathname.startsWith('/launch/app/')) {
@@ -103,6 +110,27 @@ function RouteView() {
   }
 
   return <Navigate to="/launch/login" replace />;
+}
+
+function ProtectedWorkspacePicker() {
+  const auth = useAuth();
+  if (auth.isLoading) return <BootScreen />;
+  const permissions = auth.data?.permissions ?? [];
+  if (!auth.data?.session || !auth.data.profile?.is_active || !permissions.some(permission => ['launch.view', 'launch.admin'].includes(permission))) return <AuthGate />;
+  return <WorkspacePicker name={auth.data.profile.full_name} />;
+}
+
+function ProtectedCreativeWorkspace() {
+  const auth = useAuth();
+  if (auth.isLoading) return <BootScreen />;
+  const permissions = auth.data?.permissions ?? [];
+  if (!auth.data?.session || !auth.data.profile?.is_active || !permissions.some(permission => ['launch.view', 'launch.admin'].includes(permission))) {
+    return <AuthGate />;
+  }
+  return <Suspense fallback={<BootScreen />}>
+    <CreativeWorkspace key={auth.data.profile.id} userId={auth.data.profile.id}
+      canEdit={permissions.some(permission => ['launch.edit', 'launch.admin'].includes(permission))} />
+  </Suspense>;
 }
 
 export function AppRouter() {

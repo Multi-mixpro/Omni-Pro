@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { Link } from '@/app/router/simpleRouter';
 import {
   Home,
   Kanban,
@@ -19,6 +20,7 @@ import {
   Settings,
   LogOut,
   Smartphone,
+  Megaphone,
 } from 'lucide-react';
 import { BusinessUnit } from '../../types';
 import { loadStoredBusinessUnits } from '../../services/businessUnits';
@@ -207,6 +209,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
             {/* Navigation Grid */}
             <div className="grid grid-cols-2 gap-1.5 mt-2">
+              <Link to="/launch/app" className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold">
+                <Layers className="w-4 h-4" /> Pilih ruang kerja
+              </Link>
+              <button
+                onClick={() => { setShowMoreSheet(false); onSelectTab('creative'); }}
+                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-fuchsia-50 border border-fuchsia-200 text-left text-xs font-bold text-fuchsia-700"
+              >
+                <Megaphone className="w-4 h-4" />
+                <span>Konten &amp; Kampanye</span>
+              </button>
               <button
                 onClick={() => {
                   onSelectTab('implementation');

@@ -57,6 +57,7 @@ interface PatenAppProps {
 
 type PatenTab =
   | 'dashboard'
+  | 'creative'
   | 'pipeline'
   | 'workspace'
   | 'implementation'
