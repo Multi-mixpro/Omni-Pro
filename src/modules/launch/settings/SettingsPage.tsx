@@ -1,4 +1,4 @@
-import { type ReactNode, FormEvent, useState, useEffect } from 'react';
+import { type ReactNode, FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -28,11 +28,7 @@ import {
   type TeamMember,
   type UpdateTeamUserInput,
 } from '../data/teamRepository';
-import {
-  loadStoredBusinessUnits,
-  saveStoredBusinessUnits,
-  type BusinessUnitItem,
-} from '../paten/services/businessUnits';
+import { saveWorkspaceUnit, setWorkspaceUnitActive, unitKey, unitSectors, useWorkspaceUnits, type WorkspaceUnit } from '../data/businessWorkspace';
 import { useProjects } from '../hooks/useLaunch';
 
 const emptyUser = (): NewTeamUserInput => ({ username: '', pin: '', full_name: '', job_title: '', role_code: '' });
@@ -96,48 +92,37 @@ export function SettingsPage() {
   const [projectId, setProjectId] = useState('');
 
   // Dynamic Business Units state
-  const [buList, setBuList] = useState<BusinessUnitItem[]>(() => loadStoredBusinessUnits());
+  const unitQuery = useWorkspaceUnits();
+  const buList = unitQuery.data ?? [];
   const [showBuModal, setShowBuModal] = useState(false);
   const [buEditId, setBuEditId] = useState<string | null>(null);
   const [buName, setBuName] = useState('');
   const [buCode, setBuCode] = useState('');
   const [buDesc, setBuDesc] = useState('');
+  const [buSector, setBuSector] = useState<WorkspaceUnit['sector']>('other');
+  const [buSaving, setBuSaving] = useState(false);
+  const [buError, setBuError] = useState('');
 
-  const handleSaveBu = (e: FormEvent) => {
+  const refreshUnits = async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: unitKey }),
+      client.invalidateQueries({ queryKey: ['business-execution'] }),
+    ]);
+  };
+  const handleSaveBu = async (e: FormEvent) => {
     e.preventDefault();
-    if (!buName.trim()) return;
-
-    let updated: BusinessUnitItem[];
-    if (buEditId) {
-      updated = buList.map((bu) =>
-        bu.id === buEditId
-          ? {
-              ...bu,
-              name: buName.trim(),
-              code: buCode.trim().toUpperCase() || buName.trim().toUpperCase(),
-              description: buDesc.trim() || 'Unit bisnis studio rilis.',
-            }
-          : bu
-      );
-    } else {
-      const newBu: BusinessUnitItem = {
-        id: `bu-${Date.now()}`,
-        name: buName.trim(),
-        code: buCode.trim().toUpperCase() || buName.trim().toUpperCase(),
-        description: buDesc.trim() || 'Unit bisnis studio rilis.',
-        status: 'Aktif',
-      };
-      updated = [...buList, newBu];
-    }
-
-    setBuList(updated);
-    saveStoredBusinessUnits(updated);
-    window.dispatchEvent(new Event('business-units-updated'));
-    setShowBuModal(false);
-    setBuEditId(null);
-    setBuName('');
-    setBuCode('');
-    setBuDesc('');
+    if (!isAdmin || !buName.trim() || buSaving) return;
+    const code = (buCode.trim() || buName.trim()).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+    if (!code || code.length > 32) { setBuError('Isi kode unit dengan 1–32 karakter.'); return; }
+    setBuSaving(true);
+    setBuError('');
+    try {
+      await saveWorkspaceUnit({ name: buName.trim(), code, description: buDesc.trim(), sector: buSector }, buEditId ?? undefined);
+      await refreshUnits();
+      setShowBuModal(false);
+    } catch {
+      setBuError('Unit belum dapat disimpan. Pastikan kode unik dan akun Anda memiliki izin.');
+    } finally { setBuSaving(false); }
   };
 
   const handleOpenNewBu = () => {
@@ -145,26 +130,28 @@ export function SettingsPage() {
     setBuName('');
     setBuCode('');
     setBuDesc('');
+    setBuSector('other');
+    setBuError('');
     setShowBuModal(true);
   };
 
-  const handleEditBu = (bu: BusinessUnitItem) => {
+  const handleEditBu = (bu: WorkspaceUnit) => {
     setBuEditId(bu.id);
     setBuName(bu.name);
     setBuCode(bu.code);
     setBuDesc(bu.description);
+    setBuSector(bu.sector);
+    setBuError('');
     setShowBuModal(true);
   };
 
-  const handleDeleteBu = (id: string) => {
-    if (buList.length <= 1) {
-      alert('Minimal harus ada 1 Unit Bisnis.');
-      return;
-    }
-    const updated = buList.filter((b) => b.id !== id);
-    setBuList(updated);
-    saveStoredBusinessUnits(updated);
-    window.dispatchEvent(new Event('business-units-updated'));
+  const handleToggleBu = async (unit: WorkspaceUnit) => {
+    if (!isAdmin || buSaving) return;
+    setBuSaving(true);
+    setBuError('');
+    try { await setWorkspaceUnitActive(unit.id, !unit.is_active); await refreshUnits(); }
+    catch { setBuError('Status unit belum dapat diubah.'); }
+    finally { setBuSaving(false); }
   };
 
   const access = useQuery({
@@ -177,13 +164,6 @@ export function SettingsPage() {
     client.invalidateQueries({ queryKey: ['launch-team'] });
     client.invalidateQueries({ queryKey: ['launch-all-profiles'] });
   };
-
-  useEffect(() => {
-    void purgeOrphanedProfiles().then(() => {
-      refreshTeam();
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
-  }, []);
 
   async function handlePurgeOrphaned() {
     setMemberFeedbackTone('success');
@@ -678,10 +658,11 @@ export function SettingsPage() {
             icon={<ShieldCheck className="w-5 h-5" />}
             tint="bg-white text-indigo-600 shadow-2xs"
             title="Kelola Unit Bisnis / Brand Studio"
-            subtitle="Tambah, ubah, atau hapus unit bisnis/brand terdaftar."
+            subtitle="Master bersama untuk launching dan kreatif. Arsipkan unit tanpa menghapus riwayat."
           />
           <button
             type="button"
+            disabled={!isAdmin || buSaving}
             onClick={handleOpenNewBu}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-2xs transition-colors shrink-0 cursor-pointer"
           >
@@ -690,6 +671,8 @@ export function SettingsPage() {
           </button>
         </div>
 
+        {unitQuery.isError && <p role="alert" className="text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
+        {!showBuModal && buError && <p role="alert" className="text-sm text-red-700">{buError}</p>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           {buList.map((unit) => (
             <div
@@ -703,7 +686,7 @@ export function SettingsPage() {
                     {unit.code}
                   </span>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold shrink-0">
-                    {unit.status}
+                    {unitSectors[unit.sector]} · {unit.is_active ? 'Aktif' : 'Arsip'}
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-500 mt-0.5 truncate">{unit.description}</p>
@@ -711,6 +694,7 @@ export function SettingsPage() {
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
+                  disabled={!isAdmin || buSaving}
                   onClick={() => handleEditBu(unit)}
                   title="Edit Unit Bisnis"
                   className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
@@ -719,11 +703,12 @@ export function SettingsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDeleteBu(unit.id)}
-                  title="Hapus Unit Bisnis"
+                  disabled={!isAdmin || buSaving}
+                  onClick={() => void handleToggleBu(unit)}
+                  title={unit.is_active ? 'Arsipkan Unit Bisnis' : 'Aktifkan Unit Bisnis'}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="text-xs font-semibold">{unit.is_active ? 'Arsipkan' : 'Aktifkan'}</span>
                 </button>
               </div>
             </div>
@@ -748,6 +733,12 @@ export function SettingsPage() {
               </button>
             </div>
             <form onSubmit={handleSaveBu} className="p-5 space-y-3.5 text-xs text-slate-900">
+              {buError && <p role="alert" className="text-red-700">{buError}</p>}
+              <label className="block space-y-1 font-bold">Sektor
+                <select className="w-full rounded-xl border border-slate-200 p-2.5" value={buSector} onChange={e => setBuSector(e.target.value as WorkspaceUnit['sector'])}>
+                  {Object.entries(unitSectors).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                </select>
+              </label>
               <div>
                 <label className="block font-extrabold text-slate-900 mb-1">
                   Nama Unit Bisnis / Brand <span className="text-rose-500">*</span>
@@ -791,9 +782,10 @@ export function SettingsPage() {
                 </button>
                 <button
                   type="submit"
+                  disabled={buSaving}
                   className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-extrabold hover:bg-indigo-700 shadow-2xs"
                 >
-                  Simpan Unit Bisnis
+                  {buSaving ? 'Menyimpan…' : 'Simpan Unit Bisnis'}
                 </button>
               </div>
             </form>

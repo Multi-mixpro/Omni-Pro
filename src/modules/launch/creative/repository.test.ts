@@ -64,6 +64,15 @@ describe('creative repository', () => {
     expect(chain.is).toHaveBeenCalledWith('task', null);
   });
 
+  it('applies unit and workstream before paginating tasks', async () => {
+    chain.abortSignal.mockResolvedValue({ data: [], error: null });
+    await tasks('all', { platform: '', status: '', assignee: 'staff', order: 'due_on', workstream: 'operations' },
+      0, new AbortController().signal, 'all', '', 'unit-fnb');
+    expect(chain.eq).toHaveBeenCalledWith('business_unit_id', 'unit-fnb');
+    expect(chain.eq).toHaveBeenCalledWith('workstream', 'operations');
+    expect(chain.eq).toHaveBeenCalledWith('assignee_id', 'staff');
+  });
+
   it('blocks executable URLs, inline media, and URLs with embedded credentials', () => {
     for (const url of ['javascript:alert(1)', 'data:image/png;base64,abc', 'https://user:pass@example.com']) {
       expect(safeOutputUrl(url)).toBe('');

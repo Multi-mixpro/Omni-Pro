@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ArticleFile } from '../types';
+import { isCloudinaryUploadUrl } from '../utils/cloudinary';
 
 type MediaKind =
   | 'TECH_PACK'
@@ -57,12 +58,12 @@ export function validateArticleMediaFile(
   }
 }
 
-async function sessionToken() {
+async function uploadSession() {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) {
     throw new Error('Sesi upload tidak tersedia. Silakan masuk kembali.');
   }
-  return data.session.access_token;
+  return data.session;
 }
 
 export async function uploadArticleMedia(
@@ -71,12 +72,12 @@ export async function uploadArticleMedia(
   kind: MediaKind,
 ): Promise<ArticleFile> {
   validateArticleMediaFile(projectId, file);
-  const token = await sessionToken();
+  const session = await uploadSession();
   const signatureResponse = await fetch('/api/cloudinary-sign', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({ project_id: projectId, kind }),
   });
@@ -102,6 +103,9 @@ export async function uploadArticleMedia(
     throw new Error(`Upload ${file.name} ke penyimpanan media gagal.`);
   }
   const uploaded = await uploadResponse.json() as CloudinaryUpload;
+  if (!isCloudinaryUploadUrl(uploaded.secure_url, file.type.startsWith('image/'))) {
+    throw new Error('Penyimpanan tidak mengembalikan tautan Cloudinary yang valid.');
+  }
 
   const { data: media, error: mediaError } = await supabase
     .from('media_assets')
@@ -125,7 +129,6 @@ export async function uploadArticleMedia(
   if (mediaError) throw mediaError;
 
   if (kind === 'REFERENCE') {
-    const { data: auth } = await supabase.auth.getUser();
     const { error } = await supabase.from('launch_references').insert({
       project_id: projectId,
       title: file.name.replace(/\.[^.]+$/, ''),
@@ -134,7 +137,7 @@ export async function uploadArticleMedia(
       media_asset_id: media.id,
       sort_order: 0,
       is_primary: false,
-      created_by: auth.user?.id,
+      created_by: session.user.id,
     });
     if (error) throw error;
   }
@@ -151,7 +154,7 @@ export async function uploadArticleMedia(
 }
 
 export async function deleteArticleMedia(mediaId: string) {
-  const token = await sessionToken();
+  const { access_token: token } = await uploadSession();
   const response = await fetch('/api/cloudinary-delete', {
     method: 'POST',
     headers: {

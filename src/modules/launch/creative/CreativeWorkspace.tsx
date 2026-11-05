@@ -1,41 +1,57 @@
 import { useState } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Megaphone, Plus, RefreshCw } from 'lucide-react';
-import { Link, useNavigate } from '@/app/router/simpleRouter';
+import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut } from '@/core/auth/useAuth';
+import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
+import { isProjectId } from '../discussion/repository';
+import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
 import { button, CampaignForm, errorText, field, Options, primary, TaskForm } from './CreativeForms';
 import { IdeaBank, ReferenceLinks } from './IdeaBank';
 import { focusLabels, jakartaToday, mondayWeek, type Focus } from './schedule';
 import {
-  campaigns, campaignStatuses, PAGE_SIZE, platforms, priorities, safeOutputUrl, summary, tasks, taskStatuses, team,
+  campaigns, campaignStatuses, PAGE_SIZE, platforms, priorities, safeOutputUrl, summary, tasks, taskStatuses, team, workstreams,
   type Campaign, type Filters, type Idea, type Task,
 } from './repository';
 
 const panel = 'rounded-xl border border-slate-200 bg-white p-4';
-const defaultFilters: Filters = { platform: '', status: '', assignee: '', order: 'due_on' };
+const defaultFilters: Filters = { platform: '', status: '', assignee: '', workstream: '', order: 'due_on' };
 const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZone: 'UTC' });
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const date = (value: string | null) => value ? dateFormat.format(new Date(value + 'T00:00:00Z')) : '—';
 type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea };
 
-export default function CreativeWorkspace({ userId, canEdit }: { userId: string; canEdit: boolean }) {
+export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }: {
+  userId: string; canEdit: boolean; isAdmin: boolean; jobTitle?: string | null;
+}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const client = useQueryClient();
   const [section, setSection] = useState<'work' | 'ideas'>('work');
   const [scope, setScope] = useState('all');
-  const [filters, setFilters] = useState(defaultFilters);
+  const [unit, setUnit] = useState(() => {
+    const value = new URLSearchParams(location.search).get('unit');
+    return value && (value === 'unassigned' || isProjectId(value)) ? value : 'all';
+  });
+  const [filters, setFilters] = useState(() => ({ ...defaultFilters,
+    assignee: new URLSearchParams(location.search).get('mine') === '1' ? userId : '',
+  }));
   const [focus, setFocus] = useState<Focus>('all');
   const [page, setPage] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [discussionCampaign, setDiscussionCampaign] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const prefix = ['creative', userId];
+  const units = useWorkspaceUnits();
+  const unitName = (id?: string | null) => id ? units.data?.find(row => row.id === id)?.name ?? 'Unit bisnis' : 'Belum ditetapkan';
+  const defaultUnit = unit !== 'all' && unit !== 'unassigned' ? unit : undefined;
   const today = jakartaToday();
   const { monday, nextMonday } = mondayWeek(today);
   const sunday = new Date(Date.parse(nextMonday + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10);
   const campaignQuery = useInfiniteQuery({
     enabled: section === 'work',
-    queryKey: [...prefix, 'campaigns'], initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) => campaigns(pageParam, signal),
+    queryKey: [...prefix, 'campaigns', unit], initialPageParam: 0,
+    queryFn: ({ pageParam, signal }) => campaigns(pageParam, signal, unit),
     getNextPageParam: (last, _, lastPage) => last.length > PAGE_SIZE ? lastPage + 1 : undefined,
   });
   const campaignList = campaignQuery.data?.pages.flatMap(rows => rows.slice(0, PAGE_SIZE)) ?? [];
@@ -50,18 +66,18 @@ export default function CreativeWorkspace({ userId, canEdit }: { userId: string;
   const person = (id: string | null) => id ? names.get(id) ?? 'PIC tidak tersedia' : 'Belum ditugaskan';
   const taskQuery = useQuery({
     enabled: section === 'work',
-    queryKey: [...prefix, 'tasks', campaignId, filters, page, focus, today],
-    queryFn: ({ signal }) => tasks(campaignId, filters, page, signal, focus, today),
+    queryKey: [...prefix, 'tasks', unit, campaignId, filters, page, focus, today],
+    queryFn: ({ signal }) => tasks(campaignId, filters, page, signal, focus, today, unit),
   });
   const summaryQuery = useQuery({
     enabled: section === 'work',
-    queryKey: [...prefix, 'summary', campaignId, today], queryFn: ({ signal }) => summary(campaignId, today, signal),
+    queryKey: [...prefix, 'summary', unit, campaignId, today], queryFn: ({ signal }) => summary(campaignId, today, signal, unit),
   });
   const counts = summaryQuery.data;
   const progress = counts?.total ? Math.round(counts.done * 100 / counts.total) : 0;
   const loading = campaignQuery.isFetching || taskQuery.isFetching || summaryQuery.isFetching || teamQuery.isFetching;
   const error = campaignQuery.error || taskQuery.error || summaryQuery.error || teamQuery.error;
-  const changeScope = (next: string) => { setScope(next); setPage(0); setEditor(null); setNotice(''); };
+  const changeScope = (next: string) => { setScope(next); setPage(0); setEditor(null); setNotice(''); setDiscussionCampaign(null); };
   const changeFilter = (values: Partial<Filters>) => { setFilters(current => ({ ...current, ...values })); setPage(0); };
   const chooseFocus = (next: Focus, resetFilters = false) => {
     setFocus(next);
@@ -94,7 +110,7 @@ export default function CreativeWorkspace({ userId, canEdit }: { userId: string;
         <div>
           <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-teal-800"><Megaphone size={17} /> Ruang kerja tim kreatif</p>
           <h1 className="text-2xl font-bold sm:text-3xl">Creative Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600">Dari referensi ide ke tugas konten dan kampanye promo.</p>
+          <p className="mt-1 text-sm text-slate-600">{jobTitle || (isAdmin ? 'Admin / Owner' : 'Anggota tim')} · {canEdit ? 'Kelola tugas dan kampanye' : 'Pantau pekerjaan'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button className={button + ' inline-flex items-center gap-2'} disabled={loading} onClick={refresh}><RefreshCw size={15} /> Segarkan</button>
@@ -103,12 +119,25 @@ export default function CreativeWorkspace({ userId, canEdit }: { userId: string;
         </div>
       </header>
 
+      <div className={panel + ' flex flex-wrap items-end gap-3'}>
+        <label className="min-w-0 flex-1 space-y-1 text-sm font-semibold">Unit bisnis
+          <select className={field} value={unit} onChange={event => { setUnit(event.target.value); changeScope('all'); }}>
+            <option value="all">Semua unit bisnis</option>
+            <option value="unassigned">Unit belum ditetapkan</option>
+            {defaultUnit && !units.data?.some(row => row.id === defaultUnit) && <option value={defaultUnit}>Unit terpilih</option>}
+            {units.data?.map(row => <option key={row.id} value={row.id}>{row.name} · {unitSectors[row.sector]}{row.is_active ? '' : ' (arsip)'}</option>)}
+          </select>
+        </label>
+        {isAdmin && <Link to="/launch/app/settings" className={button}>Kelola unit bisnis</Link>}
+        {units.isError && <p role="alert" className="w-full text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
+      </div>
+
       <nav aria-label="Bagian Creative Dashboard" className="flex flex-wrap gap-2">
         <button className={section === 'work' ? primary : button} aria-pressed={section === 'work'} onClick={() => setSection('work')}>Tugas &amp; Kampanye</button>
         <button className={section === 'ideas' ? primary : button} aria-pressed={section === 'ideas'} onClick={() => setSection('ideas')}>Bank Ide &amp; Referensi</button>
       </nav>
       {!canEdit && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
-      {section === 'ideas' ? <IdeaBank userId={userId} canEdit={canEdit} onConvert={sourceIdea => {
+      {section === 'ideas' ? <IdeaBank key={unit} unit={unit} userId={userId} canEdit={canEdit} onConvert={sourceIdea => {
         if (currentCampaign?.status === 'archived') changeScope('all');
         openEditor({ kind: 'task', sourceIdea });
         setSection('work');
@@ -128,9 +157,13 @@ export default function CreativeWorkspace({ userId, canEdit }: { userId: string;
           </label>
           {campaignQuery.hasNextPage && <button className={button} disabled={campaignQuery.isFetchingNextPage} onClick={() => void campaignQuery.fetchNextPage()}>Muat kampanye lain</button>}
           {canEdit && currentCampaign && <button className={button} onClick={() => openEditor({ kind: 'campaign', row: currentCampaign })}>Edit kampanye</button>}
+          {currentCampaign && <button className={button} aria-expanded={discussionCampaign === currentCampaign.id}
+            onClick={() => setDiscussionCampaign(discussionCampaign === currentCampaign.id ? null : currentCampaign.id)}>
+            {discussionCampaign === currentCampaign.id ? 'Tutup diskusi' : 'Diskusi kampanye'}
+          </button>}
         </div>
         {currentCampaign && <div className="space-y-2 border-t border-slate-200 pt-3 text-sm">
-          <p><strong>{campaignStatuses[currentCampaign.status]}</strong> · PIC: {person(currentCampaign.owner_id)} · {date(currentCampaign.starts_on)} – {date(currentCampaign.ends_on)}</p>
+          <p><strong>{campaignStatuses[currentCampaign.status]}</strong> · {unitName(currentCampaign.business_unit_id)} · PIC: {person(currentCampaign.owner_id)} · {date(currentCampaign.starts_on)} – {date(currentCampaign.ends_on)}</p>
           {currentCampaign.objective && <p className="whitespace-pre-wrap break-words text-slate-600">{currentCampaign.objective}</p>}
           <dl className="grid gap-2 sm:grid-cols-3">
             <div><dt>Anggaran</dt><dd className="font-semibold">{rupiah.format(currentCampaign.budget_idr)}</dd></div>
@@ -140,14 +173,17 @@ export default function CreativeWorkspace({ userId, canEdit }: { userId: string;
         </div>}
       </section>
 
-      {canEdit && editor?.kind === 'campaign' && <CampaignForm key={editor.row?.id ?? 'new-campaign'} campaign={editor.row} members={members} onCancel={() => setEditor(null)} onSaved={saved} />}
+      {currentCampaign && discussionCampaign === currentCampaign.id &&
+        <ProjectDiscussion scope="campaign" projectId={currentCampaign.id} userId={userId} canPost={canEdit} />}
+
+      {canEdit && editor?.kind === 'campaign' && <CampaignForm key={editor.row?.id ?? 'new-campaign'} campaign={editor.row} defaultUnit={defaultUnit} members={members} onCancel={() => setEditor(null)} onSaved={saved} />}
       {canEdit && editor?.kind === 'task' && <TaskForm key={editor.row?.id ?? editor.sourceIdea?.id ?? 'new-task'} task={editor.row} sourceIdea={editor.sourceIdea}
-        campaignId={campaignId === 'all' ? null : campaignId} campaignList={campaignList} members={members} onCancel={() => setEditor(null)} onSaved={saved} />}
+        campaignId={campaignId === 'all' ? null : campaignId} campaignList={campaignList} defaultUnit={defaultUnit} members={members} onCancel={() => setEditor(null)} onSaved={saved} />}
 
       <section className={panel + ' space-y-3'} aria-label="Target mingguan">
         <div>
-          <h2 className="font-bold">Target minggu ini</h2>
-          <p className="text-sm text-slate-600">{date(monday)} – {date(sunday)} · WIB · dihitung dari deadline tugas pada lingkup terpilih</p>
+          <h2 className="font-bold">Target tim minggu ini</h2>
+          <p className="text-sm text-slate-600">{date(monday)} – {date(sunday)} · WIB · semua PIC pada unit dan kampanye terpilih</p>
         </div>
         {counts && <>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -190,7 +226,8 @@ export default function CreativeWorkspace({ userId, canEdit }: { userId: string;
           {(Object.keys(focusLabels) as Focus[]).map(option => <button key={option} aria-pressed={focus === option}
             className={focus === option ? primary : button} onClick={() => chooseFocus(option)}>{focusLabels[option]}</button>)}
         </div>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          <select className={field} aria-label="Filter pos kerja" value={filters.workstream} onChange={event => changeFilter({ workstream: event.target.value })}><option value="">Semua pos kerja</option><Options values={workstreams} /></select>
           <select className={field} aria-label="Filter platform" value={filters.platform} onChange={event => changeFilter({ platform: event.target.value })}><option value="">Semua platform</option><Options values={platforms} /></select>
           <select className={field} aria-label="Filter status" value={filters.status} onChange={event => changeFilter({ status: event.target.value })}><option value="">Semua status</option><Options values={taskStatuses} /></select>
           <select className={field} aria-label="Filter PIC" value={filters.assignee} onChange={event => changeFilter({ assignee: event.target.value })}>
@@ -211,8 +248,8 @@ export default function CreativeWorkspace({ userId, canEdit }: { userId: string;
             return <li key={task.id} className="flex flex-wrap justify-between gap-2 py-3">
               <div className="min-w-0 flex-1 space-y-1">
                 <h3 className="break-words font-semibold">{task.title}</h3>
-                <p className="break-words text-sm text-slate-600">{platforms[task.platform]}{task.format ? ' · ' + task.format : ''} · {person(task.assignee_id)} · {priorities[task.priority]}</p>
-                {scope === 'all' && <p className="break-words text-sm text-slate-600">{task.campaign?.name ?? (task.campaign_id ? 'Kampanye terkait' : 'Tanpa kampanye')}</p>}
+                <p className="break-words text-sm text-slate-600">{workstreams[task.workstream ?? 'creative']} · {platforms[task.platform]}{task.format ? ' · ' + task.format : ''} · {person(task.assignee_id)} · {priorities[task.priority]}</p>
+                {scope === 'all' && <p className="break-words text-sm text-slate-600">{unitName(task.business_unit_id)} · {task.campaign?.name ?? (task.campaign_id ? 'Kampanye terkait' : 'Tanpa kampanye')}</p>}
                 <p className="text-sm"><strong>{taskStatuses[task.status]}</strong> · <span className={overdue ? 'font-semibold text-red-700' : ''}>Deadline {date(task.due_on)}{overdue ? ' (terlambat)' : ''}</span> · Tayang {date(task.publish_on)}</p>
                 {task.blocker && <p className="break-words text-sm text-amber-800">Hambatan: {task.blocker}</p>}
                 {task.brief && <details className="text-sm"><summary className="cursor-pointer text-slate-700">Lihat brief</summary><p className="whitespace-pre-wrap break-words pt-1">{task.brief}</p></details>}

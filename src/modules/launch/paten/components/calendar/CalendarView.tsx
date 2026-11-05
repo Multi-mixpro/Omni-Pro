@@ -21,12 +21,15 @@ import {
   CalendarCheck2,
 } from 'lucide-react';
 import { Article, BusinessUnit, TaskItem, ScheduleHealth } from '../../types';
-import { isAllBusinessUnits, loadStoredBusinessUnits } from '../../services/businessUnits';
+import { isAllBusinessUnits, UNASSIGNED_BUSINESS_UNIT } from '../../services/businessUnits';
+import { useWorkspaceUnits } from '../../../data/businessWorkspace';
+import { jakartaToday } from '../../../creative/schedule';
 
 interface CalendarViewProps {
   articles: Article[];
   tasks?: TaskItem[];
   activeBusinessUnit: BusinessUnit | 'Semua';
+  onSelectBusinessUnit: (unit: BusinessUnit) => void;
   onSelectArticle: (articleId: string, initialTab?: string) => void;
   onUpdateArticle: (article: Article) => void;
 }
@@ -56,21 +59,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   articles,
   tasks = [],
   activeBusinessUnit,
+  onSelectBusinessUnit,
   onSelectArticle,
   onUpdateArticle,
 }) => {
+  const { data: businessUnits = [] } = useWorkspaceUnits();
   // Calendar Navigation State
-  const [currentDate, setCurrentDate] = useState(() => new Date(2026, 7, 1)); // August 2026
+  const [currentDate, setCurrentDate] = useState(() => new Date(jakartaToday() + 'T12:00:00'));
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEventType, setSelectedEventType] = useState<string>('Semua');
   const [selectedHealth, setSelectedHealth] = useState<string>('Semua');
-  const [selectedUnitFilter, setSelectedUnitFilter] = useState<string>(activeBusinessUnit);
+  const selectedUnitFilter = activeBusinessUnit;
 
   // Selected date for Side Inspector Panel
-  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
-    return '2026-08-15'; // Default to date with active milestones
-  });
+  const [selectedDateStr, setSelectedDateStr] = useState(jakartaToday);
 
   // Event modal for quick view
 
@@ -504,11 +507,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
             <select
               value={selectedUnitFilter}
-              onChange={(e) => setSelectedUnitFilter(e.target.value)}
+              onChange={(e) => onSelectBusinessUnit(e.target.value)}
               className="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-[11px] text-slate-800 font-bold focus:outline-none focus:border-[#087E79] shrink-0"
             >
               <option value="Semua">Semua Brand / BU</option>
-              {loadStoredBusinessUnits().map((bu) => (
+              <option value={UNASSIGNED_BUSINESS_UNIT}>{UNASSIGNED_BUSINESS_UNIT}</option>
+              {businessUnits.map((bu) => (
                 <option key={bu.id} value={bu.name}>
                   {bu.name}
                 </option>

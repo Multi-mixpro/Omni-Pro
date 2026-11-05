@@ -47,6 +47,7 @@ interface ArticleImplementationViewProps {
   onUpdateArticle: (updated: Article) => void;
   onAddUpdate: (update: ProgressUpdate) => void;
   onNavigateToDetail: () => void;
+  onNavigateToDiscussion: (id: string) => void;
   currentUserName?: string;
   currentUserAvatar?: string | null;
   /** Indikator status autosave (lembar kerja tidak memakai tombol Simpan). */
@@ -184,6 +185,7 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
   onUpdateArticle,
   onAddUpdate,
   onNavigateToDetail,
+  onNavigateToDiscussion,
   currentUserName,
   currentUserAvatar,
   saveStatus,
@@ -297,8 +299,8 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
     {
       key: 'files',
       phaseId: 'impl-phase-3',
-      title: '14. Berkas & Riwayat Diskusi',
-      subtitle: 'Dokumen pendukung, techpack & riwayat instruksi',
+      title: '14. Berkas & Dokumen',
+      subtitle: 'Dokumen pendukung dan tech pack',
       icon: FileText,
       component: <FilesPanel article={article} onUpdateArticle={onUpdateArticle} />,
     },
@@ -426,6 +428,10 @@ export const ArticleImplementationView: React.FC<ArticleImplementationViewProps>
             </button>
           </div>
 
+          <button type="button" onClick={() => onNavigateToDiscussion(article.id)}
+            className="rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-bold text-teal-800">
+            Diskusi
+          </button>
           <button
             onClick={onNavigateToDetail}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#087E79] hover:bg-[#066864] text-white text-[10px] sm:text-[11px] font-extrabold transition-all shadow-2xs cursor-pointer shrink-0"

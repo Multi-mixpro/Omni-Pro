@@ -8,7 +8,7 @@ import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
 import { ArticleStickyHeader } from './components/article/ArticleStickyHeader';
-import { FloatingChatBubble } from './components/shared/FloatingChatBubble';
+import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
 
 const DashboardView = React.lazy(() => import('./components/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 const ArticlePipelineView = React.lazy(() => import('./components/pipeline/ArticlePipelineView').then(m => ({ default: m.ArticlePipelineView })));
@@ -63,6 +63,7 @@ type PatenTab =
   | 'implementation'
   | 'brief'
   | 'detail'
+  | 'discussion'
   | 'master'
   | 'approvals'
   | 'tasks'
@@ -73,7 +74,7 @@ function routeState(pathname: string, search: string): { tab: PatenTab; articleI
   const articleMatch = pathname.match(/^\/launch\/app\/projects\/([^/]+)/);
   if (articleMatch) {
     const view = new URLSearchParams(search).get('view');
-    const tab: PatenTab = view === 'brief' ? 'brief' : view === 'detail' ? 'detail' : 'workspace';
+    const tab: PatenTab = view === 'brief' || view === 'detail' || view === 'discussion' ? view : 'workspace';
     return { tab, articleId: decodeURIComponent(articleMatch[1]) };
   }
   const implementationMatch = pathname.match(/^\/launch\/app\/implementation\/([^/]+)/);
@@ -94,6 +95,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   const canEdit = permissions.some((permission) =>
     ['launch.edit', 'launch.admin'].includes(permission),
   );
+  const canDecideApproval = canEdit && permissions.some(permission => ['launch.approve', 'launch.admin'].includes(permission));
   const canCreate = permissions.some((permission) =>
     ['launch.create', 'launch.edit', 'launch.admin'].includes(permission),
   );
@@ -117,7 +119,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   // Navigation & Filter States
   const [activeTab, setActiveTab] = useState<PatenTab>(initialRoute.tab);
 
-  const [selectedUnit, setSelectedUnit] = useState<BusinessUnit>('Semua Unit Bisnis');
+  const [selectedUnit, setSelectedUnit] = useState<BusinessUnit>(() => new URLSearchParams(location.search).get('unit') || 'Semua Unit Bisnis');
   const [selectedArticleId, setSelectedArticleId] = useState<string>(initialRoute.articleId || '');
   const [showQuickCreateModal, setShowQuickCreateModal] = useState(false);
   const [showGlobalSearchModal, setShowGlobalSearchModal] = useState(false);
@@ -134,6 +136,8 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   const [updates, setUpdates] = useState<ProgressUpdate[]>([]);
   const [approvals, setApprovals] = useState<ApprovalGate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
@@ -167,7 +171,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     if (tab === 'dashboard') return '/launch/app/today';
     if (tab === 'pipeline') return '/launch/app/projects';
     if (tab === 'implementation') return articleId ? `/launch/app/implementation/${encodeURIComponent(articleId)}` : '/launch/app/implementation';
-    if (tab === 'workspace' || tab === 'brief' || tab === 'detail') {
+    if (tab === 'workspace' || tab === 'brief' || tab === 'detail' || tab === 'discussion') {
       return articleId
         ? `/launch/app/projects/${encodeURIComponent(articleId)}?view=${tab}`
         : '/launch/app/projects';
@@ -188,13 +192,13 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     if (next.articleId) setSelectedArticleId(next.articleId);
   }, [location.pathname, location.search]);
 
-  // Load Supabase data, then refresh periodically and when the user returns.
+  // Load once on entry; the full workspace snapshot is expensive to poll.
   useEffect(() => {
     let active = true;
 
     const reload = async () => {
       try {
-        const snapshot = await StorageService.loadWorkspace();
+        const snapshot = await (refreshVersion ? StorageService.refreshWorkspace() : StorageService.loadWorkspace());
         if (!active) return;
         setArticles(snapshot.articles.map(deriveArticleIndicators));
         setSuppliers(snapshot.suppliers);
@@ -214,20 +218,18 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
             : 'Data workspace belum dapat dimuat dari database.',
         );
       } finally {
-        if (active) setIsLoading(false);
+        if (active) { setIsLoading(false); setIsRefreshing(false); }
       }
     };
 
     void reload();
-    const unsubscribeRealtime = StorageService.subscribe(reload);
     const unsubscribeErrors = StorageService.subscribeErrors(setSyncError);
 
     return () => {
       active = false;
-      unsubscribeRealtime();
       unsubscribeErrors();
     };
-  }, []);
+  }, [refreshVersion]);
 
   // Keyboard shortcut Cmd+K for search
   useEffect(() => {
@@ -309,7 +311,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   };
 
   const handleUpdateApproval = (updatedApproval: ApprovalGate) => {
-    if (!canEdit) return;
+    if (!canDecideApproval) return;
     const previous = approvals;
     const updated = approvals.map((a) =>
       a.id === updatedApproval.id ? updatedApproval : a
@@ -490,9 +492,15 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     if (isAllBusinessUnits(selectedUnit)) return true;
     return a.businessUnit === selectedUnit;
   });
+  const scopedArticleIds = new Set(filteredArticles.map(article => article.id));
+  const inBusinessScope = (articleId?: string) => isAllBusinessUnits(selectedUnit) || (Boolean(articleId) && scopedArticleIds.has(articleId ?? ''));
+  const scopedTasks = tasks.filter(task => inBusinessScope(task.articleId));
+  const scopedBlockers = blockers.filter(blocker => inBusinessScope(blocker.articleId));
+  const scopedDecisions = decisions.filter(decision => inBusinessScope(decision.articleId));
+  const scopedApprovals = approvals.filter(approval => inBusinessScope(approval.articleId));
 
   const activeArticle =
-    articles.find((a) => a.id === selectedArticleId) || articles[0];
+    articles.find((a) => a.id === selectedArticleId) || (activeTab === 'discussion' ? undefined : articles[0]);
 
   const editingArticle = editingArticleId
     ? articles.find((article) => article.id === editingArticleId) || null
@@ -515,9 +523,9 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     navigate('/launch/login');
   };
 
-  const pendingApprovals = approvals.filter((a) => a.status === 'Pending');
+  const pendingApprovals = scopedApprovals.filter((a) => a.status === 'Pending');
   const pendingApprovalsCount = pendingApprovals.length;
-  const blockedTasksCount = blockers.length;
+  const blockedTasksCount = scopedBlockers.length;
 
   if (isLoading) {
     return (
@@ -558,6 +566,12 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
         currentUser={currentUser}
         canCreate={canCreate}
         syncHealthy={!syncError}
+        isRefreshing={isRefreshing}
+        onRefresh={() => {
+          if (isRefreshing) return;
+          setIsRefreshing(true);
+          setRefreshVersion(version => version + 1);
+        }}
       />
 
       {/* Main Body Layout */}
@@ -573,10 +587,10 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
       <div className={`paten-main ${isSidebarCollapsed ? 'md:pl-[76px]' : 'md:pl-[232px]'} transition-all duration-200 min-h-screen flex flex-col`}>
         {/* Sticky Article Header (when inspecting specific article views) */}
         {activeArticle &&
-          ['brief', 'workspace', 'detail'].includes(activeTab) && (
+          ['brief', 'workspace', 'detail', 'discussion'].includes(activeTab) && (
             <ArticleStickyHeader
               article={activeArticle}
-              activeTab={activeTab as 'brief' | 'workspace' | 'detail'}
+              activeTab={activeTab as 'brief' | 'workspace' | 'detail' | 'discussion'}
               onSelectTab={(tab) => selectTab(tab)}
               onBack={() => selectTab('pipeline')}
               onRequestApproval={() => selectTab('approvals')}
@@ -590,8 +604,8 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
             <DashboardView
               articles={filteredArticles}
               pendingApprovals={pendingApprovals}
-              decisions={decisions}
-              blockers={blockers}
+              decisions={scopedDecisions}
+              blockers={scopedBlockers}
               activeBusinessUnit={selectedUnit}
               onOpenArticle={(artId, initialTab) => {
                 selectTab(initialTab || 'workspace', artId);
@@ -645,6 +659,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
               onAddUpdate={handleAddProgressUpdate}
               onNavigateToDetail={() => selectTab('detail')}
               currentUserName={currentUser?.name}
+              onNavigateToDiscussion={id => selectTab('discussion', id)}
               currentUserAvatar={currentUser?.avatarUrl}
               saveStatus={<SaveStatus state={saveState} />}
             />
@@ -659,6 +674,12 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
 
           {activeTab === 'detail' && activeArticle && (
             <ArticleDetailView article={activeArticle} />
+          )}
+          {activeTab === 'discussion' && activeArticle && currentUser && (
+            <ProjectDiscussion scope="article" projectId={activeArticle.id} userId={currentUser.id} canPost={canEdit || canCreate} />
+          )}
+          {activeTab === 'discussion' && !activeArticle && (
+            <p role="status" className="text-sm text-slate-600">Artikel untuk diskusi tidak ditemukan atau tidak dapat diakses.</p>
           )}
 
           {activeTab === 'master' && (
@@ -680,21 +701,22 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
 
           {activeTab === 'approvals' && (
             <ApprovalsView
-              articles={articles}
-              approvals={approvals}
+              articles={filteredArticles}
+              approvals={scopedApprovals}
               onUpdateApproval={handleUpdateApproval}
               onCreateApproval={handleCreateApprovalRequest}
               currentUserName={currentUser?.name || 'Pengguna Aktif'}
-              canDecide={canEdit}
+              canRequest={canEdit}
+              canDecide={canDecideApproval}
             />
           )}
 
           {activeTab === 'tasks' && (
             <TasksView
-              articles={articles}
-              tasks={tasks}
-              blockers={blockers}
-              decisions={decisions}
+              articles={filteredArticles}
+              tasks={scopedTasks}
+              blockers={scopedBlockers}
+              decisions={scopedDecisions}
               onUpdateTask={handleUpdateTask}
               onCreateTask={handleCreateTask}
               onResolveBlocker={handleResolveBlocker}
@@ -708,8 +730,9 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
           {activeTab === 'calendar' && (
             <CalendarView
               articles={filteredArticles}
-              tasks={tasks}
+              tasks={scopedTasks}
               activeBusinessUnit={selectedUnit}
+              onSelectBusinessUnit={setSelectedUnit}
               onSelectArticle={(artId, initialTab) => {
                 selectTab(initialTab ? (initialTab as PatenTab) : 'workspace', artId);
               }}
@@ -785,12 +808,6 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
       )}
       </Suspense>
 
-      {/* Floating Chat Bubble */}
-      <FloatingChatBubble
-        articles={articles}
-        selectedArticleId={selectedArticleId}
-        currentUser={currentUser}
-      />
     </div>
   );
 }

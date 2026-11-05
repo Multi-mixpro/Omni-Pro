@@ -1,5 +1,5 @@
 /**
- * Product Launch OS 3.0 - Files, Discussion & Audit Trail History Panel
+ * Product Launch OS 3.0 - Files and Documents Panel
  */
 
 import React, { ChangeEvent, useState } from 'react';
@@ -8,7 +8,6 @@ import {
   ExternalLink,
   FileText,
   Loader2,
-  MessageSquare,
   Plus,
   Upload,
 } from 'lucide-react';
@@ -17,7 +16,6 @@ import {
   deleteArticleMedia,
   uploadArticleMedia,
 } from '../../../services/media';
-import { addArticleComment } from '../../../services/collaboration';
 import { ConfirmDeleteButton } from '../../shared/ConfirmDeleteButton';
 import { compressImageForUpload } from '../../../utils/cloudinary';
 
@@ -42,35 +40,10 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
   article,
   onUpdateArticle,
 }) => {
-  const [commentText, setCommentText] = useState('');
-  const [isSavingComment, setIsSavingComment] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const files = article.files || [];
-  const comments = article.teamComments || [];
-
-  const handleAddComment = async () => {
-    if (!commentText.trim()) return;
-    setIsSavingComment(true);
-    setMediaError(null);
-    try {
-      const comment = await addArticleComment(article.id, commentText);
-      onUpdateArticle({
-        ...article,
-        teamComments: [comment, ...comments],
-        lastUpdated: new Date().toISOString(),
-      });
-      setCommentText('');
-    } catch (reason) {
-      setMediaError(
-        reason instanceof Error ? reason.message : 'Komentar belum dapat disimpan.',
-      );
-    } finally {
-      setIsSavingComment(false);
-    }
-  };
-
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(event.target.files || []);
     event.target.value = '';
@@ -125,7 +98,7 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
       <div className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-[#087E79]" />
-          <span className="font-bold text-slate-900">File, Dokumen & Diskusi Histori</span>
+          <span className="font-bold text-slate-900">File & Dokumen</span>
         </div>
         <label
           className={`flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[#087E79] font-bold transition-colors shadow-2xs ${
@@ -198,55 +171,6 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
         )}
       </div>
 
-      <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-        <h4 className="font-bold flex items-center gap-1.5 text-[#087E79]">
-          <MessageSquare className="w-4 h-4" />
-          <span>Catatan & Diskusi Tim Internal ({comments.length})</span>
-        </h4>
-
-        <div className="space-y-2">
-          {comments.length ? comments.map((comment) => (
-            <div
-              key={comment.id}
-              className="p-3 bg-white rounded-lg border border-slate-200 space-y-1 shadow-2xs"
-            >
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold text-[#087E79]">{comment.authorName}</span>
-                <span className="text-slate-400">
-                  {comment.createdAt ? new Date(comment.createdAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
-                </span>
-              </div>
-              <p className="text-slate-800 font-medium">{comment.body}</p>
-            </div>
-          )) : (
-            <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-5 text-center text-[10px] text-slate-400">
-              Belum ada diskusi untuk artikel ini.
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 pt-1">
-          <input
-            type="text"
-            placeholder="Tuliskan catatan atau komentar untuk tim..."
-            value={commentText}
-            onChange={(event) => setCommentText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void handleAddComment();
-            }}
-            className="flex-1 p-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-[#087E79]"
-          />
-          <button
-            type="button"
-            disabled={isSavingComment || !commentText.trim()}
-            onClick={() => void handleAddComment()}
-            className="px-3 py-2 rounded-lg bg-[#087E79] text-white font-bold flex items-center gap-1 hover:bg-[#066864] transition-colors shrink-0 shadow-2xs disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSavingComment ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-            <span>{isSavingComment ? 'Menyimpan…' : 'Kirim'}</span>
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

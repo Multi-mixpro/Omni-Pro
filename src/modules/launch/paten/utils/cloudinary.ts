@@ -24,6 +24,16 @@ const WIDTH_BUCKETS = [96, 200, 400, 800, 1600] as const;
 
 const CLOUDINARY_HOST = 'res.cloudinary.com';
 
+export function isCloudinaryUploadUrl(value: string, imageOnly = false) {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' || url.host !== CLOUDINARY_HOST || url.username || url.password) return false;
+    return (imageOnly ? /^\/[^/]+\/image\/upload\/.+/ : /^\/[^/]+\/(image|video|raw)\/upload\/.+/).test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 /** Bulatkan ke bucket terdekat yang >= lebar yang dibutuhkan. */
 function snapWidth(width: number): number {
   const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;

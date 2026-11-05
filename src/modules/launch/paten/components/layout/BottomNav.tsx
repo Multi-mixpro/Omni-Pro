@@ -23,7 +23,8 @@ import {
   Megaphone,
 } from 'lucide-react';
 import { BusinessUnit } from '../../types';
-import { loadStoredBusinessUnits } from '../../services/businessUnits';
+import { useWorkspaceUnits } from '../../../data/businessWorkspace';
+import { UNASSIGNED_BUSINESS_UNIT } from '../../services/businessUnits';
 
 interface BottomNavProps {
   activeTab: string;
@@ -50,7 +51,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showIosGuide, setShowIosGuide] = useState(false);
 
-  const [buList, setBuList] = useState(() => loadStoredBusinessUnits());
+  const { data: buList = [] } = useWorkspaceUnits();
 
   useEffect(() => {
     const handlePrompt = (e: Event) => {
@@ -77,19 +78,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     }
   };
 
-  useEffect(() => {
-    const handleUpdate = () => {
-      setBuList(loadStoredBusinessUnits());
-    };
-    window.addEventListener('business-units-updated', handleUpdate);
-    return () => {
-      window.removeEventListener('business-units-updated', handleUpdate);
-    };
-  }, []);
-
   const businessUnits: BusinessUnit[] = [
     'Semua Unit Bisnis',
     ...Array.from(new Set(buList.map((u) => u.name))),
+    UNASSIGNED_BUSINESS_UNIT,
   ];
 
   return (

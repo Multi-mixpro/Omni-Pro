@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useWorkspaceUnits } from '../data/businessWorkspace';
 import { button, errorText, field, IdeaForm, Options, primary } from './CreativeForms';
 import { ideas, ideaQueues, PAGE_SIZE, platforms, safeOutputUrl, taskStatuses, type Idea } from './repository';
 
@@ -15,16 +16,17 @@ export function ReferenceLinks({ urls }: { urls: string[] }) {
   </ul>;
 }
 
-export function IdeaBank({ userId, canEdit, onConvert }: { userId: string; canEdit: boolean; onConvert: (idea: Idea) => void }) {
+export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string; canEdit: boolean; onConvert: (idea: Idea) => void; unit: string }) {
   const client = useQueryClient();
+  const units = useWorkspaceUnits();
   const [page, setPage] = useState(0);
   const [priority, setPriority] = useState(false);
   const [queue, setQueue] = useState('');
   const [editor, setEditor] = useState<Idea | 'new' | null>(null);
   const [notice, setNotice] = useState('');
   const query = useQuery({
-    queryKey: ['creative', userId, 'ideas', page, priority, queue],
-    queryFn: ({ signal }) => ideas(page, priority, queue, signal),
+    queryKey: ['creative', userId, 'ideas', unit, page, priority, queue],
+    queryFn: ({ signal }) => ideas(page, priority, queue, signal, unit),
   });
   const saved = () => {
     setEditor(null);
@@ -43,6 +45,7 @@ export function IdeaBank({ userId, canEdit, onConvert }: { userId: string; canEd
     </div>
     {notice && <p role="status" className="text-sm text-teal-800">{notice}</p>}
     {editor && canEdit && <IdeaForm key={editor === 'new' ? 'new' : editor.id} idea={editor === 'new' ? undefined : editor}
+      defaultUnit={unit === 'all' || unit === 'unassigned' ? undefined : unit}
       onCancel={() => setEditor(null)} onSaved={saved} />}
     <div className="flex flex-wrap gap-3">
       <label className="text-sm font-medium">Antrean
@@ -61,6 +64,7 @@ export function IdeaBank({ userId, canEdit, onConvert }: { userId: string; canEd
       {query.data?.slice(0, PAGE_SIZE).map(idea => <li key={idea.id} className="flex flex-wrap justify-between gap-3 py-4">
         <div className="min-w-0 flex-1 space-y-2">
           <h3 className="break-words font-semibold">{idea.title}</h3>
+          {unit === 'all' && <p className="text-sm text-slate-600">{units.data?.find(row => row.id === idea.business_unit_id)?.name ?? 'Unit belum ditetapkan'}</p>}
           <p className="text-sm text-slate-600">{platforms[idea.platform]}{idea.prioritized ? ' · Prioritas' : ''} · {idea.task ? 'Tugas: ' + taskStatuses[idea.task.status] : ideaQueues[idea.queue_state]}</p>
           {idea.brief && <p className="whitespace-pre-wrap break-words text-sm">{idea.brief}</p>}
           <ReferenceLinks urls={idea.reference_urls} />

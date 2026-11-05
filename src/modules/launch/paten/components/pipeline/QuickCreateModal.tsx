@@ -20,9 +20,10 @@ import {
   Upload,
 } from 'lucide-react';
 import { Article, BusinessUnit, CategoryType, MaterialMaster } from '../../types';
-import { loadStoredBusinessUnits, isAllBusinessUnits } from '../../services/businessUnits';
+import { isAllBusinessUnits } from '../../services/businessUnits';
+import { useWorkspaceUnits } from '../../../data/businessWorkspace';
 import { formatIDR } from '../../utils/calculations';
-import { optimizedImageUrl } from '../../utils/cloudinary';
+import { isCloudinaryUploadUrl, optimizedImageUrl } from '../../utils/cloudinary';
 import { buildCategoryDefaultSizeChart } from '../../data/measurementFields';
 import { getColorHexFromName } from '../../utils/colorUtils';
 
@@ -94,9 +95,9 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [subCategory, setSubCategory] = useState(editArticle?.subCategory ?? 'Outerwear Technical');
   // "Semua Unit Bisnis" adalah filter tampilan, bukan unit nyata — jangan
   // dipakai sebagai unit artikel baru. Jatuhkan ke unit terdaftar pertama.
-  const defaultBusinessUnit: BusinessUnit = isAllBusinessUnits(activeBusinessUnit)
-    ? (loadStoredBusinessUnits()[0]?.name ?? 'GUDSKUY')
-    : activeBusinessUnit;
+  const { data: units = [] } = useWorkspaceUnits();
+  const activeUnits = units.filter(unit => unit.is_active);
+  const defaultBusinessUnit: BusinessUnit = isAllBusinessUnits(activeBusinessUnit) ? '' : activeBusinessUnit;
   const [businessUnit, setBusinessUnit] = useState<BusinessUnit>(editArticle?.businessUnit ?? defaultBusinessUnit);
   const [genderTarget, setGenderTarget] = useState<'Men' | 'Women' | 'Unisex' | 'Kids'>(
     editArticle?.genderTarget ?? 'Unisex',
@@ -340,7 +341,9 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   };
 
   // Boleh disimpan bila nama terisi dan kode artikel valid (tidak kosong/bentrok).
-  const canSubmit = !!name.trim() && !!articleCode.trim() && !codeError;
+  const validUnit = activeUnits.some(unit => unit.name === businessUnit) ||
+    Boolean(editArticle && businessUnit === editArticle.businessUnit);
+  const canSubmit = !!name.trim() && !!articleCode.trim() && !codeError && validUnit;
 
   if (isOpen === false) return null;
 
@@ -350,8 +353,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   // Handler for Photos
   const handleAddPhoto = (urlToAdd: string, labelToAdd: string = 'Sisi Lain') => {
     if (!urlToAdd.trim()) return;
-    if (/^data:/i.test(urlToAdd.trim())) {
-      setUploadError('Gunakan URL foto atau unggah berkas. Gambar Base64 terlalu besar untuk disimpan dalam data artikel.');
+    if (!isCloudinaryUploadUrl(urlToAdd, true)) {
+      setUploadError('Gunakan tautan foto Cloudinary atau unggah berkas. Tautan eksternal bisa disimpan sebagai referensi.');
       return;
     }
     if (productPhotos.length >= MAX_PHOTOS) {
@@ -487,7 +490,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   };
 
   const handleSubmit = (isDraft: boolean) => {
-    if (!name.trim()) return;
+    if (!canSubmit) return;
 
     // Kode artikel: pakai nilai dari field (otomatis bila terkunci, custom bila dibuka).
     const code = articleCode.trim() || `GG-${category.slice(0, 3).toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
@@ -831,13 +834,12 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                     onChange={(e) => setBusinessUnit(e.target.value as BusinessUnit)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-[#087E79] focus:outline-none cursor-pointer"
                   >
-                    {/* Sertakan unit artikel saat ini walau sudah dihapus/di-rename,
-                        agar penetapan lama tidak diam-diam berpindah. */}
+                    <option value="">Pilih unit bisnis</option>
                     {Array.from(
                       new Set(
                         [
-                          !isAllBusinessUnits(businessUnit) ? (businessUnit as string) : '',
-                          ...loadStoredBusinessUnits().map((bu) => bu.name),
+                          editArticle?.businessUnit ?? '',
+                          ...activeUnits.map((bu) => bu.name),
                         ].filter(Boolean),
                       ),
                     ).map((name) => (
@@ -1010,7 +1012,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                 {/* Custom URL Add Row */}
                 <div className="space-y-2 pt-2 border-t border-slate-200/80">
                   <span className="text-[11px] font-bold text-slate-700 block">
-                    Atau tambahkan lewat URL foto:
+                    Atau tambahkan lewat URL foto Cloudinary:
                   </span>
 
                   {/* Manual URL Input Bar */}

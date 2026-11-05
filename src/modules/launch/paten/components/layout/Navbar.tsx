@@ -2,7 +2,7 @@
  * Product Launch OS 3.0 - Top Navigation Bar
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Search,
   Bell,
@@ -16,7 +16,8 @@ import {
   Circle,
 } from 'lucide-react';
 import { BusinessUnit, ApprovalGate } from '../../types';
-import { loadStoredBusinessUnits } from '../../services/businessUnits';
+import { useWorkspaceUnits } from '../../../data/businessWorkspace';
+import { UNASSIGNED_BUSINESS_UNIT } from '../../services/businessUnits';
 import { useTeamActivity, TeamMemberActivity } from '../../hooks/useTeamActivity';
 
 interface NavbarProps {
@@ -36,6 +37,8 @@ interface NavbarProps {
   };
   canCreate?: boolean;
   syncHealthy?: boolean;
+  isRefreshing: boolean;
+  onRefresh: () => void;
 }
 
 function formatLastSeen(dateStr: string | null): string {
@@ -74,7 +77,7 @@ const TeamMemberRow: React.FC<{ member: TeamMemberActivity; isMe: boolean }> = (
     </div>
     <div className="flex-shrink-0 text-right">
       {member.is_online ? (
-        <span className="text-[10px] font-bold text-emerald-600">Online</span>
+        <span className="text-[10px] font-bold text-emerald-600">Baru aktif</span>
       ) : (
         <span className="text-[10px] text-slate-400">{formatLastSeen(member.last_seen_at)}</span>
       )}
@@ -94,6 +97,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   canCreate = false,
   syncHealthy = true,
+  isRefreshing,
+  onRefresh,
 }) => {
   const [showBuDropdown, setShowBuDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -102,21 +107,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const { members: teamMembers, onlineCount, onOpen: onOpenTeam } = useTeamActivity(currentUser?.id);
 
-  const [buList, setBuList] = useState(() => loadStoredBusinessUnits());
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      setBuList(loadStoredBusinessUnits());
-    };
-    window.addEventListener('business-units-updated', handleUpdate);
-    return () => {
-      window.removeEventListener('business-units-updated', handleUpdate);
-    };
-  }, []);
+  const { data: buList = [] } = useWorkspaceUnits();
 
   const businessUnits: BusinessUnit[] = [
     'Semua Unit Bisnis',
     ...Array.from(new Set(buList.map((u) => u.name))),
+    UNASSIGNED_BUSINESS_UNIT,
   ];
 
   return (
@@ -213,15 +209,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Search className="w-4 h-4" />
         </button>
 
-        {/* Sync Status Badge */}
-        <div className={`hidden xl:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-          syncHealthy
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            : 'bg-amber-50 text-amber-700 border-amber-200'
-        }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${syncHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-          <span>{syncHealthy ? 'Sinkronisasi aktif' : 'Perlu sinkronisasi'}</span>
-        </div>
+        <button type="button" onClick={onRefresh} disabled={isRefreshing}
+          className={`rounded-lg border px-2 py-1 text-xs font-semibold disabled:opacity-50 ${syncHealthy ? 'border-slate-200 text-slate-700' : 'border-amber-200 text-amber-800'}`}>
+          {isRefreshing ? 'Memuat…' : 'Segarkan'}
+        </button>
 
         {/* Team Activity Dropdown */}
         <div className="relative">
@@ -251,7 +242,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   TIM ({teamMembers.length})
                 </h3>
                 <span className="text-[10px] font-mono text-emerald-600 font-bold">
-                  {onlineCount} online
+                  {onlineCount} baru aktif
                 </span>
               </div>
 

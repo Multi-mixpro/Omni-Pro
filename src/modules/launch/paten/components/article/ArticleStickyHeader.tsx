@@ -10,14 +10,15 @@ import {
   Layers,
   AlertTriangle,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 import { Article } from '../../types';
 import { optimizedImageUrl } from '../../utils/cloudinary';
 
 interface ArticleStickyHeaderProps {
   article: Article;
-  activeTab: 'brief' | 'detail' | 'workspace';
-  onSelectTab: (tab: 'brief' | 'detail' | 'workspace') => void;
+  activeTab: 'brief' | 'detail' | 'workspace' | 'discussion';
+  onSelectTab: (tab: 'brief' | 'detail' | 'workspace' | 'discussion') => void;
   onBack: () => void;
   onRequestApproval: () => void;
 }
@@ -70,8 +71,7 @@ export const ArticleStickyHeader: React.FC<ArticleStickyHeaderProps> = ({
           </div>
         </div>
 
-        {/* Center: The 3 Mode Segmented Navigation Tabs */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200 self-center sm:self-auto">
+        <div className="flex flex-wrap items-center bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200 self-center sm:self-auto">
           <button
             onClick={() => onSelectTab('brief')}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition-all ${
@@ -106,6 +106,11 @@ export const ArticleStickyHeader: React.FC<ArticleStickyHeaderProps> = ({
           >
             <Layers className="w-3.5 h-3.5" />
             <span>Workspace</span>
+          </button>
+          <button onClick={() => onSelectTab('discussion')} aria-current={activeTab === 'discussion' ? 'page' : undefined}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 ${activeTab === 'discussion' ? 'bg-[#087E79] text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Diskusi</span>
           </button>
         </div>
 

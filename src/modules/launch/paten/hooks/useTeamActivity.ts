@@ -11,31 +11,23 @@ export interface TeamMemberActivity {
   is_online: boolean;
 }
 
-const HEARTBEAT_INTERVAL = 5 * 60_000; // 5 min
-const ONLINE_THRESHOLD = 10 * 60_000; // 10 min
+const ACTIVITY_WINDOW = 30 * 60_000;
+const lastActivity = new Map<string, number>();
 
 export function useTeamActivity(currentUserId?: string) {
   const [members, setMembers] = useState<TeamMemberActivity[]>([]);
-  const heartbeatRef = useRef<ReturnType<typeof setInterval>>();
-  const hasFetched = useRef(false);
+  const lastRosterRead = useRef(0);
 
-  useEffect(() => {
+  const recordActivity = useCallback(() => {
     if (!currentUserId) return;
-
-    async function heartbeat() {
-      await supabase
-        .from('profiles')
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq('id', currentUserId!);
-    }
-
-    heartbeat();
-    heartbeatRef.current = setInterval(heartbeat, HEARTBEAT_INTERVAL);
-
-    return () => {
-      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-    };
+    const now = Date.now();
+    if (now - (lastActivity.get(currentUserId) ?? 0) < ACTIVITY_WINDOW) return;
+    lastActivity.set(currentUserId, now);
+    void (async () => {
+      await supabase.from('profiles').update({ last_seen_at: new Date(now).toISOString() }).eq('id', currentUserId);
+    })();
   }, [currentUserId]);
+  useEffect(recordActivity, [recordActivity]);
 
   const fetchMembers = useCallback(async () => {
     const { data } = await supabase
@@ -50,7 +42,7 @@ export function useTeamActivity(currentUserId?: string) {
         data.map((m: any) => ({
           ...m,
           is_online: m.last_seen_at
-            ? now - new Date(m.last_seen_at).getTime() < ONLINE_THRESHOLD
+            ? now - new Date(m.last_seen_at).getTime() < ACTIVITY_WINDOW
             : false,
         })),
       );
@@ -58,13 +50,12 @@ export function useTeamActivity(currentUserId?: string) {
   }, []);
 
   const onOpen = useCallback(() => {
-    if (!hasFetched.current) {
-      hasFetched.current = true;
-      fetchMembers();
-    } else {
-      fetchMembers();
-    }
-  }, [fetchMembers]);
+    recordActivity();
+    const now = Date.now();
+    if (now - lastRosterRead.current < 60_000) return;
+    lastRosterRead.current = now;
+    void fetchMembers();
+  }, [fetchMembers, recordActivity]);
 
   const onlineCount = members.filter((m) => m.is_online).length;
 

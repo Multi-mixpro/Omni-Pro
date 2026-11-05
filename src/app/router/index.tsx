@@ -117,7 +117,8 @@ function ProtectedWorkspacePicker() {
   if (auth.isLoading) return <BootScreen />;
   const permissions = auth.data?.permissions ?? [];
   if (!auth.data?.session || !auth.data.profile?.is_active || !permissions.some(permission => ['launch.view', 'launch.admin'].includes(permission))) return <AuthGate />;
-  return <WorkspacePicker name={auth.data.profile.full_name} />;
+  return <WorkspacePicker name={auth.data.profile.full_name} userId={auth.data.profile.id}
+    jobTitle={auth.data.profile.job_title} permissions={permissions} />;
 }
 
 function ProtectedCreativeWorkspace() {
@@ -129,6 +130,7 @@ function ProtectedCreativeWorkspace() {
   }
   return <Suspense fallback={<BootScreen />}>
     <CreativeWorkspace key={auth.data.profile.id} userId={auth.data.profile.id}
+      isAdmin={permissions.includes('launch.admin')} jobTitle={auth.data.profile.job_title}
       canEdit={permissions.some(permission => ['launch.edit', 'launch.admin'].includes(permission))} />
   </Suspense>;
 }

@@ -12,23 +12,28 @@ export const taskStatuses = {
 export const campaignStatuses = { planned: 'Direncanakan', active: 'Aktif', completed: 'Selesai', archived: 'Diarsipkan' };
 export const priorities = { normal: 'Normal', high: 'Tinggi', urgent: 'Mendesak' };
 export const ideaQueues = { candidate: 'Perlu ditinjau', ready: 'Siap dikerjakan', parked: 'Ditunda' };
+export const workstreams = { creative: 'Produksi Konten', marketing: 'Marketing & Promo', operations: 'Operasional' };
 type Row = { id: string; updated_at: string };
 export type Campaign = Row & {
+  business_unit_id?: string | null;
   name: string; objective: string; owner_id: string | null; status: keyof typeof campaignStatuses;
   starts_on: string | null; ends_on: string | null; budget_idr: number; spent_idr: number;
 };
 export type Task = Row & {
+  business_unit_id?: string | null;
+  workstream?: keyof typeof workstreams;
   campaign_id: string | null; title: string; brief: string; assignee_id: string | null;
   platform: keyof typeof platforms; format: string; status: keyof typeof taskStatuses;
   priority: keyof typeof priorities; due_on: string | null; publish_on: string | null;
   output_url: string; blocker: string;
 };
-export type TeamMember = { id: string; full_name: string; is_active: boolean };
+export type TeamMember = { id: string; full_name: string; is_active: boolean; job_title: string | null };
 type ListedTask = Task & {
   campaign: { name: string } | null;
   source_idea: { title: string; reference_urls: string[] } | null;
 };
 export type Idea = Row & {
+  business_unit_id?: string | null;
   title: string; brief: string; platform: Task['platform']; reference_urls: string[]; prioritized: boolean;
   queue_state: keyof typeof ideaQueues;
 };
@@ -36,19 +41,21 @@ export type ListedIdea = Idea & { task: Pick<Task, 'id' | 'status'> | null };
 export type Draft<T> = Omit<T, keyof Row>;
 export const PAGE_SIZE = 30;
 
-const campaignColumns = 'id,name,objective,owner_id,status,starts_on,ends_on,budget_idr,spent_idr,updated_at';
-const taskColumns = 'id,campaign_id,title,brief,assignee_id,platform,format,status,priority,due_on,publish_on,output_url,blocker,updated_at';
+const campaignColumns = 'id,business_unit_id,name,objective,owner_id,status,starts_on,ends_on,budget_idr,spent_idr,updated_at';
+const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,assignee_id,platform,format,status,priority,due_on,publish_on,output_url,blocker,updated_at';
 
-export async function campaigns(page: number, signal: AbortSignal) {
+export async function campaigns(page: number, signal: AbortSignal, unit = 'all') {
   const start = page * PAGE_SIZE;
-  const { data, error } = await supabase.from('creative_campaigns').select(campaignColumns)
+  let query = supabase.from('creative_campaigns').select(campaignColumns);
+  if (unit !== 'all') query = unit === 'unassigned' ? query.is('business_unit_id', null) : query.eq('business_unit_id', unit);
+  const { data, error } = await query
     .order('name').order('id').range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
   return data as Campaign[];
 }
 
 export async function team(signal: AbortSignal) {
-  const { data, error } = await supabase.from('profiles').select('id,full_name,is_active')
+  const { data, error } = await supabase.from('profiles').select('id,full_name,is_active,job_title')
     .order('full_name').abortSignal(signal);
   if (error) throw error;
   return data as TeamMember[];
@@ -56,14 +63,17 @@ export async function team(signal: AbortSignal) {
 
 export type Filters = {
   platform: string; status: string; assignee: string; order: 'due_on' | 'publish_on';
+  workstream?: string;
 };
 
 export async function tasks(campaignId: string | null | 'all', filters: Filters, page: number, signal: AbortSignal,
-  focus: Focus = 'all', today = '') {
+  focus: Focus = 'all', today = '', unit = 'all') {
   const start = page * PAGE_SIZE;
   let query = supabase.from('creative_tasks').select(taskColumns + ',campaign:creative_campaigns(name),source_idea:creative_ideas(title,reference_urls)');
+  if (unit !== 'all') query = unit === 'unassigned' ? query.is('business_unit_id', null) : query.eq('business_unit_id', unit);
   if (campaignId !== 'all') query = campaignId ? query.eq('campaign_id', campaignId) : query.is('campaign_id', null);
   if (filters.platform) query = query.eq('platform', filters.platform);
+  if (filters.workstream) query = query.eq('workstream', filters.workstream);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.assignee === 'unassigned') query = query.is('assignee_id', null);
   else if (filters.assignee) query = query.eq('assignee_id', filters.assignee);
@@ -85,9 +95,10 @@ export async function tasks(campaignId: string | null | 'all', filters: Filters,
   return data as unknown as ListedTask[];
 }
 
-export async function summary(campaignId: string | null, today: string, signal: AbortSignal) {
-  const { data, error } = await supabase.rpc('creative_weekly_execution', {
+export async function summary(campaignId: string | null, today: string, signal: AbortSignal, unit = 'all') {
+  const { data, error } = await supabase.rpc('creative_unit_execution', {
     p_campaign_id: campaignId === 'all' ? null : campaignId, p_all: campaignId === 'all', p_today: today,
+    p_unit_id: unit === 'all' || unit === 'unassigned' ? null : unit, p_unassigned: unit === 'unassigned',
   })
     .abortSignal(signal).single();
   if (error) throw error;
@@ -105,10 +116,11 @@ export function safeOutputUrl(value: string) {
   return '';
 }
 
-export async function ideas(page: number, onlyPriority: boolean, queue: string, signal: AbortSignal) {
+export async function ideas(page: number, onlyPriority: boolean, queue: string, signal: AbortSignal, unit = 'all') {
   const start = page * PAGE_SIZE;
   let query = supabase.from('creative_ideas')
-    .select('id,title,brief,platform,reference_urls,prioritized,queue_state,updated_at,task:creative_tasks(id,status)');
+    .select('id,business_unit_id,title,brief,platform,reference_urls,prioritized,queue_state,updated_at,task:creative_tasks(id,status)');
+  if (unit !== 'all') query = unit === 'unassigned' ? query.is('business_unit_id', null) : query.eq('business_unit_id', unit);
   if (onlyPriority) query = query.eq('prioritized', true);
   if (queue) query = query.eq('queue_state', queue);
   if (queue === 'ready') query = query.is('task', null);
@@ -119,7 +131,7 @@ export async function ideas(page: number, onlyPriority: boolean, queue: string, 
     .map(row => ({ ...row, task: Array.isArray(row.task) ? row.task[0] ?? null : row.task }));
 }
 
-async function save(table: string, values: Record<string, string | number | boolean | string[] | null>, previous?: Row) {
+async function save(table: string, values: Record<string, string | number | boolean | string[] | null | undefined>, previous?: Row) {
   const target = supabase.from(table);
   const query = previous
     ? target.update(values).eq('id', previous.id).eq('updated_at', previous.updated_at)

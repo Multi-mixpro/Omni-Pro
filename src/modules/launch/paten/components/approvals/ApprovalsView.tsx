@@ -18,6 +18,7 @@ interface ApprovalsViewProps {
   onCreateApproval: (approval: ApprovalGate) => void;
   currentUserName: string;
   canDecide: boolean;
+  canRequest: boolean;
 }
 
 export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
@@ -27,6 +28,7 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
   onCreateApproval,
   currentUserName,
   canDecide,
+  canRequest,
 }) => {
   const [activeTab, setActiveTab] = useState<'pending' | 'decided'>('pending');
   const [selectedApproval, setSelectedApproval] = useState<ApprovalGate | null>(null);
@@ -91,7 +93,7 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
             Pintu persetujuan resmi untuk HPP, Sampel, Spesifikasi & Pelepasan Produksi Massal.
           </p>
         </div>
-        {canDecide && (
+        {canRequest && (
           <button type="button" onClick={() => setShowRequestModal(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-slate-950 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800">
             <Plus className="h-4 w-4" />
             Request Approval

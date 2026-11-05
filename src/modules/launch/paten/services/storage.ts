@@ -7,7 +7,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { createPollGate } from './polling';
+import { UNASSIGNED_BUSINESS_UNIT } from './businessUnits';
 import {
   ApprovalGate,
   Article,
@@ -64,7 +64,6 @@ const lastPayloads = new Map<RecordType, Map<string, string>>();
 const lastRevisions = new Map<RecordType, Map<string, number>>();
 const errorListeners = new Set<(message: string | null) => void>();
 let persistenceQueue: Promise<void> = Promise.resolve();
-let lastLocalWriteTime = 0;
 
 // Master data cache — these tables rarely change and don't need realtime reload
 let masterDataCache: {
@@ -120,8 +119,8 @@ function rowsFor<T extends { id: string }>(
       if (type === 'article' && current) {
         const baseline = current as unknown as Article;
         Object.assign(merged as unknown as Article, {
+          businessUnit: baseline.businessUnit,
           files: baseline.files || [],
-          teamComments: baseline.teamComments || [],
         });
       }
       map.set(record.record_id, merged);
@@ -149,7 +148,7 @@ function mapBusinessUnit(row: Row): BusinessUnit {
   const code = String(row.business_unit?.code || row.business_unit_code || '').toUpperCase();
   if (code === 'GUDSKUY') return 'GUDSKUY';
   if (code === 'GG_SUPPLY') return 'GG Supply';
-  return 'GUDSKUY';
+  return UNASSIGNED_BUSINESS_UNIT;
 }
 
 function mapStage(stage: unknown): ArticleStage {
@@ -200,7 +199,6 @@ function legacyArticle(
     releasePlans: Row[];
     variantRows: Row[];
     mediaAssets: Row[];
-    comments: Row[];
     blockers: Row[];
     approvals: Row[];
   },
@@ -286,15 +284,6 @@ function legacyArticle(
         mimeType: String(media.metadata?.mime_type || ''),
         bytes: Number(media.bytes || 0),
         uploadedAt: String(media.created_at || ''),
-      })),
-    teamComments: related.comments
-      .filter((comment) => comment.project_id === projectId && !comment.is_decision_request)
-      .map((comment) => ({
-        id: String(comment.id),
-        authorName: String(comment.author?.full_name || 'Tim'),
-        authorAvatar: String(comment.author?.avatar_url || ''),
-        body: String(comment.body || ''),
-        createdAt: String(comment.created_at || ''),
       })),
     stage: mapStage(project.current_stage),
     status: mapStatus(project.status),
@@ -517,7 +506,7 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
         rows(supabase.from('launch_projects').select('id, code, category, reference_image_url, current_stage, status, progress, concept, source_notes, production_notes, target_date, updated_at, created_at, business_unit:business_units(name, code), owner:profiles!launch_projects_owner_id_fkey(full_name)').order('updated_at', { ascending: false })),
     rows(supabase.from('launch_tasks').select('*')),
     rows(supabase.from('launch_blockers').select('*')),
-    rows(supabase.from('launch_comments').select('id, project_id, body, created_at, is_decision_request, decision_deadline, decision_status, decision_note, author:profiles!launch_comments_author_id_fkey(full_name, avatar_url)').or('project_id.not.is.null,is_decision_request.eq.true')),
+    rows(supabase.from('launch_comments').select('id, project_id, body, is_decision_request, decision_deadline, decision_status, decision_note').eq('is_decision_request', true)),
     rows(supabase.from('launch_approvals').select('*')),
     rows(supabase.from('launch_progress_updates').select('*')),
     rows(supabase.from('launch_references').select('*')),
@@ -532,7 +521,7 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
     rows(supabase.from('launch_production_batches').select('*')),
     rows(supabase.from('launch_release_plans').select('*')),
     rows(supabase.from('launch_variant_matrix').select('*')),
-    rows(supabase.from('media_assets').select('*').is('deleted_at', null)),
+    rows(supabase.from('media_assets').select('id,project_id,kind,public_id,secure_url,bytes,created_at,metadata').is('deleted_at', null)),
   ]);
 
   const value = (index: number) => queries[index];
@@ -569,7 +558,6 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
     releasePlans: value(17),
     variantRows: value(18),
     mediaAssets: value(19),
-    comments: commentsRaw,
     blockers: blockersRaw,
     approvals: approvalsRaw,
   };
@@ -732,9 +720,7 @@ function projectIdFor(type: RecordType, value: Row): string | null {
 function queue(operation: () => Promise<unknown>): Promise<void> {
   const result = persistenceQueue
     .then(async () => {
-      lastLocalWriteTime = Date.now();
       await operation();
-      lastLocalWriteTime = Date.now();
     })
     .then(() => {
       clearError();
@@ -762,7 +748,7 @@ async function ensureProjects(articles: Article[], newIds: Set<string>) {
     const unit = businessUnits.find((item: any) =>
       item.name?.toUpperCase() === article.businessUnit?.toUpperCase() ||
       item.code?.toUpperCase() === article.businessUnit?.toUpperCase()
-    ) || businessUnits[0];
+    );
     if (!unit) throw new Error('Business unit belum tersedia di database.');
     const { error } = await supabase.from('launch_projects').upsert({
       id: article.id,
@@ -796,9 +782,16 @@ async function syncArticleColumns(
     const previous = previousSerialized
       ? JSON.parse(previousSerialized) as Article
       : undefined;
+    let unitUpdate: { business_unit_id?: string } = {};
+    if (previous && previous.businessUnit !== article.businessUnit) {
+      const units = await rows(supabase.from('business_units').select('id,name').eq('name', article.businessUnit).eq('is_active', true));
+      if (units.length !== 1) throw new Error('Pilih unit bisnis aktif yang terdaftar.');
+      unitUpdate = { business_unit_id: String(units[0].id) };
+    }
     const { error } = await supabase
       .from('launch_projects')
       .update({
+        ...unitUpdate,
         code: article.code,
         article_name: article.name,
         category: article.subCategory || article.category,
@@ -1258,7 +1251,7 @@ async function persistCollection<T extends { id: string }>(
     });
     if (error) {
       if (error.code === '40001' || String(error.message).includes('PATEN_CONFLICT')) {
-        throw new Error('Data diubah oleh pengguna lain. Workspace dimuat ulang sebelum Anda melanjutkan.');
+        throw new Error('Data diubah oleh pengguna lain. Tekan Segarkan dan periksa perubahan sebelum mencoba lagi.');
       }
       throw error;
     }
@@ -1293,6 +1286,11 @@ function save<T extends { id: string }>(type: RecordType, values: T[]) {
 
 export const StorageService = {
   loadWorkspace,
+  async refreshWorkspace() {
+    await persistenceQueue;
+    invalidateMasterData();
+    return loadWorkspace();
+  },
 
   saveArticles(values: Article[]) { return save('article', values); },
   saveSuppliers(values: Supplier[]) { invalidateMasterData(); return save('supplier', values); },
@@ -1305,30 +1303,6 @@ export const StorageService = {
   saveUpdates(values: ProgressUpdate[]) { return save('progress_update', values); },
   resolveDecision(decisionId: string, choice: string) {
     return queue(() => resolveDecision(decisionId, choice));
-  },
-
-  subscribe(onChange: () => void | Promise<void>) {
-    // Full-workspace sync is intentionally infrequent: this endpoint reads
-    // several operational tables. Refresh immediately when the user returns
-    // to the app, but never consume bandwidth from a background tab.
-    const POLL_INTERVAL = 5 * 60_000;
-    const runPoll = createPollGate(POLL_INTERVAL, true);
-    const poll = () => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-      if (Date.now() - lastLocalWriteTime < 4000) return;
-      void runPoll(onChange);
-    };
-    const refreshWhenVisible = () => {
-      if (typeof document === 'undefined' || document.visibilityState === 'visible') poll();
-    };
-    const interval = setInterval(poll, POLL_INTERVAL);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-    window.addEventListener('focus', refreshWhenVisible);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-      window.removeEventListener('focus', refreshWhenVisible);
-    };
   },
 
   subscribeErrors(listener: (message: string | null) => void) {
