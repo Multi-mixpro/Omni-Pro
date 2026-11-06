@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const unitSectors = { garment: 'Garment', fnb: 'F&B', other: 'Lainnya' };
 export type WorkspaceUnit = {
+  logo_url?: string;
   id: string; code: string; name: string; description: string;
   sector: keyof typeof unitSectors; is_active: boolean;
 };
@@ -11,13 +12,13 @@ export const unitKey = ['workspace-business-units'];
 export function useWorkspaceUnits() {
   return useQuery({ queryKey: unitKey, staleTime: 300_000, queryFn: async ({ signal }) => {
     const { data, error } = await supabase.from('business_units')
-      .select('id,code,name,description,sector,is_active').order('name').abortSignal(signal);
+      .select('*').order('name').abortSignal(signal);
     if (error) throw error;
     return data as WorkspaceUnit[];
   } });
 }
 
-export async function saveWorkspaceUnit(unit: Pick<WorkspaceUnit, 'name' | 'code' | 'description' | 'sector'>, id?: string) {
+export async function saveWorkspaceUnit(unit: Pick<WorkspaceUnit, 'name' | 'code' | 'description' | 'sector' | 'logo_url'>, id?: string) {
   const table = supabase.from('business_units');
   const { error } = await (id ? table.update({ ...unit, short_name: unit.name }).eq('id', id)
     : table.insert({ ...unit, short_name: unit.name }));

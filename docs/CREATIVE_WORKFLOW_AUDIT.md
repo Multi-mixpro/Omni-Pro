@@ -1,0 +1,12 @@
+# Audit alur Creative Hub
+
+Lingkup pemeriksaan mencakup kode akun, produksi, review, kalender, evaluasi, dan pelaporan. Temuan perilaku di bawah berasal dari struktur layar dan kueri. Waktu penggunaan oleh tim belum diukur.
+
+| Prioritas | Friksi yang ditemukan | Perubahan atau langkah berikutnya | Cara mengecek hasil |
+|---|---|---|---|
+| Tinggi | Akun ditampilkan sebagai kartu teks tanpa pencarian. Riwayat muncul di bawah seluruh daftar, sehingga pengguna harus menemukannya lagi setelah memilih akun. | Tambahkan ikon platform, identitas usaha, pencarian handle, filter platform, dan filter akun aktif. Fokus pindah ke riwayat saat dibuka. | Temukan satu akun dari beberapa platform, buka riwayatnya, lalu kembali dan pilih akun lain. |
+| Tinggi | Aktivasi dari riwayat akun hanya menampilkan ringkasan. Untuk mengevaluasi, pengguna harus membuka menu Iklan & Evaluasi dan mencari ulang. | Tambahkan tombol **Buka evaluasi** yang membawa ID aktivasi dan kampanye ke layar tujuan. | Buka aktivasi dari akun dan cek judul serta kampanye yang sama di layar evaluasi. |
+| Tinggi | Status `ready` juga dipakai saat persetujuan akhir masih tertunda. Kartu menahan aksi tayang, tetapi pintasan **Siap tayang** masih memakai status `ready`. | Pisahkan antrean persetujuan tertunda dan siap tayang di filter daftar serta kanban. Pertahankan aturan database untuk pencatatan tayang. | Bandingkan tugas tanpa approver, menunggu persetujuan, dan sudah disetujui pada kedua tampilan. |
+| Sedang | Riwayat metrik akun dan konten menggunakan data yang diinput per periode. Jumlah tanpa tanggal atau sumber yang jelas mudah dianggap sebagai hasil terkini. | Tampilkan periode terbaru dan sumber pada kartu ringkasan. Bedakan metrik kosong dari nol. | Pakai akun dengan laporan lama, laporan baru, dan akun tanpa laporan. |
+| Sedang | Copy memiliki keputusan per versi, sedangkan antrean **Menunggu saya** hanya memuat tugas. Reviewer copy perlu mencari versi di detail tugas. | Tambahkan antrean keputusan copy dengan tautan langsung ke versi dan pisahkan dari persetujuan tugas. | Buka dua versi berbeda dan pastikan tindakan selalu diarahkan ke naskah yang benar. |
+| Sedang | Anggaran kanal menampilkan rencana dan realisasi aktivasi. Belum ada bukti bahwa angka itu mewakili persetujuan biaya atau komitmen. | Pertahankan sumber angka yang eksplisit. Hubungkan permintaan, komitmen, dan realisasi setelah model anggaran disetujui. | Rekonsiliasi satu kampanye dengan aktivitas kanal tanpa menghitung biaya dua kali. |

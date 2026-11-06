@@ -14,13 +14,14 @@ export type Publication = { id: string; published_url: string; published_at: str
 export type TaskEvent = { id: string; kind: 'status' | 'publication' | 'nudge'; detail: string; created_at: string; task_id: string; task?: { title: string } | null };
 const accountFields = 'id,business_unit_id,platform,handle,profile_url,owner_id,is_active,updated_at';
 
-export async function accounts(unit: string, page: number, signal: AbortSignal, activeOnly = false, platform?: string | string[]) {
+export async function accounts(unit: string, page: number, signal: AbortSignal, activeOnly = false, platform?: string | string[], search = '') {
   let query = supabase.from('creative_accounts').select(accountFields);
   if (unit === 'unassigned') return [];
   if (unit !== 'all') query = query.eq('business_unit_id', unit);
   if (activeOnly) query = query.eq('is_active', true);
   if (Array.isArray(platform)) query = query.in('platform', platform);
   else if (platform) query = query.eq('platform', platform);
+  if (search.trim()) query = query.ilike('handle', `%${search.trim().replace(/[\\%_]/g, '\\$&')}%`);
   const { data, error } = await query.order('handle').order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
   return (data ?? []) as SocialAccount[];

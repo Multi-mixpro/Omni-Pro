@@ -100,6 +100,7 @@ export function SettingsPage() {
   const [buName, setBuName] = useState('');
   const [buCode, setBuCode] = useState('');
   const [buDesc, setBuDesc] = useState('');
+  const [buLogo, setBuLogo] = useState('');
   const [buSector, setBuSector] = useState<WorkspaceUnit['sector']>('other');
   const [buSaving, setBuSaving] = useState(false);
   const [buError, setBuError] = useState('');
@@ -115,10 +116,24 @@ export function SettingsPage() {
     if (!isAdmin || !buName.trim() || buSaving) return;
     const code = (buCode.trim() || buName.trim()).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
     if (!code || code.length > 32) { setBuError('Isi kode unit dengan 1–32 karakter.'); return; }
+    const logoInput = buLogo.trim();
+    let logoUrl = '';
+    if (logoInput) {
+      try {
+        const url = new URL(logoInput);
+        if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 1024) throw new Error();
+        logoUrl = url.href;
+      } catch {
+        setBuError('Gunakan tautan HTTPS yang langsung menuju gambar logo.');
+        return;
+      }
+    }
     setBuSaving(true);
     setBuError('');
     try {
-      await saveWorkspaceUnit({ name: buName.trim(), code, description: buDesc.trim(), sector: buSector }, buEditId ?? undefined);
+      await saveWorkspaceUnit({ name: buName.trim(), code, description: buDesc.trim(), sector: buSector,
+        ...(logoUrl || buList.find(unit => unit.id === buEditId)?.logo_url ? { logo_url: logoUrl } : {}),
+      }, buEditId ?? undefined);
       await refreshUnits();
       setShowBuModal(false);
     } catch {
@@ -131,6 +146,7 @@ export function SettingsPage() {
     setBuName('');
     setBuCode('');
     setBuDesc('');
+    setBuLogo('');
     setBuSector('other');
     setBuError('');
     setShowBuModal(true);
@@ -141,6 +157,7 @@ export function SettingsPage() {
     setBuName(bu.name);
     setBuCode(bu.code);
     setBuDesc(bu.description);
+    setBuLogo(bu.logo_url ?? '');
     setBuSector(bu.sector);
     setBuError('');
     setShowBuModal(true);
@@ -777,6 +794,10 @@ export function SettingsPage() {
                   className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:border-indigo-600 focus:outline-none"
                 />
               </div>
+              <label className="block font-extrabold text-slate-900">Tautan logo usaha
+                <input type="url" value={buLogo} onChange={e => setBuLogo(e.target.value)} maxLength={1024}
+                  placeholder="https://…/logo.png" className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 font-normal" />
+              </label>
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"

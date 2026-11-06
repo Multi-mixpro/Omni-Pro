@@ -447,7 +447,8 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
       </Suspense>}
       {section === 'calendar' && <Suspense fallback={sectionLoading}><CreativePlanner key={unit + ':' + scope + ':' + (calendarDay ?? '')}
         userId={userId} unit={unit} scope={scope} today={today} initialDay={calendarDay} onEvent={openCalendarEvent} /></Suspense>}
-      {section === 'accounts' && <Suspense fallback={sectionLoading}><CreativeAccounts key={unit} userId={userId} unit={unit} today={today} members={members} canEdit={canEdit} /></Suspense>}
+      {section === 'accounts' && <Suspense fallback={sectionLoading}><CreativeAccounts key={unit} userId={userId} unit={unit} today={today} members={members} canEdit={canEdit}
+        onActivation={(id, campaignId) => { openSection('ads'); changeScope(campaignId); setAdsActivation(id); }} /></Suspense>}
       {section === 'inbox' && <Suspense fallback={sectionLoading}><CreativeInbox userId={userId} counts={counts}
         evaluations={scope === 'standalone' || !channels.data ? undefined : overdueEvaluations}
         onFocus={openFocus} onAds={() => openSection('ads','overdue')} onTask={setDetailId} onDecisions={() => openSection('decisions')} /></Suspense>}
