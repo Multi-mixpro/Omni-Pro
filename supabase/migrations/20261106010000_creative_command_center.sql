@@ -66,23 +66,42 @@ create index creative_task_events_inbox on public.creative_task_events(recipient
 create unique index creative_task_nudge_once on public.creative_task_events(task_id,recipient_id,day_wib) where kind = 'nudge';
 alter table public.creative_tasks add column review_note text not null default '' check (length(review_note) <= 1000);
 
-do $$
-declare t text;
-begin
-  foreach t in array array['creative_accounts','creative_account_snapshots','creative_publications','creative_publication_snapshots','creative_task_events'] loop
-    execute format('alter table public.%I enable row level security', t);
-    execute format('revoke all on public.%I from anon, authenticated', t);
-    execute format('grant select on public.%I to authenticated', t);
-    execute format('create policy command_read on public.%I for select to authenticated using ((select public.is_active_user()) and ((select public.has_permission(''launch.view'')) or (select public.has_permission(''launch.admin''))))', t);
-    if t in ('creative_accounts','creative_account_snapshots','creative_publication_snapshots') then
-      execute format('grant insert, update on public.%I to authenticated', t);
-      execute format('create policy command_insert on public.%I for insert to authenticated with check ((select public.is_active_user()) and ((select public.has_permission(''launch.edit'')) or (select public.has_permission(''launch.admin''))))', t);
-      execute format('create policy command_update on public.%I for update to authenticated using ((select public.is_active_user()) and ((select public.has_permission(''launch.edit'')) or (select public.has_permission(''launch.admin'')))) with check ((select public.is_active_user()) and ((select public.has_permission(''launch.edit'')) or (select public.has_permission(''launch.admin''))))', t);
-    end if;
-  end loop;
-end $$;
+-- Explicit statements let SQL Editor see that all five tables enable RLS.
+alter table public.creative_accounts enable row level security;
+revoke all on public.creative_accounts from anon, authenticated;
+grant select, insert, update on public.creative_accounts to authenticated;
+create policy command_read on public.creative_accounts for select to authenticated using ((select public.is_active_user()) and ((select public.has_permission('launch.view')) or (select public.has_permission('launch.admin'))));
+create policy command_insert on public.creative_accounts for insert to authenticated with check ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))));
+create policy command_update on public.creative_accounts for update to authenticated
+  using ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))))
+  with check ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))));
 
-drop policy command_read on public.creative_task_events;
+alter table public.creative_account_snapshots enable row level security;
+revoke all on public.creative_account_snapshots from anon, authenticated;
+grant select, insert, update on public.creative_account_snapshots to authenticated;
+create policy command_read on public.creative_account_snapshots for select to authenticated using ((select public.is_active_user()) and ((select public.has_permission('launch.view')) or (select public.has_permission('launch.admin'))));
+create policy command_insert on public.creative_account_snapshots for insert to authenticated with check ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))));
+create policy command_update on public.creative_account_snapshots for update to authenticated
+  using ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))))
+  with check ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))));
+
+alter table public.creative_publications enable row level security;
+revoke all on public.creative_publications from anon, authenticated;
+grant select on public.creative_publications to authenticated;
+create policy command_read on public.creative_publications for select to authenticated using ((select public.is_active_user()) and ((select public.has_permission('launch.view')) or (select public.has_permission('launch.admin'))));
+
+alter table public.creative_publication_snapshots enable row level security;
+revoke all on public.creative_publication_snapshots from anon, authenticated;
+grant select, insert, update on public.creative_publication_snapshots to authenticated;
+create policy command_read on public.creative_publication_snapshots for select to authenticated using ((select public.is_active_user()) and ((select public.has_permission('launch.view')) or (select public.has_permission('launch.admin'))));
+create policy command_insert on public.creative_publication_snapshots for insert to authenticated with check ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))));
+create policy command_update on public.creative_publication_snapshots for update to authenticated
+  using ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))))
+  with check ((select public.is_active_user()) and ((select public.has_permission('launch.edit')) or (select public.has_permission('launch.admin'))));
+
+alter table public.creative_task_events enable row level security;
+revoke all on public.creative_task_events from anon, authenticated;
+grant select on public.creative_task_events to authenticated;
 create policy command_read on public.creative_task_events for select to authenticated using (
   (select public.is_active_user())
   and ((select public.has_permission('launch.view')) or (select public.has_permission('launch.admin')))
