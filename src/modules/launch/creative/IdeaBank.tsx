@@ -65,7 +65,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
         <div className="min-w-0 flex-1 space-y-2">
           <h3 className="break-words font-semibold">{idea.title}</h3>
           {unit === 'all' && <p className="text-sm text-slate-600">{units.data?.find(row => row.id === idea.business_unit_id)?.name ?? 'Unit belum ditetapkan'}</p>}
-          <p className="text-sm text-slate-600">{platforms[idea.platform]}{idea.prioritized ? ' · Prioritas' : ''} · {idea.task ? 'Tugas: ' + taskStatuses[idea.task.status] : ideaQueues[idea.queue_state]}</p>
+          <p className="text-sm text-slate-600">{[idea.platform, ...(idea.additional_platforms ?? [])].map(platform => platforms[platform]).join(', ')}{idea.prioritized ? ' · Prioritas' : ''} · {idea.task ? 'Tugas: ' + taskStatuses[idea.task.status] : ideaQueues[idea.queue_state]}</p>
           {idea.brief && <p className="whitespace-pre-wrap break-words text-sm">{idea.brief}</p>}
           <ReferenceLinks urls={idea.reference_urls} />
         </div>

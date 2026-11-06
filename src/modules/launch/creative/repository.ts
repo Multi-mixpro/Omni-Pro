@@ -54,6 +54,7 @@ export type ListedTask = Task & {
   source_idea: { title: string; reference_urls: string[] } | null;
 };
 export type Idea = Row & {
+  additional_platforms?: Task['platform'][];
   business_unit_id?: string | null;
   title: string; brief: string; platform: Task['platform']; reference_urls: string[]; prioritized: boolean;
   queue_state: keyof typeof ideaQueues;
@@ -157,7 +158,7 @@ export function safeOutputUrl(value: string) {
 export async function ideas(page: number, onlyPriority: boolean, queue: string, signal: AbortSignal, unit = 'all') {
   const start = page * PAGE_SIZE;
   let query = supabase.from('creative_ideas')
-    .select('id,business_unit_id,title,brief,platform,reference_urls,prioritized,queue_state,updated_at,task:creative_tasks(id,status)');
+    .select('*,task:creative_tasks(id,status)');
   if (unit !== 'all') query = unit === 'unassigned' ? query.is('business_unit_id', null) : query.eq('business_unit_id', unit);
   if (onlyPriority) query = query.eq('prioritized', true);
   if (queue) query = query.eq('queue_state', queue);
@@ -191,7 +192,21 @@ export async function saveTask(values: Draft<Task>, previous?: Task, sourceIdeaI
     throw error;
   }
 }
-export const saveIdea = (values: Draft<Idea>, previous?: Idea) => save('creative_ideas', values, previous);
+export async function saveIdea(values: Draft<Idea>, previous?: Idea) {
+  const { additional_platforms, ...fields } = values;
+  const payload = additional_platforms?.length || previous?.additional_platforms?.length
+    ? { ...fields, additional_platforms: additional_platforms ?? [] }
+    : fields;
+  try {
+    return await save('creative_ideas', payload, previous);
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST204'
+      && 'message' in error && String(error.message).includes('additional_platforms')) {
+      throw new Error('Penyimpanan beberapa platform belum aktif. Terapkan migrasi Bank Ide terlebih dahulu.');
+    }
+    throw error;
+  }
+}
 
 export function setTaskChecklistItem(task: Task, index: number, done: boolean) {
   if (!task.checklist?.[index]) throw new Error('Langkah checklist tidak ditemukan.');

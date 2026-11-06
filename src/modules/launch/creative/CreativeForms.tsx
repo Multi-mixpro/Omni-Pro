@@ -166,7 +166,7 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
           {Object.entries(platforms).filter(([id]) => id !== 'internal').map(([id, label]) => (
             <label key={id} hidden={id === platform} className="space-x-2">
               <input type="checkbox" name="additionalPlatform" value={id} disabled={id === platform || platform === 'internal'}
-                defaultChecked={task?.additional_platforms?.includes(id as Task['platform'])} />
+                defaultChecked={(task ? task.additional_platforms : sourceIdea?.additional_platforms)?.includes(id as Task['platform'])} />
               <span>{label}</span>
             </label>
           ))}
@@ -222,8 +222,20 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
 }
 
 export function IdeaForm({ idea, defaultUnit, onCancel, onSaved }: Omit<Common, 'members'> & { idea?: Idea; defaultUnit?: string }) {
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Idea['platform'][]>(
+    idea ? [idea.platform, ...new Set(idea.additional_platforms ?? [])] : ['internal'],
+  );
+  function togglePlatform(platform: Idea['platform'], checked: boolean) {
+    setSelectedPlatforms(current => {
+      if (!checked) return current.filter(choice => choice !== platform);
+      if (platform === 'internal') return ['internal'];
+      return [...current.filter(choice => choice !== 'internal'), platform];
+    });
+  }
   return <Editor title={idea ? 'Edit ide konten' : 'Tambah ide konten'} onCancel={onCancel} onSaved={onSaved}
     onSave={data => {
+      const [platform, ...additionalPlatforms] = selectedPlatforms;
+      if (!platform) throw new Error('Pilih minimal satu platform tujuan.');
       const inputs = value(data, 'references').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
       if (inputs.length > 5) throw new Error('Masukkan maksimal 5 tautan referensi.');
       const references = inputs.map(safeOutputUrl);
@@ -234,14 +246,23 @@ export function IdeaForm({ idea, defaultUnit, onCancel, onSaved }: Omit<Common, 
         throw new Error('Setiap referensi harus berupa tautan HTTP atau HTTPS yang valid (maksimal 1024 karakter).');
       }
       return saveIdea({
-        title: value(data, 'title'), brief, platform: value(data, 'platform') as Idea['platform'],
+        title: value(data, 'title'), brief, platform, additional_platforms: additionalPlatforms,
         reference_urls: [...new Set(references)], prioritized: data.has('prioritized'), queue_state: queue,
         business_unit_id: value(data, 'businessUnit') || null,
       }, idea);
     }}>
     <Label title="Judul ide"><input name="title" className={field} maxLength={160} required defaultValue={idea?.title} /></Label>
     <UnitField current={idea ? idea.business_unit_id : defaultUnit} required={!idea} />
-    <Label title="Platform tujuan"><select name="platform" className={field} defaultValue={idea?.platform ?? 'internal'}><Options values={platforms} /></select></Label>
+    <fieldset className="min-w-0 rounded-lg border border-slate-200 px-3 pb-3">
+      <legend className="px-1 text-sm font-medium">Platform tujuan</legend>
+      <p className="mb-2 text-xs text-slate-600">Centang beberapa platform. Pilih Internal untuk ide khusus tim.</p>
+      <div className="grid grid-cols-2 gap-2">
+        {(Object.keys(platforms) as Idea['platform'][]).map(platform => <label key={platform} className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={selectedPlatforms.includes(platform)} onChange={event => togglePlatform(platform, event.target.checked)} />
+          <span>{platforms[platform]}</span>
+        </label>)}
+      </div>
+    </fieldset>
     <Label title="Antrean ide"><select name="queue" className={field} defaultValue={idea?.queue_state ?? 'candidate'}><Options values={ideaQueues} /></select></Label>
     <Label title="Catatan: apa yang perlu dibuat atau diadaptasi?"><textarea name="brief" className={field} rows={4} maxLength={2000} defaultValue={idea?.brief} /></Label>
     <Label title="Tautan referensi (maksimal 5, satu per baris)"><textarea name="references" className={field} rows={4} maxLength={5124}

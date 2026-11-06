@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { advanceTask, ideas, pendingTaskDecisions, safeOutputUrl, saveTask, setTaskChecklistItem, tasks, type Draft, type Task } from './repository';
+import { advanceTask, ideas, pendingTaskDecisions, safeOutputUrl, saveIdea, saveTask, setTaskChecklistItem, tasks, type Draft, type Idea, type Task } from './repository';
 
 const { from, chain } = vi.hoisted(() => {
   const chain = {
@@ -22,6 +22,17 @@ const draft: Draft<Task> = {
 beforeEach(() => vi.clearAllMocks());
 
 describe('creative repository', () => {
+  it('stores multiple idea platforms and clears removed platforms when editing', async () => {
+    chain.maybeSingle.mockResolvedValue({ data: { id: 'idea-id' }, error: null });
+    const idea: Draft<Idea> = {
+      title: 'Ide promosi', brief: '', platform: 'instagram', additional_platforms: ['tiktok', 'youtube'],
+      reference_urls: [], prioritized: false, queue_state: 'candidate',
+    };
+    await saveIdea(idea);
+    expect(chain.insert).toHaveBeenCalledWith(idea);
+    await saveIdea({ ...idea, additional_platforms: [] }, { ...idea, id: 'idea-id', updated_at: '2026-11-06T08:00:00Z' });
+    expect(chain.update).toHaveBeenCalledWith({ ...idea, additional_platforms: [] });
+  });
   it('scopes assigned decisions to the selected unit and standalone tasks', async () => {
     const user = '10000000-0000-4000-8000-000000000001';
     chain.abortSignal.mockResolvedValue({ data: [], error: null });
