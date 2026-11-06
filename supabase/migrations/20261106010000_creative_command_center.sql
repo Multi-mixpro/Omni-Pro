@@ -282,13 +282,28 @@ create index creative_publications_calendar on public.creative_publications(publ
 revoke all on function public.creative_recorded_publications_calendar(date,date,uuid,boolean,uuid,boolean) from public, anon;
 grant execute on function public.creative_recorded_publications_calendar(date,date,uuid,boolean,uuid,boolean) to authenticated;
 
--- Accept projects that applied the earlier version of the Hub migration.
-do $$
-begin
-  if to_regprocedure('public.creative_planned_calendar_events(date,date,uuid,boolean,uuid,boolean)') is null then
-    alter function public.creative_calendar_events(date,date,uuid,boolean,uuid,boolean) rename to creative_planned_calendar_events;
-  end if;
-end $$;
+-- Define the planned feed explicitly for both versions of the Hub migration.
+create or replace function public.creative_planned_calendar_events(p_from date, p_until date, p_unit_id uuid, p_unassigned boolean, p_campaign_id uuid, p_standalone boolean)
+returns table(item_id uuid,title text,platform text,event_day date,kind text,status text)
+language sql stable security invoker set search_path = '' as $planned_calendar$
+  select t.id, t.title, t.platform, event.day, event.kind, t.status
+  from public.creative_tasks t
+  cross join lateral (values (t.due_on, 'deadline'), (t.publish_on, 'publish')) as event(day,kind)
+  where event.day >= p_from and event.day < p_until and t.status <> 'cancelled'
+    and ((t.due_on >= p_from and t.due_on < p_until) or (t.publish_on >= p_from and t.publish_on < p_until))
+    and (case when p_standalone then t.campaign_id is null when p_campaign_id is not null then t.campaign_id = p_campaign_id else true end)
+    and (case when p_unassigned then t.business_unit_id is null when p_unit_id is not null then t.business_unit_id = p_unit_id else true end)
+  union all
+  select a.id, a.name, a.platform, a.review_on, 'evaluation', a.status
+  from public.creative_channel_activations a
+  join public.creative_campaigns c on c.id = a.campaign_id
+  where not p_standalone and a.review_on >= p_from and a.review_on < p_until and a.status <> 'cancelled'
+    and (p_campaign_id is null or a.campaign_id = p_campaign_id)
+    and (case when p_unassigned then c.business_unit_id is null when p_unit_id is not null then c.business_unit_id = p_unit_id else true end);
+$planned_calendar$;
+revoke all on function public.creative_planned_calendar_events(date,date,uuid,boolean,uuid,boolean) from public, anon;
+grant execute on function public.creative_planned_calendar_events(date,date,uuid,boolean,uuid,boolean) to authenticated;
+
 create or replace function public.creative_calendar_events(p_from date, p_until date, p_unit_id uuid, p_unassigned boolean, p_campaign_id uuid, p_standalone boolean)
 returns table(item_id uuid,title text,platform text,event_day date,kind text,status text)
 language sql stable security invoker set search_path = '' as $$
