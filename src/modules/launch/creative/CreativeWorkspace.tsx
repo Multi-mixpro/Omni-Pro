@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, Bell, CalendarDays, ClipboardCheck, Command, ExternalLink, FileText, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, TrendingUp, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, ExternalLink, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, TrendingUp, Users, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut } from '@/core/auth/useAuth';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
@@ -28,6 +28,8 @@ const CreativeInbox = lazy(() => import('./CreativeActions').then(module => ({ d
 const CreativeTaskDetail = lazy(() => import('./CreativeActions').then(module => ({ default: module.CreativeTaskDetail })));
 const CreativeDecisionQueue = lazy(() => import('./CreativeActions').then(module => ({ default: module.CreativeDecisionQueue })));
 const CreativeStudio = lazy(() => import('./CreativeStudio').then(module => ({ default: module.CreativeStudio })));
+const CreativeManagement = lazy(() => import('./CreativeManagement').then(module => ({ default: module.CreativeManagement })));
+const CreativeAssetLibrary = lazy(() => import('./CreativeAssetLibrary').then(module => ({ default: module.CreativeAssetLibrary })));
 const sectionLoading = <p role="status" className="p-4 text-sm text-slate-600">Memuat bagian ini…</p>;
 
 const panel = 'rounded-2xl border border-teal-100 bg-white p-4 shadow-sm';
@@ -36,7 +38,7 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZ
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const date = (value: string | null) => value ? dateFormat.format(new Date(value + 'T00:00:00Z')) : '—';
 type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea };
-type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio';
+type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'budget' | 'assets';
 const navigation = [
   { label: 'Ruang kerja', items: [
     { id: 'overview', label: 'Pusat Kerja', icon: LayoutDashboard },
@@ -50,10 +52,17 @@ const navigation = [
   { label: 'Pengelolaan', items: [
     { id: 'accounts', label: 'Akun & Performa', icon: AtSign },
     { id: 'ads', label: 'Iklan & Evaluasi', icon: TrendingUp },
+    { id: 'analytics', label: 'Analitik Creative', icon: BarChart3 },
+    { id: 'budget', label: 'Anggaran Kanal', icon: Wallet },
+    { id: 'assets', label: 'Pustaka Aset', icon: Images },
     { id: 'inbox', label: 'Kotak Tindakan', icon: Bell },
     { id: 'team', label: 'Tim & PIC', icon: Users },
   ] },
 ] as const;
+const sectionColors: Record<Section, string> = {
+  overview: 'blue', work: 'blue', studio: 'pink', decisions: 'green', campaigns: 'orange', calendar: 'red',
+  ideas: 'orange', accounts: 'mint', ads: 'pink', inbox: 'red', team: 'blue', analytics: 'pink', budget: 'green', assets: 'mint',
+};
 const sectionDescriptions: Record<Section, string> = {
   overview: 'Lihat target, jadwal, dan pekerjaan yang perlu ditindak.',
   work: 'Kelola tugas dari brief dan produksi sampai bukti tayang.',
@@ -66,6 +75,9 @@ const sectionDescriptions: Record<Section, string> = {
   ads: 'Pantau aktivitas kanal dan tindak lanjuti hasil evaluasi.',
   inbox: 'Lihat hambatan, keterlambatan, dan permintaan tindak lanjut.',
   team: 'Lihat beban kerja tim dan buka daftar tugas per PIC.',
+  analytics: 'Pantau hasil produksi, publikasi aktual, dan evaluasi kanal.',
+  budget: 'Bandingkan rencana dan realisasi biaya aktivitas kanal.',
+  assets: 'Temukan tautan hasil produksi dan buka tugas asalnya.',
 };
 const nextAction = {
   todo: { status: 'doing', label: 'Mulai' },
@@ -158,7 +170,7 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
   });
   const visibleQuery = taskView === 'board' ? boardQuery : taskQuery;
   const summaryQuery = useQuery({
-    enabled: section === 'overview' || section === 'inbox',
+    enabled: section === 'overview' || section === 'inbox' || section === 'analytics',
     queryKey: [...prefix, 'summary', unit, campaignId, today], queryFn: ({ signal }) => summary(campaignId, today, signal, unit),
   });
   const counts = summaryQuery.data;
@@ -172,13 +184,13 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
   const campaignStats = new Map(performance.data?.map(item => [item.subject_id,item]));
   const adsScope = scope === 'standalone' ? 'all' : scope;
   const channels = useQuery({
-    enabled: section === 'ads' || (['overview','inbox'].includes(section) && scope !== 'standalone'),
+    enabled: section === 'ads' || (['overview','inbox','analytics','budget'].includes(section) && scope !== 'standalone'),
     queryKey: [...prefix, 'channel-summary', unit, adsScope, today],
     queryFn: ({ signal }) => channelSummary(unit, adsScope, today, signal),
   });
   const overdueEvaluations = channels.data?.reduce((sum, row) => sum + Number(row.overdue), 0) ?? 0;
   const pendingEvaluations = channels.data?.reduce((sum, row) => sum + Number(row.pending_review), 0) ?? 0;
-  const loading = campaignQuery.isFetching || visibleQuery.isFetching || summaryQuery.isFetching || teamQuery.isFetching || performance.isFetching;
+  const loading = campaignQuery.isFetching || visibleQuery.isFetching || summaryQuery.isFetching || teamQuery.isFetching || performance.isFetching || channels.isFetching;
   const error = campaignQuery.error || (section === 'work' ? visibleQuery.error : null) || summaryQuery.error || teamQuery.error;
   const changeScope = (next: string) => { setScope(next); setPage(0); setEditor(null); setNotice(''); setDiscussionCampaign(null); };
   const changeFilter = (values: Partial<Filters>) => { setFilters(current => ({ ...current, ...values })); setPage(0); };
@@ -279,7 +291,7 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
             <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">{group.label}</p>
             {group.items.map(({ id,label,icon:Icon }) => <button key={id} aria-current={section === id ? 'page' : undefined}
               className="creative-nav-item flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold"
-              onClick={() => openSection(id)}><Icon className="shrink-0" size={16} />{label}</button>)}
+              onClick={() => openSection(id)}><span className="creative-color-icon" data-color={sectionColors[id]}><Icon size={15} /></span>{label}</button>)}
           </div>)}
           <div className="creative-nav-links space-y-1 pt-3">
             <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">Workspace</p>
@@ -329,6 +341,16 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
       </div>
 
       {!canEdit && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
+      {(section === 'analytics' || section === 'budget') && <Suspense fallback={sectionLoading}>
+        <CreativeManagement mode={section} counts={section === 'analytics' ? counts : undefined}
+          channels={scope === 'standalone' ? undefined : channels.data} standalone={scope === 'standalone'}
+          pending={(section === 'analytics' && summaryQuery.isPending) || (scope !== 'standalone' && channels.isPending)}
+          error={(section === 'analytics' ? summaryQuery.error : null) ?? (scope === 'standalone' ? null : channels.error)}
+          onFocus={openFocus} onAds={() => openSection('ads')} />
+      </Suspense>}
+      {section === 'assets' && <Suspense fallback={sectionLoading}>
+        <CreativeAssetLibrary key={`${unit}:${scope}`} userId={userId} unit={unit} scope={scope} onTask={setDetailId} />
+      </Suspense>}
       {section === 'decisions' && <Suspense fallback={sectionLoading}>
         <CreativeDecisionQueue key={`${unit}:${scope}`} userId={userId} unit={unit} scope={scope} onTask={setDetailId} />
       </Suspense>}
