@@ -19,7 +19,7 @@ export function errorText(error: unknown) {
   return 'Permintaan gagal. Coba lagi.';
 }
 
-function Label({ children, title }: { children: ReactNode; title: string }) {
+export function Label({ children, title }: { children: ReactNode; title: string }) {
   return <label className="block space-y-1 text-sm font-medium"><span>{title}</span>{children}</label>;
 }
 
@@ -40,7 +40,7 @@ export function Options({ values }: { values: Record<string, string> }) {
   return <>{Object.entries(values).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</>;
 }
 
-function People({ members, current, required }: { members: TeamMember[]; current?: string | null; required?: boolean }) {
+export function People({ members, current, required }: { members: TeamMember[]; current?: string | null; required?: boolean }) {
   return <select className={field} name="person" required={required} defaultValue={current ?? ''}>
     <option value="">Belum ditugaskan</option>
     {current && !members.some(member => member.id === current) && <option value={current}>PIC saat ini</option>}
@@ -49,7 +49,7 @@ function People({ members, current, required }: { members: TeamMember[]; current
   </select>;
 }
 
-function Editor({ title, children, onCancel, onSave, onSaved }: {
+export function Editor({ title, children, onCancel, onSave, onSaved }: {
   title: string; children: ReactNode; onCancel: () => void;
   onSave: (data: FormData) => Promise<string>; onSaved: (id: string) => void;
 }) {
@@ -69,7 +69,7 @@ function Editor({ title, children, onCancel, onSave, onSaved }: {
       setBusy(false);
     }
   }
-  return <form onSubmit={submit} className="space-y-4 rounded-xl border border-teal-200 bg-white p-4">
+  return <form onSubmit={submit} aria-busy={busy} className="space-y-4 rounded-xl border border-teal-200 bg-white p-4">
     <h2 className="text-lg font-bold">{title}</h2>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">{children}</fieldset>

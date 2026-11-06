@@ -7,7 +7,7 @@ export const platforms = {
 };
 export const taskStatuses = {
   todo: 'Belum mulai', doing: 'Dikerjakan', review: 'Review', ready: 'Siap tayang',
-  done: 'Selesai / tayang', blocked: 'Terhambat', cancelled: 'Dibatalkan',
+  done: 'Selesai', blocked: 'Terhambat', cancelled: 'Dibatalkan',
 };
 export const campaignStatuses = { planned: 'Direncanakan', active: 'Aktif', completed: 'Selesai', archived: 'Diarsipkan' };
 export const priorities = { normal: 'Normal', high: 'Tinggi', urgent: 'Mendesak' };
@@ -20,6 +20,8 @@ export type Campaign = Row & {
   starts_on: string | null; ends_on: string | null; budget_idr: number; spent_idr: number;
 };
 export type Task = Row & {
+  review_note?: string;
+  source_activation_id?: string | null;
   business_unit_id?: string | null;
   workstream?: keyof typeof workstreams;
   campaign_id: string | null; title: string; brief: string; assignee_id: string | null;
@@ -28,7 +30,7 @@ export type Task = Row & {
   output_url: string; blocker: string;
 };
 export type TeamMember = { id: string; full_name: string; is_active: boolean; job_title: string | null };
-type ListedTask = Task & {
+export type ListedTask = Task & {
   campaign: { name: string } | null;
   source_idea: { title: string; reference_urls: string[] } | null;
 };
@@ -42,7 +44,7 @@ export type Draft<T> = Omit<T, keyof Row>;
 export const PAGE_SIZE = 30;
 
 const campaignColumns = 'id,business_unit_id,name,objective,owner_id,status,starts_on,ends_on,budget_idr,spent_idr,updated_at';
-const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,assignee_id,platform,format,status,priority,due_on,publish_on,output_url,blocker,updated_at';
+const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,assignee_id,platform,format,status,priority,due_on,publish_on,output_url,blocker,review_note,source_activation_id,updated_at';
 
 export async function campaigns(page: number, signal: AbortSignal, unit = 'all') {
   const start = page * PAGE_SIZE;
@@ -84,8 +86,8 @@ export async function tasks(campaignId: string | null | 'all', filters: Filters,
   } else if (focus === 'today' || focus === 'overdue') {
     query = (focus === 'today' ? query.eq('due_on', today) : query.lt('due_on', today))
       .not('status', 'in', '(done,cancelled)');
-  } else if (focus === 'review') {
-    query = query.eq('status', 'review');
+  } else if (focus === 'review' || focus === 'blocked' || focus === 'ready') {
+    query = query.eq('status', focus);
   } else if (focus === 'unplanned') {
     query = query.or('assignee_id.is.null,due_on.is.null').not('status', 'in', '(done,cancelled)');
   }
@@ -96,7 +98,7 @@ export async function tasks(campaignId: string | null | 'all', filters: Filters,
 }
 
 export async function summary(campaignId: string | null, today: string, signal: AbortSignal, unit = 'all') {
-  const { data, error } = await supabase.rpc('creative_unit_execution', {
+  const { data, error } = await supabase.rpc('creative_command_summary', {
     p_campaign_id: campaignId === 'all' ? null : campaignId, p_all: campaignId === 'all', p_today: today,
     p_unit_id: unit === 'all' || unit === 'unassigned' ? null : unit, p_unassigned: unit === 'unassigned',
   })
@@ -104,7 +106,7 @@ export async function summary(campaignId: string | null, today: string, signal: 
   if (error) throw error;
   return data as {
     total: number; done: number; blocked: number; overdue: number;
-    target: number; closed: number; on_time: number; review: number; unplanned: number;
+    target: number; closed: number; on_time: number; review: number; unplanned: number; published_week: number;
   };
 }
 
@@ -154,3 +156,31 @@ export async function saveTask(values: Draft<Task>, previous?: Task, sourceIdeaI
   }
 }
 export const saveIdea = (values: Draft<Idea>, previous?: Idea) => save('creative_ideas', values, previous);
+
+export function advanceTask(task: Task, status: Exclude<Task['status'], 'blocked'>) {
+  return save('creative_tasks', { status, blocker: '' }, task);
+}
+
+export function requestRevision(task: Task, note: string) {
+  if (task.status !== 'review' || !note.trim()) throw new Error('Masukkan catatan revisi untuk tugas yang sedang direview.');
+  return save('creative_tasks', { status: 'doing', review_note: note.trim(), blocker: '' }, task);
+}
+
+export async function getTask(id: string, signal: AbortSignal) {
+  const { data, error } = await supabase.from('creative_tasks')
+    .select(taskColumns + ',campaign:creative_campaigns(name),source_idea:creative_ideas(title,reference_urls)')
+    .eq('id', id).abortSignal(signal).single();
+  if (error) throw error;
+  return data as unknown as ListedTask;
+}
+
+export const BOARD_PAGE_SIZE = 6;
+export async function boardTasks(scope: string, unit: string, filters: Filters, focus: Focus, today: string, page: number, signal: AbortSignal) {
+  const { data, error } = await supabase.rpc('creative_board', {
+    p_unit: unit === 'all' || unit === 'unassigned' ? null : unit, p_unassigned: unit === 'unassigned',
+    p_campaign: scope === 'all' || scope === 'standalone' ? null : scope, p_standalone: scope === 'standalone',
+    p_filters: filters, p_focus: focus, p_today: today, p_page: page,
+  }).abortSignal(signal);
+  if (error) throw error;
+  return (data ?? []) as { stage: Task['status']; total: number; items: ListedTask[] }[];
+}

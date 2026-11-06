@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ideas, safeOutputUrl, saveTask, tasks, type Draft, type Task } from './repository';
+import { advanceTask, ideas, safeOutputUrl, saveTask, tasks, type Draft, type Task } from './repository';
 
 const { from, chain } = vi.hoisted(() => {
   const chain = {
@@ -26,6 +26,15 @@ describe('creative repository', () => {
     chain.maybeSingle.mockResolvedValue({ data: null, error: null });
     const previous: Task = { ...draft, id: 'task-id', updated_at: '2026-11-05T08:00:00.000001+00:00' };
     await expect(saveTask({ ...draft, status: 'ready' }, previous)).rejects.toThrow(/diubah pengguna lain/);
+    expect(chain.eq).toHaveBeenCalledWith('id', previous.id);
+    expect(chain.eq).toHaveBeenCalledWith('updated_at', previous.updated_at);
+  });
+
+  it('uses the task revision for quick progress without resending its other fields', async () => {
+    chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    const previous: Task = { ...draft, id: 'task-id', updated_at: '2026-11-05T08:00:00.000001+00:00' };
+    await expect(advanceTask(previous, 'ready')).rejects.toThrow(/diubah pengguna lain/);
+    expect(chain.update).toHaveBeenCalledWith({ status: 'ready', blocker: '' });
     expect(chain.eq).toHaveBeenCalledWith('id', previous.id);
     expect(chain.eq).toHaveBeenCalledWith('updated_at', previous.updated_at);
   });

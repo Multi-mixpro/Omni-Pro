@@ -1,8 +1,8 @@
-export type Focus = 'all' | 'week' | 'today' | 'overdue' | 'review' | 'unplanned' | 'publish';
+export type Focus = 'all' | 'week' | 'today' | 'overdue' | 'review' | 'ready' | 'blocked' | 'unplanned' | 'publish';
 
 export const focusLabels: Record<Focus, string> = {
   all: 'Semua tugas', week: 'Target minggu ini', today: 'Deadline hari ini',
-  overdue: 'Terlambat', review: 'Menunggu review', unplanned: 'Tanpa PIC / deadline', publish: 'Tayang minggu ini',
+  overdue: 'Terlambat', review: 'Menunggu review', ready: 'Siap tayang', blocked: 'Terhambat', unplanned: 'Tanpa PIC / deadline', publish: 'Tayang minggu ini',
 };
 
 export function jakartaToday(now = new Date()) {
