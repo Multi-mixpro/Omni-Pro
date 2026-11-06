@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { advanceTask, ideas, safeOutputUrl, saveTask, setTaskChecklistItem, tasks, type Draft, type Task } from './repository';
+import { advanceTask, ideas, pendingTaskDecisions, safeOutputUrl, saveTask, setTaskChecklistItem, tasks, type Draft, type Task } from './repository';
 
 const { from, chain } = vi.hoisted(() => {
   const chain = {
@@ -22,6 +22,14 @@ const draft: Draft<Task> = {
 beforeEach(() => vi.clearAllMocks());
 
 describe('creative repository', () => {
+  it('scopes assigned decisions to the selected unit and standalone tasks', async () => {
+    const user = '10000000-0000-4000-8000-000000000001';
+    chain.abortSignal.mockResolvedValue({ data: [], error: null });
+    await pendingTaskDecisions(user, 0, new AbortController().signal, 'unit-id', 'standalone');
+    expect(chain.eq).toHaveBeenCalledWith('business_unit_id', 'unit-id');
+    expect(chain.is).toHaveBeenCalledWith('campaign_id', null);
+    expect(chain.or).toHaveBeenCalledWith(`and(status.eq.review,reviewer_id.eq.${user}),and(status.eq.ready,approver_id.eq.${user},approved_at.is.null)`);
+  });
   it('updates one checklist step without overwriting a newer task revision', async () => {
     chain.maybeSingle.mockResolvedValue({ data: null, error: null });
     const task: Task = { ...draft, id: 'task-id', updated_at: '2026-11-05T08:00:00Z', checklist: [

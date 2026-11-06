@@ -129,7 +129,6 @@ function ProtectedCreativeWorkspace() {
   }
   return <Suspense fallback={<BootScreen />}>
     <CreativeWorkspace key={auth.data.profile.id} userId={auth.data.profile.id}
-      isAdmin={access.admin} jobTitle={auth.data.profile.job_title}
       canEdit={access.creativeEdit} canSwitchWorkspace={access.both} />
   </Suspense>;
 }

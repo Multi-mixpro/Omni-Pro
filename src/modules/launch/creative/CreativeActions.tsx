@@ -170,34 +170,21 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
   </section>;
 }
 
-export function CreativeInbox({ userId, counts, evaluations, onFocus, onAds, onTask }: {
+export function CreativeInbox({ userId, counts, evaluations, onFocus, onAds, onTask, onDecisions }: {
   userId: string; counts?: { review: number; overdue: number; blocked: number }; evaluations?: number;
-  onFocus: (focus: Focus) => void; onAds: () => void; onTask: (id: string) => void;
+  onFocus: (focus: Focus) => void; onAds: () => void; onTask: (id: string) => void; onDecisions: () => void;
 }) {
   const [page, setPage] = useState(0);
-  const [decisionPage, setDecisionPage] = useState(0);
   const query = useQuery({ queryKey: ['creative',userId,'task-events','inbox',page], queryFn: ({ signal }) => taskEvents('inbox',userId,signal,page) });
-  const decisions = useQuery({ queryKey: ['creative',userId,'tasks','waiting-for-me',decisionPage],
-    queryFn: ({ signal }) => pendingTaskDecisions(userId,decisionPage,signal) });
   return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4" aria-label="Kotak tindakan">
     <div><h2 className="text-lg font-bold">Kotak tindakan</h2><p className="text-sm text-slate-600">Antrean dari lingkup terpilih dan permintaan yang dikirim ke Anda.</p></div>
     <div className="flex flex-wrap gap-2">
+      <button type="button" className={button} onClick={onDecisions}>Review &amp; persetujuan saya</button>
       <button className={button} onClick={() => onFocus('ready')}>Buka antrean siap tayang</button>
       {counts && <><button className={button} onClick={() => onFocus('review')}>{counts.review} menunggu review</button>
         <button className={button} onClick={() => onFocus('overdue')}>{counts.overdue} terlambat</button>
         <button className={button} onClick={() => onFocus('blocked')}>{counts.blocked} terhambat</button></>}
       {evaluations !== undefined && <button className={button} onClick={onAds}>{evaluations} evaluasi terlambat</button>}
-    </div>
-    <div className="space-y-2 border-t border-slate-200 pt-3">
-      <h3 className="font-semibold">Menunggu saya · semua unit</h3>
-      {decisions.isPending && <p role="status" className="text-sm">Memuat antrean keputusan…</p>}
-      {decisions.isError && <p role="alert" className="text-sm text-red-700">{errorText(decisions.error)}</p>}
-      {decisions.isSuccess && !decisions.data.length && <p className="text-sm text-slate-600">Tidak ada review atau persetujuan yang menunggu Anda di halaman ini.</p>}
-      <ul className="divide-y divide-slate-200">{decisions.data?.slice(0,PAGE_SIZE).map(item => <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-        <div><h4 className="font-semibold">{item.title}</h4><p className="text-sm text-slate-600">{item.status === 'review' ? 'Review' : 'Persetujuan akhir'}{item.due_on ? ` · Deadline ${item.due_on}` : ''}</p></div>
-        <button type="button" className={button} onClick={() => onTask(item.id)}>Buka tugas</button>
-      </li>)}</ul>
-      <CreativePager page={decisionPage} next={(decisions.data?.length ?? 0)>PAGE_SIZE} onPage={setDecisionPage} />
     </div>
     <h3 className="font-semibold">Permintaan tindak lanjut untuk saya · semua unit</h3>
     {query.isPending && <p role="status" className="text-sm">Memuat kotak tindakan…</p>}
@@ -208,5 +195,25 @@ export function CreativeInbox({ userId, counts, evaluations, onFocus, onAds, onT
       <button className={button} onClick={() => onTask(event.task_id)}>Buka tugas</button>
     </li>)}</ul>
     <CreativePager page={page} next={(query.data?.length ?? 0)>PAGE_SIZE} onPage={setPage} />
+  </section>;
+}
+
+export function CreativeDecisionQueue({ userId, unit, scope, onTask }: {
+  userId: string; unit: string; scope: string; onTask: (id: string) => void;
+}) {
+  const [page, setPage] = useState(0);
+  const decisions = useQuery({ queryKey: ['creative', userId, 'tasks', 'waiting-for-me', unit, scope, page],
+    queryFn: ({ signal }) => pendingTaskDecisions(userId, page, signal, unit, scope) });
+
+  return <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4" aria-label="Menunggu keputusan saya">
+    <div><h2 className="text-lg font-bold">Menunggu saya</h2><p className="text-sm text-slate-600">Tugas yang ditugaskan kepada Anda dalam unit dan kampanye terpilih.</p></div>
+    {decisions.isPending && <p role="status" className="text-sm">Memuat antrean keputusan…</p>}
+    {decisions.isError && <p role="alert" className="text-sm text-red-700">{errorText(decisions.error)}</p>}
+    {decisions.isSuccess && !decisions.data.length && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Tidak ada review atau persetujuan yang menunggu Anda di halaman ini.</p>}
+    <ul className="divide-y divide-slate-200">{decisions.data?.slice(0, PAGE_SIZE).map(item => <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+      <div><h3 className="font-semibold">{item.title}</h3><p className="text-sm text-slate-600">{item.status === 'review' ? 'Review' : 'Persetujuan akhir'}{item.due_on ? ` · Deadline ${item.due_on}` : ''}</p></div>
+      <button type="button" className={button} onClick={() => onTask(item.id)}>Buka keputusan</button>
+    </li>)}</ul>
+    <CreativePager page={page} next={(decisions.data?.length ?? 0) > PAGE_SIZE} onPage={setPage} />
   </section>;
 }

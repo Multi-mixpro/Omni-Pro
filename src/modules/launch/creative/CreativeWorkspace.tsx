@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, Bell, CalendarDays, Command, ExternalLink, FolderKanban, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, Settings2, TrendingUp, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Bell, CalendarDays, ClipboardCheck, Command, ExternalLink, FileText, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, TrendingUp, Users } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut } from '@/core/auth/useAuth';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
@@ -26,6 +26,8 @@ const CreativePlanner = lazy(() => import('./CreativePlanner').then(module => ({
 const CreativeAccounts = lazy(() => import('./CreativeAccounts').then(module => ({ default: module.CreativeAccounts })));
 const CreativeInbox = lazy(() => import('./CreativeActions').then(module => ({ default: module.CreativeInbox })));
 const CreativeTaskDetail = lazy(() => import('./CreativeActions').then(module => ({ default: module.CreativeTaskDetail })));
+const CreativeDecisionQueue = lazy(() => import('./CreativeActions').then(module => ({ default: module.CreativeDecisionQueue })));
+const CreativeStudio = lazy(() => import('./CreativeStudio').then(module => ({ default: module.CreativeStudio })));
 const sectionLoading = <p role="status" className="p-4 text-sm text-slate-600">Memuat bagian ini…</p>;
 
 const panel = 'rounded-2xl border border-teal-100 bg-white p-4 shadow-sm';
@@ -34,11 +36,13 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZ
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const date = (value: string | null) => value ? dateFormat.format(new Date(value + 'T00:00:00Z')) : '—';
 type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea };
-type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox';
+type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio';
 const navigation = [
   { label: 'Ruang kerja', items: [
     { id: 'overview', label: 'Pusat Kerja', icon: LayoutDashboard },
     { id: 'work', label: 'Produksi & Publikasi', icon: ListTodo },
+    { id: 'studio', label: 'Studio Brief & Copy', icon: FileText },
+    { id: 'decisions', label: 'Review & Persetujuan', icon: ClipboardCheck },
     { id: 'campaigns', label: 'Campaign Hub', icon: Megaphone },
     { id: 'calendar', label: 'Kalender', icon: CalendarDays },
     { id: 'ideas', label: 'Bank Ide & Aset', icon: Lightbulb },
@@ -50,6 +54,19 @@ const navigation = [
     { id: 'team', label: 'Tim & PIC', icon: Users },
   ] },
 ] as const;
+const sectionDescriptions: Record<Section, string> = {
+  overview: 'Lihat target, jadwal, dan pekerjaan yang perlu ditindak.',
+  work: 'Kelola tugas dari brief dan produksi sampai bukti tayang.',
+  studio: 'Siapkan brief dan kelola versi naskah dari tugas produksi konten.',
+  decisions: 'Buka tugas yang menunggu review atau persetujuan Anda.',
+  campaigns: 'Rencanakan kampanye dan pantau pekerjaan yang terkait.',
+  calendar: 'Buka tugas dari jadwal deadline, publikasi, dan evaluasi.',
+  ideas: 'Simpan ide dan referensi, lalu ubah ide terpilih menjadi tugas.',
+  accounts: 'Kelola kanal dan catat data performa akun.',
+  ads: 'Pantau aktivitas kanal dan tindak lanjuti hasil evaluasi.',
+  inbox: 'Lihat hambatan, keterlambatan, dan permintaan tindak lanjut.',
+  team: 'Lihat beban kerja tim dan buka daftar tugas per PIC.',
+};
 const nextAction = {
   todo: { status: 'doing', label: 'Mulai' },
   doing: { status: 'review', label: 'Ajukan review' },
@@ -78,8 +95,8 @@ function EditorDialog({ children, onClose }: { children: ReactNode; onClose: () 
   </dialog>;
 }
 
-export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, canSwitchWorkspace }: {
-  userId: string; canEdit: boolean; isAdmin: boolean; jobTitle?: string | null; canSwitchWorkspace: boolean;
+export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace }: {
+  userId: string; canEdit: boolean; canSwitchWorkspace: boolean;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -253,7 +270,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
       <aside className="creative-sidebar self-start space-y-4 rounded-3xl p-3 lg:sticky lg:top-4">
         <div className="flex items-center justify-between gap-2 px-2 py-2">
           <div className="flex min-w-0 items-center gap-3"><span className="creative-mark grid h-10 w-10 shrink-0 place-items-center rounded-[13px] text-white"><Command size={19} /></span>
-            <div><strong className="block text-white">GG Workspace</strong><span className="creative-sidebar-caption block text-xs">Creative Hub</span></div></div>
+            <div><strong className="block text-slate-900">GG Workspace</strong><span className="creative-sidebar-caption block text-xs">Creative Hub</span></div></div>
           <button type="button" className={button + ' creative-menu-toggle inline-flex items-center gap-1.5 lg:hidden'} aria-expanded={menuOpen} aria-controls="creative-navigation"
             onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> {menuOpen ? 'Tutup menu' : 'Menu'}</button>
         </div>
@@ -266,8 +283,6 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
           </div>)}
           <div className="creative-nav-links space-y-1 pt-3">
             <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">Workspace</p>
-            {canSwitchWorkspace && <Link to="/launch/app/today" className="creative-nav-item flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-semibold"><FolderKanban size={16} /> Proyek artikel</Link>}
-            {isAdmin && <Link to="/launch/app/settings" className="creative-nav-item flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-semibold"><Settings2 size={16} /> Pengaturan</Link>}
             <Link to="/blueprint" className="creative-nav-item flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-semibold"><ExternalLink size={16} /> Pratinjau blueprint</Link>
           </div>
         </nav>
@@ -277,14 +292,14 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
         <div>
           <p className="creative-eyebrow mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"><span /> Creative Hub</p>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{activeSection}</h1>
-          <p className="mt-1 text-sm text-slate-600">{jobTitle || (isAdmin ? 'Admin / Owner' : 'Anggota tim')} · {canEdit ? 'Kelola tugas dan kampanye' : 'Pantau pekerjaan'}</p>
+          <p className="mt-1 text-sm text-slate-600">{sectionDescriptions[section]}</p>
         </div>
         <div className="creative-toolbar-actions flex flex-wrap gap-2">
           {canSwitchWorkspace && <Link to="/launch/app" className={button + ' inline-flex items-center gap-2'}><ArrowLeft size={16} /> Pilih ruang kerja</Link>}
           <button className={button} onClick={async () => { await signOut(); navigate('/launch/login'); }}>Keluar</button>
           <button className={button + ' inline-flex items-center gap-2'} disabled={loading} onClick={refresh}><RefreshCw size={15} /> Segarkan</button>
           {canEdit && section === 'campaigns' && <button className={primary + ' inline-flex items-center gap-2'} onClick={() => openEditor({ kind: 'campaign' })}><Plus size={16} /> Kampanye baru</button>}
-          {canEdit && (section === 'overview' || section === 'work') && <button className={primary + ' inline-flex items-center gap-2'} disabled={currentCampaign?.status === 'archived'} onClick={() => openEditor({ kind: 'task' })}><Plus size={16} /> Tugas baru</button>}
+          {canEdit && (section === 'overview' || section === 'work' || section === 'studio') && <button className={primary + ' inline-flex items-center gap-2'} disabled={currentCampaign?.status === 'archived'} onClick={() => openEditor({ kind: 'task' })}><Plus size={16} /> Tugas baru</button>}
         </div>
       </header>
 
@@ -309,12 +324,18 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
           </label>
           {campaignQuery.hasNextPage && <button className={button} disabled={campaignQuery.isFetchingNextPage} onClick={() => void campaignQuery.fetchNextPage()}>Muat kampanye lain</button>}
         </>}
-        {isAdmin && <Link to="/launch/app/settings" className={button}>Kelola unit bisnis</Link>}
         {units.isError && <p role="alert" className="w-full text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
         </div>
       </div>
 
       {!canEdit && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
+      {section === 'decisions' && <Suspense fallback={sectionLoading}>
+        <CreativeDecisionQueue key={`${unit}:${scope}`} userId={userId} unit={unit} scope={scope} onTask={setDetailId} />
+      </Suspense>}
+      {section === 'studio' && <Suspense fallback={sectionLoading}>
+        <CreativeStudio key={`${unit}:${scope}`} userId={userId} unit={unit} campaign={campaignId} canEdit={canEdit}
+          onOpen={setDetailId} onEdit={row => openEditor({ kind: 'task', row })} />
+      </Suspense>}
       {section === 'ideas' ? <IdeaBank key={unit} unit={unit} userId={userId} canEdit={canEdit} onConvert={sourceIdea => {
         if (currentCampaign?.status === 'archived') changeScope('all');
         openEditor({ kind: 'task', sourceIdea });
@@ -375,6 +396,8 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
       <div className={panel + ' flex flex-wrap gap-2'} aria-label="Pintasan eksekusi">
         <button className={primary} onClick={() => { chooseFocus('all',true); changeFilter({ assignee:userId }); openSection('work'); }}>Tugas saya</button>
         <button className={button} onClick={() => openFocus('today')}>Deadline hari ini</button>
+        <button type="button" className={button} onClick={() => openSection('decisions')}>Review saya</button>
+        <button type="button" className={button} onClick={() => openSection('studio')}>Brief &amp; copy</button>
         <button className={button} onClick={() => openFocus('ready')}>Siap tayang</button>
         <button className={button + ' xl:hidden'} onClick={() => openCalendar(today)}>Agenda hari ini</button>
         <button className={button} onClick={() => openSection('inbox')}>Kotak tindakan</button>
@@ -409,7 +432,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
       {section === 'accounts' && <Suspense fallback={sectionLoading}><CreativeAccounts key={unit} userId={userId} unit={unit} today={today} members={members} canEdit={canEdit} /></Suspense>}
       {section === 'inbox' && <Suspense fallback={sectionLoading}><CreativeInbox userId={userId} counts={counts}
         evaluations={scope === 'standalone' || !channels.data ? undefined : overdueEvaluations}
-        onFocus={openFocus} onAds={() => openSection('ads','overdue')} onTask={setDetailId} /></Suspense>}
+        onFocus={openFocus} onAds={() => openSection('ads','overdue')} onTask={setDetailId} onDecisions={() => openSection('decisions')} /></Suspense>}
       {detailId && <EditorDialog onClose={() => setDetailId(null)}><Suspense fallback={sectionLoading}><CreativeTaskDetail key={detailId} taskId={detailId} userId={userId} canEdit={canEdit}
         onClose={() => setDetailId(null)} onChanged={taskChanged} /></Suspense></EditorDialog>}
       {section === 'team' && <CreativeTeamPerformance members={members} stats={performance.data} userId={userId}

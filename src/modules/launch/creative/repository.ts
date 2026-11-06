@@ -87,12 +87,14 @@ export type Filters = {
   workstream?: string;
 };
 
-export async function pendingTaskDecisions(userId: string, page: number, signal: AbortSignal) {
+export async function pendingTaskDecisions(userId: string, page: number, signal: AbortSignal, unit = 'all', scope = 'all') {
   if (!/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(userId)) return [];
   const start = page * PAGE_SIZE;
-  const { data, error } = await supabase.from('creative_tasks').select('id,title,status,due_on')
-    .or(`and(status.eq.review,reviewer_id.eq.${userId}),and(status.eq.ready,approver_id.eq.${userId},approved_at.is.null)`)
-    .order('due_on', { nullsFirst: false }).order('id')
+  let query = supabase.from('creative_tasks').select('id,title,status,due_on')
+    .or(`and(status.eq.review,reviewer_id.eq.${userId}),and(status.eq.ready,approver_id.eq.${userId},approved_at.is.null)`);
+  if (unit !== 'all') query = unit === 'unassigned' ? query.is('business_unit_id', null) : query.eq('business_unit_id', unit);
+  if (scope !== 'all') query = scope === 'standalone' ? query.is('campaign_id', null) : query.eq('campaign_id', scope);
+  const { data, error } = await query.order('due_on', { nullsFirst: false }).order('id')
     .range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
   return (data ?? []) as Pick<Task, 'id' | 'title' | 'status' | 'due_on'>[];
