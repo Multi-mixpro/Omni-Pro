@@ -28,7 +28,6 @@
 }
 .creative-nav-item:hover { background: #e2e8ef; color: #172333; }
 .creative-nav-item[aria-current='page'] { background: #dcecff; border-color: #c1dcfa; color: #004f9e; }
-.creative-nav-links { border-top: 1px solid #d9e0e9; }
 .creative-color-icon {
   display: inline-grid;
   place-items: center;

@@ -9,7 +9,6 @@ import { Navigate, RouterProvider, useLocation } from './simpleRouter';
 import { WorkspacePicker } from './WorkspacePicker';
 
 const CreativeWorkspace = lazy(() => import('@/modules/launch/creative/CreativeWorkspace'));
-const BlueprintWorkspace = lazy(() => import('@/modules/blueprint/BlueprintWorkspace'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,10 +78,6 @@ function ProtectedSettingsPage() {
 
 function RouteView() {
   const { pathname } = useLocation();
-
-  if (pathname === '/blueprint' || pathname === '/blueprint/') {
-    return <Suspense fallback={<BootScreen />}><BlueprintWorkspace /></Suspense>;
-  }
 
   if (pathname === '/' || pathname === '') {
     return <Navigate to="/launch/login" replace />;

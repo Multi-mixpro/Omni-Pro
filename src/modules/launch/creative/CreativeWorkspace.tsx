@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, ExternalLink, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, TrendingUp, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, TrendingUp, Users, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut } from '@/core/auth/useAuth';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
@@ -293,10 +293,6 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
               className="creative-nav-item flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold"
               onClick={() => openSection(id)}><span className="creative-color-icon" data-color={sectionColors[id]}><Icon size={15} /></span>{label}</button>)}
           </div>)}
-          <div className="creative-nav-links space-y-1 pt-3">
-            <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">Workspace</p>
-            <Link to="/blueprint" className="creative-nav-item flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-semibold"><ExternalLink size={16} /> Pratinjau blueprint</Link>
-          </div>
         </nav>
       </aside>
       <div className="min-w-0 space-y-4">
