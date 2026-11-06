@@ -69,11 +69,11 @@ export function Editor({ title, children, onCancel, onSave, onSaved }: {
       setBusy(false);
     }
   }
-  return <form onSubmit={submit} aria-busy={busy} className="space-y-4 rounded-xl border border-teal-200 bg-white p-4">
+  return <form onSubmit={submit} aria-busy={busy} className="creative-editor space-y-4 rounded-xl border border-teal-200 bg-white p-4">
     <h2 className="text-lg font-bold">{title}</h2>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">{children}</fieldset>
-    <div className="flex flex-wrap gap-2">
+    <div className="creative-editor-actions flex flex-wrap gap-2">
       <button type="submit" className={primary} disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</button>
       <button type="button" className={button} disabled={busy} onClick={onCancel}>Batal</button>
     </div>

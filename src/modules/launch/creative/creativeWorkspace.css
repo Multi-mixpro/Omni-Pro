@@ -41,6 +41,11 @@
 .creative-eyebrow span { height: 7px; width: 7px; border-radius: 50%; background: #8768f4; }
 .creative-shell [class~='border-teal-100'], .creative-shell [class~='border-teal-200'] { border-color: var(--creative-line); }
 .creative-shell .creative-filter { background: #ffffffc7; backdrop-filter: blur(14px); }
+.creative-filter-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 10px; }
+.creative-filter-heading strong { color: #25203c; font-size: .8125rem; }
+.creative-filter-heading span { color: #625c73; font-size: .75rem; }
+.creative-filter-fields label { color: #47405b; font-size: .75rem; }
+.creative-filter-fields select { min-height: 38px; color: #211c37; }
 .creative-shell :is(input:not([type='checkbox']), textarea, select)[class~='border-slate-300'] { border-color: #dcd7e9; }
 .creative-shell :is(button, a)[class~='border-slate-300'] { border-color: #ded9eb; transition: background-color .16s, border-color .16s; }
 .creative-shell :is(button, a)[class~='border-slate-300']:hover:not(:disabled) { background: #f3effd; border-color: #c8baea; }
@@ -57,7 +62,33 @@
 .creative-weekly-hero [class~='bg-teal-300'] { background-color: #cfbdff; }
 .creative-shell dialog { border: 1px solid var(--creative-line); box-shadow: 0 24px 75px #20164155; }
 .creative-shell dialog::backdrop { background: #17112a8c; backdrop-filter: blur(4px); }
+.creative-shell dialog > .creative-editor { border: 0; border-radius: inherit; }
+.creative-shell dialog > .creative-editor > .creative-editor-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-inline: -1rem;
+  margin-bottom: -1rem;
+  padding: .75rem 1rem max(.75rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--creative-line);
+  background: #fffffff5;
+  backdrop-filter: blur(14px);
+}
+.creative-shell dialog > .creative-editor { scroll-margin-bottom: 4.5rem; }
+.creative-shell dialog > .creative-editor :is(input, select, textarea, summary) { scroll-margin-bottom: 4.5rem; }
+.creative-shell .creative-sidebar .creative-menu-toggle { color: #eee9ff; background: #ffffff14; border-color: #ffffff3b; min-height: 40px; }
+.creative-shell .creative-sidebar .creative-menu-toggle:hover { color: white; background: #ffffff24; border-color: #ffffff55; }
 
 @media (min-width: 1024px) {
   .creative-sidebar { max-height: calc(100dvh - 2rem); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #7667a6 transparent; }
+}
+
+@media (max-width: 639px) {
+  .creative-shell .creative-toolbar { gap: .75rem; border-radius: 1.25rem; padding: 1rem; }
+  .creative-toolbar-actions { width: 100%; border-top: 1px solid var(--creative-line); padding-top: .75rem; }
+  .creative-toolbar-actions > :is(a, button), .creative-filter-fields > :is(a, button) { min-height: 40px; }
+  .creative-toolbar-actions > [class~='bg-teal-800'] { margin-left: auto; }
+  .creative-filter-fields { gap: .625rem; }
+  .creative-filter-fields > label { flex-basis: 100%; }
+  .creative-shell dialog > .creative-editor > .creative-editor-actions > button { flex: 1; min-height: 42px; }
 }

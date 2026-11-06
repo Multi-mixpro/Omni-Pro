@@ -254,8 +254,8 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
         <div className="flex items-center justify-between gap-2 px-2 py-2">
           <div className="flex min-w-0 items-center gap-3"><span className="creative-mark grid h-10 w-10 shrink-0 place-items-center rounded-[13px] text-white"><Command size={19} /></span>
             <div><strong className="block text-white">GG Workspace</strong><span className="creative-sidebar-caption block text-xs">Creative Hub</span></div></div>
-          <button className={button + ' inline-flex items-center gap-1 lg:hidden'} aria-expanded={menuOpen} aria-controls="creative-navigation"
-            onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> Menu</button>
+          <button type="button" className={button + ' creative-menu-toggle inline-flex items-center gap-1.5 lg:hidden'} aria-expanded={menuOpen} aria-controls="creative-navigation"
+            onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> {menuOpen ? 'Tutup menu' : 'Menu'}</button>
         </div>
         <nav id="creative-navigation" aria-label="Bagian Creative Dashboard" className={(menuOpen ? 'block' : 'hidden') + ' space-y-3 lg:block'}>
           {navigation.map(group => <div key={group.label} className="space-y-1">
@@ -279,7 +279,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{activeSection}</h1>
           <p className="mt-1 text-sm text-slate-600">{jobTitle || (isAdmin ? 'Admin / Owner' : 'Anggota tim')} · {canEdit ? 'Kelola tugas dan kampanye' : 'Pantau pekerjaan'}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="creative-toolbar-actions flex flex-wrap gap-2">
           {canSwitchWorkspace && <Link to="/launch/app" className={button + ' inline-flex items-center gap-2'}><ArrowLeft size={16} /> Pilih ruang kerja</Link>}
           <button className={button} onClick={async () => { await signOut(); navigate('/launch/login'); }}>Keluar</button>
           <button className={button + ' inline-flex items-center gap-2'} disabled={loading} onClick={refresh}><RefreshCw size={15} /> Segarkan</button>
@@ -288,7 +288,9 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
         </div>
       </header>
 
-      <div className={panel + ' creative-filter flex flex-wrap items-end gap-3'} aria-label="Filter ruang kerja">
+      <div className={panel + ' creative-filter'} aria-label="Filter ruang kerja">
+        <div className="creative-filter-heading"><strong>Lingkup ruang kerja</strong><span>Pilih unit bisnis dan kampanye yang ingin dilihat.</span></div>
+        <div className="creative-filter-fields flex flex-wrap items-end gap-3">
         <label className="min-w-0 flex-[1_1_12rem] space-y-1 text-sm font-semibold">Unit bisnis
           <select className={field} value={unit} onChange={event => { setUnit(event.target.value); changeScope('all'); }}>
             <option value="all">Semua unit bisnis</option>
@@ -309,6 +311,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
         </>}
         {isAdmin && <Link to="/launch/app/settings" className={button}>Kelola unit bisnis</Link>}
         {units.isError && <p role="alert" className="w-full text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
+        </div>
       </div>
 
       {!canEdit && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
