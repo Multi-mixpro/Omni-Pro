@@ -30,6 +30,7 @@ import {
 } from '../data/teamRepository';
 import { saveWorkspaceUnit, setWorkspaceUnitActive, unitKey, unitSectors, useWorkspaceUnits, type WorkspaceUnit } from '../data/businessWorkspace';
 import { useProjects } from '../hooks/useLaunch';
+import { BusinessAccessSettings } from './BusinessAccessSettings';
 
 const emptyUser = (): NewTeamUserInput => ({ username: '', pin: '', full_name: '', job_title: '', role_code: '' });
 const emptyEditUser = (): UpdateTeamUserInput => ({
@@ -650,6 +651,9 @@ export function SettingsPage() {
           </div>
         )}
       </div>
+
+      {isAdmin && auth.data?.profile && <BusinessAccessSettings key={auth.data.profile.id}
+        userId={auth.data.profile.id} profiles={allProfiles.data ?? []} />}
 
       {/* Langkah 4 — Kelola Unit Bisnis / Brand Studio */}
       <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl p-4 space-y-3 shadow-2xs">

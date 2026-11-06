@@ -14,18 +14,37 @@ export const priorities = { normal: 'Normal', high: 'Tinggi', urgent: 'Mendesak'
 export const ideaQueues = { candidate: 'Perlu ditinjau', ready: 'Siap dikerjakan', parked: 'Ditunda' };
 export const workstreams = { creative: 'Produksi Konten', marketing: 'Marketing & Promo', operations: 'Operasional' };
 type Row = { id: string; updated_at: string };
+export type ChecklistItem = { label: string; done: boolean };
+export const briefFields = {
+  objective: 'Tujuan', audience: 'Audiens', insight: 'Insight pelanggan', message: 'Pesan utama',
+  offer: 'Penawaran', cta: 'Ajakan bertindak', mandatory: 'Elemen wajib', restrictions: 'Batasan atau klaim yang dihindari',
+  voice: 'Panduan gaya bahasa dan visual', references: 'Referensi',
+};
+type CreativeBrief = Partial<Record<keyof typeof briefFields, string>>;
 export type Campaign = Row & {
   business_unit_id?: string | null;
   name: string; objective: string; owner_id: string | null; status: keyof typeof campaignStatuses;
   starts_on: string | null; ends_on: string | null; budget_idr: number; spent_idr: number;
 };
 export type Task = Row & {
+  creative_brief?: CreativeBrief;
+  approver_id?: string | null;
+  approved_at?: string | null;
+  reviewer_id?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  checklist?: ChecklistItem[];
+  deliverable?: string;
+  acceptance_criteria?: string;
+  completion_note?: string;
   review_note?: string;
   source_activation_id?: string | null;
   business_unit_id?: string | null;
   workstream?: keyof typeof workstreams;
   campaign_id: string | null; title: string; brief: string; assignee_id: string | null;
   platform: keyof typeof platforms; format: string; status: keyof typeof taskStatuses;
+  additional_platforms?: (keyof typeof platforms)[];
+  additional_assignee_ids?: string[];
   priority: keyof typeof priorities; due_on: string | null; publish_on: string | null;
   output_url: string; blocker: string;
 };
@@ -44,7 +63,7 @@ export type Draft<T> = Omit<T, keyof Row>;
 export const PAGE_SIZE = 30;
 
 const campaignColumns = 'id,business_unit_id,name,objective,owner_id,status,starts_on,ends_on,budget_idr,spent_idr,updated_at';
-const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,assignee_id,platform,format,status,priority,due_on,publish_on,output_url,blocker,review_note,source_activation_id,updated_at';
+const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,creative_brief,deliverable,acceptance_criteria,completion_note,checklist,assignee_id,reviewer_id,reviewed_by,reviewed_at,approver_id,approved_at,platform,additional_platforms,additional_assignee_ids,format,status,priority,due_on,publish_on,output_url,blocker,review_note,source_activation_id,updated_at';
 
 export async function campaigns(page: number, signal: AbortSignal, unit = 'all') {
   const start = page * PAGE_SIZE;
@@ -68,17 +87,32 @@ export type Filters = {
   workstream?: string;
 };
 
+export async function pendingTaskDecisions(userId: string, page: number, signal: AbortSignal) {
+  if (!/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(userId)) return [];
+  const start = page * PAGE_SIZE;
+  const { data, error } = await supabase.from('creative_tasks').select('id,title,status,due_on')
+    .or(`and(status.eq.review,reviewer_id.eq.${userId}),and(status.eq.ready,approver_id.eq.${userId},approved_at.is.null)`)
+    .order('due_on', { nullsFirst: false }).order('id')
+    .range(start, start + PAGE_SIZE).abortSignal(signal);
+  if (error) throw error;
+  return (data ?? []) as Pick<Task, 'id' | 'title' | 'status' | 'due_on'>[];
+}
+
 export async function tasks(campaignId: string | null | 'all', filters: Filters, page: number, signal: AbortSignal,
   focus: Focus = 'all', today = '', unit = 'all') {
   const start = page * PAGE_SIZE;
   let query = supabase.from('creative_tasks').select(taskColumns + ',campaign:creative_campaigns(name),source_idea:creative_ideas(title,reference_urls)');
   if (unit !== 'all') query = unit === 'unassigned' ? query.is('business_unit_id', null) : query.eq('business_unit_id', unit);
   if (campaignId !== 'all') query = campaignId ? query.eq('campaign_id', campaignId) : query.is('campaign_id', null);
-  if (filters.platform) query = query.eq('platform', filters.platform);
+  if (filters.platform && Object.prototype.hasOwnProperty.call(platforms, filters.platform)) {
+    query = query.or(`platform.eq.${filters.platform},additional_platforms.cs.{${filters.platform}}`);
+  }
   if (filters.workstream) query = query.eq('workstream', filters.workstream);
   if (filters.status) query = query.eq('status', filters.status);
-  if (filters.assignee === 'unassigned') query = query.is('assignee_id', null);
-  else if (filters.assignee) query = query.eq('assignee_id', filters.assignee);
+  if (filters.assignee === 'unassigned') query = query.is('assignee_id', null).eq('additional_assignee_ids', '{}');
+  else if (/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(filters.assignee)) {
+    query = query.or(`assignee_id.eq.${filters.assignee},additional_assignee_ids.cs.{${filters.assignee}}`);
+  }
   if (focus === 'week' || focus === 'publish') {
     const { monday, nextMonday } = mondayWeek(today);
     const column = focus === 'week' ? 'due_on' : 'publish_on';
@@ -89,7 +123,7 @@ export async function tasks(campaignId: string | null | 'all', filters: Filters,
   } else if (focus === 'review' || focus === 'blocked' || focus === 'ready') {
     query = query.eq('status', focus);
   } else if (focus === 'unplanned') {
-    query = query.or('assignee_id.is.null,due_on.is.null').not('status', 'in', '(done,cancelled)');
+    query = query.or('and(assignee_id.is.null,additional_assignee_ids.eq.{}),due_on.is.null').not('status', 'in', '(done,cancelled)');
   }
   const { data, error } = await query.order(filters.order, { nullsFirst: false }).order('id')
     .range(start, start + PAGE_SIZE).abortSignal(signal);
@@ -133,7 +167,7 @@ export async function ideas(page: number, onlyPriority: boolean, queue: string, 
     .map(row => ({ ...row, task: Array.isArray(row.task) ? row.task[0] ?? null : row.task }));
 }
 
-async function save(table: string, values: Record<string, string | number | boolean | string[] | null | undefined>, previous?: Row) {
+async function save(table: string, values: Record<string, string | number | boolean | string[] | ChecklistItem[] | CreativeBrief | null | undefined>, previous?: Row) {
   const target = supabase.from(table);
   const query = previous
     ? target.update(values).eq('id', previous.id).eq('updated_at', previous.updated_at)
@@ -156,6 +190,17 @@ export async function saveTask(values: Draft<Task>, previous?: Task, sourceIdeaI
   }
 }
 export const saveIdea = (values: Draft<Idea>, previous?: Idea) => save('creative_ideas', values, previous);
+
+export function setTaskChecklistItem(task: Task, index: number, done: boolean) {
+  if (!task.checklist?.[index]) throw new Error('Langkah checklist tidak ditemukan.');
+  const checklist = task.checklist.map((item, position) => position === index ? { ...item, done } : item);
+  return save('creative_tasks', { checklist }, task);
+}
+
+export function approveTask(task: Task) {
+  // The database validates the caller and records its own timestamp.
+  return save('creative_tasks', { approved_at: new Date().toISOString() }, task);
+}
 
 export function advanceTask(task: Task, status: Exclude<Task['status'], 'blocked'>) {
   return save('creative_tasks', { status, blocker: '' }, task);

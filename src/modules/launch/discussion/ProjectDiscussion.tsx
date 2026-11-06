@@ -18,6 +18,7 @@ function DiscussionPanel({ scope, projectId, userId, canPost }: Props) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const valid = isProjectId(projectId);
+  const title = scope === 'task' ? 'Diskusi tugas' : 'Diskusi proyek';
   const key = ['project-discussion', userId, scope, projectId];
   const query = useQuery({
     queryKey: [...key, page], enabled: valid,
@@ -42,10 +43,10 @@ function DiscussionPanel({ scope, projectId, userId, canPost }: Props) {
     }
   }
   if (!valid) return <p className="text-sm text-slate-600">Diskusi tersedia setelah proyek tersimpan.</p>;
-  return <section className="mx-auto max-w-4xl space-y-4 rounded-xl border border-slate-200 bg-white p-4" aria-label="Diskusi proyek">
+  return <section className="mx-auto max-w-4xl space-y-4 rounded-xl border border-slate-200 bg-white p-4" aria-label={title}>
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div>
-        <h2 className="text-lg font-bold">Diskusi proyek</h2>
+        <h2 className="text-lg font-bold">{title}</h2>
         <p className="text-sm text-slate-600">Catat masukan, keputusan tim, atau tindak lanjut. Gunakan Segarkan untuk memuat komentar terbaru.</p>
       </div>
       <button type="button" className={button} disabled={query.isFetching || sending} onClick={() => {

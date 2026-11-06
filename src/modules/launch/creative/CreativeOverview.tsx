@@ -13,7 +13,7 @@ export function CreativeOverview({ counts, period, onFocus }: {
   ] as const;
   const percent = counts.target ? Math.round(100 * counts.closed / counts.target) : 0;
   return <div className="space-y-3">
-    <section className="space-y-4 rounded-3xl bg-gradient-to-br from-teal-950 to-teal-800 p-5 text-white shadow-sm sm:p-6" aria-label="Target minggu ini">
+    <section className="creative-weekly-hero space-y-4 rounded-3xl bg-gradient-to-br from-teal-950 to-teal-800 p-5 text-white shadow-sm sm:p-6" aria-label="Target minggu ini">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-semibold text-teal-100"><Flag size={16} /> Target tim minggu ini</div>
         <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-teal-50">{percent}% tercapai</span>

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, Bell, CalendarDays, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, TrendingUp, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, Bell, CalendarDays, Command, ExternalLink, FolderKanban, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, Settings2, TrendingUp, Users } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut } from '@/core/auth/useAuth';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
@@ -10,6 +10,7 @@ import { button, CampaignForm, errorText, field, Options, primary, TaskForm } fr
 import { IdeaBank, ReferenceLinks } from './IdeaBank';
 import { CreativeOverview } from './CreativeOverview';
 import { CreativeAgenda } from './CreativeAgenda';
+import { SavedTaskViews } from './SavedTaskViews';
 import { CreativeTeamPerformance, WeeklyProgress } from './CreativePerformance';
 import { channelSummary, type CalendarEvent } from './channelRepository';
 import { publicationTaskId } from './commandRepository';
@@ -18,6 +19,7 @@ import {
   advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, PAGE_SIZE, platforms, priorities, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
   type Campaign, type Filters, type Idea, type Task,
 } from './repository';
+import './creativeWorkspace.css';
 
 const ChannelHub = lazy(() => import('./ChannelHub').then(module => ({ default: module.ChannelHub })));
 const CreativePlanner = lazy(() => import('./CreativePlanner').then(module => ({ default: module.CreativePlanner })));
@@ -34,14 +36,14 @@ const date = (value: string | null) => value ? dateFormat.format(new Date(value 
 type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea };
 type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox';
 const navigation = [
-  { label: 'Eksekusi', items: [
+  { label: 'Ruang kerja', items: [
     { id: 'overview', label: 'Pusat Kerja', icon: LayoutDashboard },
     { id: 'work', label: 'Produksi & Publikasi', icon: ListTodo },
     { id: 'campaigns', label: 'Campaign Hub', icon: Megaphone },
     { id: 'calendar', label: 'Kalender', icon: CalendarDays },
     { id: 'ideas', label: 'Bank Ide & Aset', icon: Lightbulb },
   ] },
-  { label: 'Monitoring', items: [
+  { label: 'Pengelolaan', items: [
     { id: 'accounts', label: 'Akun & Performa', icon: AtSign },
     { id: 'ads', label: 'Iklan & Evaluasi', icon: TrendingUp },
     { id: 'inbox', label: 'Kotak Tindakan', icon: Bell },
@@ -246,28 +248,34 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
     .sort((a,b) => Number(b.status === 'active') - Number(a.status === 'active') ||
       (a.ends_on ?? '9999-12-31').localeCompare(b.ends_on ?? '9999-12-31'))).slice(0,3);
 
-  return <main className="min-h-screen bg-[#eaf4f3] px-3 py-4 text-slate-900 sm:px-6 sm:py-6">
-    <div className="mx-auto grid max-w-[1536px] gap-4 lg:grid-cols-[218px_minmax(0,1fr)] xl:gap-5">
-      <aside className="self-start space-y-4 rounded-3xl border border-teal-100 bg-white p-3 shadow-sm lg:sticky lg:top-4">
+  return <main className="creative-shell min-h-screen px-3 py-4 text-slate-900 sm:px-6 sm:py-6">
+    <div className="mx-auto grid max-w-[1536px] gap-4 lg:grid-cols-[228px_minmax(0,1fr)] xl:gap-5">
+      <aside className="creative-sidebar self-start space-y-4 rounded-3xl p-3 lg:sticky lg:top-4">
         <div className="flex items-center justify-between gap-2 px-2 py-2">
-          <div className="flex min-w-0 items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-900 text-white"><Megaphone size={17} /></span>
-            <div><strong className="block text-teal-950">Omni Pro</strong><span className="block text-xs text-slate-600">Creative workspace</span></div></div>
+          <div className="flex min-w-0 items-center gap-3"><span className="creative-mark grid h-10 w-10 shrink-0 place-items-center rounded-[13px] text-white"><Command size={19} /></span>
+            <div><strong className="block text-white">GG Workspace</strong><span className="creative-sidebar-caption block text-xs">Creative Hub</span></div></div>
           <button className={button + ' inline-flex items-center gap-1 lg:hidden'} aria-expanded={menuOpen} aria-controls="creative-navigation"
             onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> Menu</button>
         </div>
         <nav id="creative-navigation" aria-label="Bagian Creative Dashboard" className={(menuOpen ? 'block' : 'hidden') + ' space-y-3 lg:block'}>
           {navigation.map(group => <div key={group.label} className="space-y-1">
-            <p className="px-2 text-xs font-bold uppercase tracking-wide text-teal-900/75">{group.label}</p>
+            <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">{group.label}</p>
             {group.items.map(({ id,label,icon:Icon }) => <button key={id} aria-current={section === id ? 'page' : undefined}
-              className={'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold ' + (section === id ? 'bg-teal-800 text-white' : 'text-slate-700 hover:bg-slate-100')}
+              className="creative-nav-item flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold"
               onClick={() => openSection(id)}><Icon className="shrink-0" size={16} />{label}</button>)}
           </div>)}
+          <div className="creative-nav-links space-y-1 pt-3">
+            <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">Workspace</p>
+            {canSwitchWorkspace && <Link to="/launch/app/today" className="creative-nav-item flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-semibold"><FolderKanban size={16} /> Proyek artikel</Link>}
+            {isAdmin && <Link to="/launch/app/settings" className="creative-nav-item flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-semibold"><Settings2 size={16} /> Pengaturan</Link>}
+            <Link to="/blueprint" className="creative-nav-item flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-semibold"><ExternalLink size={16} /> Pratinjau blueprint</Link>
+          </div>
         </nav>
       </aside>
       <div className="min-w-0 space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-teal-100 bg-white p-5 shadow-sm sm:p-6">
+      <header className="creative-toolbar flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-teal-100 bg-white p-5 shadow-sm sm:p-6">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-teal-800">Creative Dashboard</p>
+          <p className="creative-eyebrow mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"><span /> Creative Hub</p>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{activeSection}</h1>
           <p className="mt-1 text-sm text-slate-600">{jobTitle || (isAdmin ? 'Admin / Owner' : 'Anggota tim')} · {canEdit ? 'Kelola tugas dan kampanye' : 'Pantau pekerjaan'}</p>
         </div>
@@ -280,7 +288,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
         </div>
       </header>
 
-      <div className={panel + ' flex flex-wrap items-end gap-3'} aria-label="Filter ruang kerja">
+      <div className={panel + ' creative-filter flex flex-wrap items-end gap-3'} aria-label="Filter ruang kerja">
         <label className="min-w-0 flex-[1_1_12rem] space-y-1 text-sm font-semibold">Unit bisnis
           <select className={field} value={unit} onChange={event => { setUnit(event.target.value); changeScope('all'); }}>
             <option value="all">Semua unit bisnis</option>
@@ -420,6 +428,9 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
           {(Object.keys(focusLabels) as Focus[]).map(option => <button key={option} aria-pressed={focus === option}
             className={focus === option ? primary : button} onClick={() => chooseFocus(option)}>{focusLabels[option]}</button>)}
         </div>
+        <SavedTaskViews key={userId} userId={userId} view={{ filters, focus, mode: taskView }} onApply={view => {
+          setFilters(view.filters); setFocus(view.focus); setTaskView(view.mode); setPage(0);
+        }} />
         {showFilters && <div id="creative-task-filters" className="grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-5">
           <select className={field} aria-label="Filter pos kerja" value={filters.workstream} onChange={event => changeFilter({ workstream: event.target.value })}><option value="">Semua pos kerja</option><Options values={workstreams} /></select>
           <select className={field} aria-label="Filter platform" value={filters.platform} onChange={event => changeFilter({ platform: event.target.value })}><option value="">Semua platform</option><Options values={platforms} /></select>
@@ -446,8 +457,12 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
           {group.rows.map(task => {
             const overdue = task.due_on && task.due_on < today && !['done', 'cancelled'].includes(task.status);
             const output = safeOutputUrl(task.output_url);
+            const platformNames = [task.platform, ...(task.additional_platforms ?? [])].map(key => platforms[key]).join(', ');
+            const assigneeIds = [...(task.assignee_id ? [task.assignee_id] : []), ...(task.additional_assignee_ids ?? [])];
             const publishable = task.platform !== 'internal' && task.workstream !== 'operations' && !task.source_activation_id;
-            const action = task.status in nextAction && !(task.status === 'ready' && publishable) ? nextAction[task.status as keyof typeof nextAction] : null;
+            const waitingForReviewer = task.status === 'review' && task.reviewer_id && task.reviewer_id !== userId;
+            const awaitingApproval = task.status === 'ready' && task.approver_id && !task.approved_at;
+            const action = task.status in nextAction && !waitingForReviewer && !awaitingApproval && !(task.status === 'ready' && publishable) ? nextAction[task.status as keyof typeof nextAction] : null;
             const updating = quickUpdate.isPending && quickUpdate.variables?.task.id === task.id;
             return <li key={task.id} className={'flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 ' + (taskView === 'list' ? 'sm:flex-row sm:p-4' : '')}>
               <div className="min-w-0 flex-1 space-y-1">
@@ -456,9 +471,11 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
                   {task.priority !== 'normal' && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-800">{priorities[task.priority]}</span>}
                 </div>
                 <h3 className="break-words font-semibold">{task.title}</h3>
-                <p className="break-words text-sm text-slate-600">{workstreams[task.workstream ?? 'creative']} · {platforms[task.platform]}{task.format ? ' · ' + task.format : ''} · {person(task.assignee_id)}</p>
+                <p className="break-words text-sm text-slate-600">{workstreams[task.workstream ?? 'creative']} · {platformNames}{task.format ? ' · ' + task.format : ''} · {assigneeIds.length ? assigneeIds.map(person).join(', ') : person(null)}</p>
                 {scope === 'all' && <p className="break-words text-sm text-slate-600">{unitName(task.business_unit_id)} · {task.campaign?.name ?? (task.campaign_id ? 'Kampanye terkait' : 'Tanpa kampanye')}</p>}
                 <p className="text-sm"><span className={overdue ? 'font-semibold text-red-700' : ''}>Deadline {date(task.due_on)}{overdue ? ' (terlambat)' : ''}</span> · Tayang {date(task.publish_on)}</p>
+                {task.reviewer_id && <p className="text-sm text-slate-600">Reviewer: {person(task.reviewer_id)}{task.reviewed_at ? ' · Disetujui' : ''}</p>}
+                {awaitingApproval && <p className="text-sm text-amber-800">Menunggu persetujuan {person(task.approver_id ?? null)}</p>}
                 {task.blocker && <p className="break-words text-sm text-amber-800">Hambatan: {task.blocker}</p>}
                 {task.status === 'doing' && task.review_note && <p className="break-words text-sm text-amber-800">Revisi: {task.review_note}</p>}
                 {task.brief && <details className="text-sm"><summary className="cursor-pointer text-slate-700">Lihat brief</summary><p className="whitespace-pre-wrap break-words pt-1">{task.brief}</p></details>}
@@ -471,7 +488,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, 
               <div className="flex shrink-0 flex-wrap items-start gap-2">
                 {canEdit && action && <button className={primary} disabled={quickUpdate.isPending} aria-label={action.label + ': ' + task.title}
                   onClick={() => { setNotice(''); quickUpdate.mutate({ task, status: action.status }); }}>{updating ? 'Menyimpan…' : action.label}</button>}
-                <button className={canEdit && publishable && task.status === 'ready' ? primary : button} onClick={() => setDetailId(task.id)}>{canEdit && publishable && task.status === 'ready' ? 'Catat tayang' : 'Detail'}</button>
+                <button className={canEdit && publishable && task.status === 'ready' && !awaitingApproval ? primary : button} onClick={() => setDetailId(task.id)}>{canEdit && publishable && task.status === 'ready' && !awaitingApproval ? 'Catat tayang' : 'Detail'}</button>
                 {canEdit && <button className={button} disabled={updating} aria-label={'Edit ' + task.title} onClick={() => openEditor({ kind: 'task', row: task })}>Edit</button>}
               </div>
             </li>;

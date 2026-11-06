@@ -1,0 +1,63 @@
+.creative-shell {
+  --creative-line: #e5e1ef;
+  --creative-accent: #5336bf;
+  --creative-accent-strong: #452b9f;
+  background: radial-gradient(ellipse at 70% -10%, #eae2ff 0%, transparent 46%), #f7f6fb;
+  font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+}
+
+.creative-shell h1, .creative-shell h2, .creative-shell h3 { font-family: inherit; }
+.creative-shell h1 { letter-spacing: -.045em; }
+.creative-shell :focus-visible { outline: 2px solid #8567ef; outline-offset: 3px; }
+
+.creative-sidebar {
+  background: linear-gradient(155deg, #23203d, #17162b 65%);
+  border: 1px solid #302b4c;
+  box-shadow: 0 12px 30px #21183722;
+  color: #f2eeff;
+}
+.creative-mark {
+  background: linear-gradient(145deg, #987ef5, #6645d7);
+  box-shadow: 0 6px 14px #613cc560, inset 0 1px 0 #ffffff55;
+}
+.creative-sidebar-caption, .creative-nav-label { color: #b8aed5; }
+.creative-nav-item {
+  color: #e0d9ef;
+  border: 1px solid transparent;
+  transition: background-color .16s, border-color .16s, color .16s;
+}
+.creative-nav-item:hover { background: #ffffff13; color: #fff; }
+.creative-nav-item[aria-current='page'] { background: #a78bfa30; border-color: #bda6ff3d; color: #fff; }
+.creative-nav-item[aria-current='page'] svg { color: #d6c5ff; }
+.creative-nav-links { border-top: 1px solid #ffffff22; }
+
+.creative-shell .creative-toolbar {
+  background: #ffffffd9;
+  border-color: var(--creative-line);
+  box-shadow: 0 8px 25px #281d4910, inset 0 1px 0 #fff;
+  backdrop-filter: blur(18px);
+}
+.creative-eyebrow { color: var(--creative-accent-strong); }
+.creative-eyebrow span { height: 7px; width: 7px; border-radius: 50%; background: #8768f4; }
+.creative-shell [class~='border-teal-100'], .creative-shell [class~='border-teal-200'] { border-color: var(--creative-line); }
+.creative-shell .creative-filter { background: #ffffffc7; backdrop-filter: blur(14px); }
+.creative-shell :is(input:not([type='checkbox']), textarea, select)[class~='border-slate-300'] { border-color: #dcd7e9; }
+.creative-shell :is(button, a)[class~='border-slate-300'] { border-color: #ded9eb; transition: background-color .16s, border-color .16s; }
+.creative-shell :is(button, a)[class~='border-slate-300']:hover:not(:disabled) { background: #f3effd; border-color: #c8baea; }
+.creative-shell :is(button, a)[class~='bg-teal-800'] { background-color: var(--creative-accent); box-shadow: 0 4px 10px #5034c924; }
+.creative-shell :is(button, a)[class~='bg-teal-800']:hover:not(:disabled) { background-color: var(--creative-accent-strong); }
+.creative-shell [class~='text-teal-800'] { color: var(--creative-accent-strong); }
+.creative-shell [class~='bg-teal-50'] { background-color: #f0eaff; }
+
+.creative-shell .creative-weekly-hero {
+  background: radial-gradient(ellipse at 98% 8%, #8060d9, transparent 56%), linear-gradient(124deg, #22174c, #47319e);
+  box-shadow: 0 8px 21px #33247024;
+}
+.creative-weekly-hero [class~='text-teal-100'], .creative-weekly-hero [class~='text-teal-50'] { color: #f1eaff; }
+.creative-weekly-hero [class~='bg-teal-300'] { background-color: #cfbdff; }
+.creative-shell dialog { border: 1px solid var(--creative-line); box-shadow: 0 24px 75px #20164155; }
+.creative-shell dialog::backdrop { background: #17112a8c; backdrop-filter: blur(4px); }
+
+@media (min-width: 1024px) {
+  .creative-sidebar { max-height: calc(100dvh - 2rem); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #7667a6 transparent; }
+}

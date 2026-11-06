@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type DiscussionScope = 'article' | 'campaign';
+export type DiscussionScope = 'article' | 'campaign' | 'task';
 export const DISCUSSION_PAGE_SIZE = 20;
 export const MAX_COMMENT_LENGTH = 2000;
 export const isProjectId = (id: string) => /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(id);
@@ -8,6 +8,7 @@ export const isProjectId = (id: string) => /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d
 const tables = {
   article: { name: 'launch_comments', parent: 'project_id', author: 'launch_comments_author_id_fkey' },
   campaign: { name: 'creative_campaign_comments', parent: 'campaign_id', author: 'creative_campaign_comments_author_id_fkey' },
+  task: { name: 'creative_task_comments', parent: 'task_id', author: 'creative_task_comments_author_id_fkey' },
 } as const;
 
 export async function loadDiscussion(scope: DiscussionScope, id: string, page: number, signal: AbortSignal) {

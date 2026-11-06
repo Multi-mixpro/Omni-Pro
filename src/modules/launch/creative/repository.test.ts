@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { advanceTask, ideas, safeOutputUrl, saveTask, tasks, type Draft, type Task } from './repository';
+import { advanceTask, ideas, safeOutputUrl, saveTask, setTaskChecklistItem, tasks, type Draft, type Task } from './repository';
 
 const { from, chain } = vi.hoisted(() => {
   const chain = {
     select: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis(), insert: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(), is: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(), is: vi.fn().mockReturnThis(), or: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(), lt: vi.fn().mockReturnThis(), neq: vi.fn().mockReturnThis(), not: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(), range: vi.fn().mockReturnThis(),
     abortSignal: vi.fn(), maybeSingle: vi.fn(),
@@ -22,6 +22,28 @@ const draft: Draft<Task> = {
 beforeEach(() => vi.clearAllMocks());
 
 describe('creative repository', () => {
+  it('updates one checklist step without overwriting a newer task revision', async () => {
+    chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    const task: Task = { ...draft, id: 'task-id', updated_at: '2026-11-05T08:00:00Z', checklist: [
+      { label: 'Cek naskah', done: false }, { label: 'Cek visual', done: false },
+    ] };
+    await expect(setTaskChecklistItem(task, 1, true)).rejects.toThrow(/diubah pengguna lain/);
+    expect(chain.update).toHaveBeenCalledWith({ checklist: [
+      { label: 'Cek naskah', done: false }, { label: 'Cek visual', done: true },
+    ] });
+    expect(chain.eq).toHaveBeenCalledWith('updated_at', task.updated_at);
+  });
+  it('saves additional platforms and assignees in the same task insert', async () => {
+    chain.maybeSingle.mockResolvedValue({ data: { id: 'task-id' }, error: null });
+    const multiTask: Draft<Task> = {
+      ...draft,
+      assignee_id: '10000000-0000-4000-8000-000000000001',
+      additional_platforms: ['instagram', 'youtube'],
+      additional_assignee_ids: ['10000000-0000-4000-8000-000000000002'],
+    };
+    await expect(saveTask(multiTask)).resolves.toBe('task-id');
+    expect(chain.insert).toHaveBeenCalledExactlyOnceWith(multiTask);
+  });
   it('rejects saving a stale edit instead of overwriting a teammate', async () => {
     chain.maybeSingle.mockResolvedValue({ data: null, error: null });
     const previous: Task = { ...draft, id: 'task-id', updated_at: '2026-11-05T08:00:00.000001+00:00' };
@@ -50,7 +72,8 @@ describe('creative repository', () => {
     await tasks(null, { platform: 'tiktok', status: 'review', assignee: 'unassigned', order: 'publish_on' }, 1, new AbortController().signal);
     expect(chain.is).toHaveBeenCalledWith('campaign_id', null);
     expect(chain.is).toHaveBeenCalledWith('assignee_id', null);
-    expect(chain.eq).toHaveBeenCalledWith('platform', 'tiktok');
+    expect(chain.or).toHaveBeenCalledWith('platform.eq.tiktok,additional_platforms.cs.{tiktok}');
+    expect(chain.eq).toHaveBeenCalledWith('additional_assignee_ids', '{}');
     expect(chain.eq).toHaveBeenCalledWith('status', 'review');
     expect(chain.range).toHaveBeenCalledWith(30, 60);
   });
@@ -75,11 +98,12 @@ describe('creative repository', () => {
 
   it('applies unit and workstream before paginating tasks', async () => {
     chain.abortSignal.mockResolvedValue({ data: [], error: null });
-    await tasks('all', { platform: '', status: '', assignee: 'staff', order: 'due_on', workstream: 'operations' },
+    const staff = '10000000-0000-4000-8000-000000000001';
+    await tasks('all', { platform: '', status: '', assignee: staff, order: 'due_on', workstream: 'operations' },
       0, new AbortController().signal, 'all', '', 'unit-fnb');
     expect(chain.eq).toHaveBeenCalledWith('business_unit_id', 'unit-fnb');
     expect(chain.eq).toHaveBeenCalledWith('workstream', 'operations');
-    expect(chain.eq).toHaveBeenCalledWith('assignee_id', 'staff');
+    expect(chain.or).toHaveBeenCalledWith(`assignee_id.eq.${staff},additional_assignee_ids.cs.{${staff}}`);
   });
 
   it('blocks executable URLs, inline media, and URLs with embedded credentials', () => {

@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
 import {
-  campaignStatuses, ideaQueues, platforms, priorities, safeOutputUrl, saveCampaign, saveIdea, saveTask, taskStatuses, workstreams,
+  briefFields, campaignStatuses, ideaQueues, platforms, priorities, safeOutputUrl, saveCampaign, saveIdea, saveTask, taskStatuses, workstreams,
   type Campaign, type Idea, type Task, type TeamMember,
 } from './repository';
 
@@ -40,8 +40,8 @@ export function Options({ values }: { values: Record<string, string> }) {
   return <>{Object.entries(values).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</>;
 }
 
-export function People({ members, current, required }: { members: TeamMember[]; current?: string | null; required?: boolean }) {
-  return <select className={field} name="person" required={required} defaultValue={current ?? ''}>
+export function People({ members, current, required, name = 'person' }: { members: TeamMember[]; current?: string | null; required?: boolean; name?: string }) {
+  return <select className={field} name={name} required={required} defaultValue={current ?? ''}>
     <option value="">Belum ditugaskan</option>
     {current && !members.some(member => member.id === current) && <option value={current}>PIC saat ini</option>}
     {members.filter(member => member.is_active || member.id === current).map(member =>
@@ -113,17 +113,34 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
 }) {
   const [status, setStatus] = useState(task?.status ?? 'todo');
   const [selectedCampaign, setSelectedCampaign] = useState(task ? task.campaign_id ?? '' : campaignId ?? '');
+  const [platform, setPlatform] = useState<Task['platform']>(task?.platform ?? sourceIdea?.platform ?? 'internal');
   return <Editor title={task ? 'Edit tugas' : sourceIdea ? 'Jadikan ide sebagai tugas' : 'Tugas kreatif baru'} onCancel={onCancel} onSaved={onSaved}
     onSave={data => {
       const link = value(data, 'url');
       const output = safeOutputUrl(link);
       const blocker = value(data, 'blocker');
+      const people = [...new Set(data.getAll('additionalPerson').map(String))];
+      const primaryPerson = value(data, 'person') || people[0] || null;
+      const extraPlatforms = data.getAll('additionalPlatform').map(String) as Task['platform'][];
+      const steps = [...new Set(value(data, 'checklist').split(/\r?\n/).map(line => line.trim()).filter(Boolean))];
+      if (steps.length > 20 || steps.some(step => step.length > 160)) {
+        throw new Error('Checklist maksimal 20 langkah, masing-masing 160 karakter.');
+      }
+      const checked = new Set(task?.checklist?.filter(item => item.done).map(item => item.label));
       if (sourceIdea && (!value(data, 'person') || !value(data, 'due'))) throw new Error('Tentukan PIC dan deadline sebelum memasukkan ide ke antrean produksi.');
       if (link && !output) throw new Error('Tautan hasil harus berupa URL HTTP atau HTTPS yang valid.');
       if (status === 'blocked' && !blocker) throw new Error('Isi alasan tugas terhambat.');
       return saveTask({
         campaign_id: value(data, 'campaign') || null, title: value(data, 'title'), brief: value(data, 'brief'),
-        assignee_id: value(data, 'person') || null, platform: value(data, 'platform') as Task['platform'],
+        creative_brief: Object.fromEntries(Object.keys(briefFields).map(key => [key, value(data, `brief.${key}`)]).filter(([, text]) => text)),
+        deliverable: value(data, 'deliverable'), acceptance_criteria: value(data, 'criteria'),
+        completion_note: value(data, 'evidence'),
+        checklist: steps.map(label => ({ label, done: checked.has(label) })),
+        assignee_id: primaryPerson, platform,
+        reviewer_id: value(data, 'reviewer') || null,
+        approver_id: value(data, 'approver') || null,
+        additional_assignee_ids: people.filter(id => id !== primaryPerson),
+        additional_platforms: platform === 'internal' ? [] : extraPlatforms.filter(choice => choice !== platform),
         format: value(data, 'format'), status, priority: value(data, 'priority') as Task['priority'],
         due_on: value(data, 'due') || null, publish_on: value(data, 'publish') || null,
         output_url: output, blocker: status === 'blocked' ? blocker : '',
@@ -141,16 +158,65 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
     </select></Label>
     {selectedCampaign ? <p className="self-center text-sm text-slate-600">Unit bisnis mengikuti kampanye.</p>
       : <UnitField current={task ? task.business_unit_id : sourceIdea?.business_unit_id ?? defaultUnit} required={!task} />}
-    <Label title="Platform"><select name="platform" className={field} defaultValue={task?.platform ?? sourceIdea?.platform ?? 'internal'}><Options values={platforms} /></select></Label>
+    <div className="space-y-2">
+      <Label title="Platform utama"><select name="platform" className={field} value={platform} onChange={event => setPlatform(event.target.value as Task['platform'])}><Options values={platforms} /></select></Label>
+      <details className="rounded-lg border border-slate-200 p-2 text-sm" hidden={platform === 'internal'}>
+        <summary className="cursor-pointer font-medium">Platform tambahan</summary>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {Object.entries(platforms).filter(([id]) => id !== 'internal').map(([id, label]) => (
+            <label key={id} hidden={id === platform} className="space-x-2">
+              <input type="checkbox" name="additionalPlatform" value={id} disabled={id === platform || platform === 'internal'}
+                defaultChecked={task?.additional_platforms?.includes(id as Task['platform'])} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+      </details>
+    </div>
     <Label title="Pos kerja"><select name="workstream" className={field} defaultValue={task?.workstream ?? 'creative'}><Options values={workstreams} /></select></Label>
     <Label title="Format"><input name="format" className={field} maxLength={80} placeholder="Contoh: Reels 30 detik" defaultValue={task?.format} /></Label>
-    <Label title={sourceIdea ? 'PIC tugas (wajib)' : 'PIC tugas'}><People members={members} current={task?.assignee_id} required={!!sourceIdea} /></Label>
+    <div className="space-y-2">
+      <Label title={sourceIdea ? 'PIC utama (wajib)' : 'PIC utama'}><People members={members} current={task?.assignee_id} required={!!sourceIdea} /></Label>
+      <details className="rounded-lg border border-slate-200 p-2 text-sm">
+        <summary className="cursor-pointer font-medium">PIC tambahan</summary>
+        <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
+          {members.filter(member => member.is_active || task?.additional_assignee_ids?.includes(member.id)).map(member => (
+            <label key={member.id} className="flex items-center gap-2">
+              <input type="checkbox" name="additionalPerson" value={member.id} defaultChecked={task?.additional_assignee_ids?.includes(member.id)} />
+              <span>{member.full_name}{member.is_active ? '' : ' (nonaktif)'}</span>
+            </label>
+          ))}
+          {task?.additional_assignee_ids?.filter(id => !members.some(member => member.id === id)).map(id => (
+            <label key={id} className="flex items-center gap-2">
+              <input type="checkbox" name="additionalPerson" value={id} defaultChecked />
+              <span>PIC saat ini (profil tidak tersedia)</span>
+            </label>
+          ))}
+          {!members.length && <p className="text-slate-600">Belum ada anggota yang dapat dipilih.</p>}
+        </div>
+      </details>
+    </div>
+    <Label title="Reviewer"><People name="reviewer" members={members} current={task?.reviewer_id} /></Label>
+    <Label title="Pemberi persetujuan"><People name="approver" members={members} current={task?.approver_id} /></Label>
     <Label title="Prioritas"><select name="priority" className={field} defaultValue={task?.priority ?? 'normal'}><Options values={priorities} /></select></Label>
     <Label title={sourceIdea ? 'Deadline pengerjaan (wajib)' : 'Deadline pengerjaan'}><input name="due" className={field} required={!!sourceIdea} type="date" defaultValue={task?.due_on ?? ''} /></Label>
     <Label title="Jadwal tayang"><input name="publish" className={field} type="date" defaultValue={task?.publish_on ?? ''} /></Label>
     <Label title="Status"><select name="status" className={field} value={status} onChange={event => setStatus(event.target.value as Task['status'])}><Options values={taskStatuses} /></select></Label>
     {status === 'blocked' && <Label title="Alasan terhambat"><input name="blocker" className={field} required maxLength={500} defaultValue={task?.blocker} /></Label>}
     <Label title="Brief"><textarea name="brief" className={field} maxLength={2000} defaultValue={task?.brief ?? sourceIdea?.brief} /></Label>
+    <details className="rounded-lg border border-slate-200 p-3 sm:col-span-2">
+      <summary className="cursor-pointer text-sm font-semibold">Brief kreatif terstruktur</summary>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {(Object.keys(briefFields) as (keyof typeof briefFields)[]).map(key => <Label key={key} title={briefFields[key]}>
+          <textarea name={`brief.${key}`} className={field} maxLength={700} rows={2} defaultValue={task?.creative_brief?.[key]} />
+        </Label>)}
+      </div>
+    </details>
+    <Label title="Hasil yang harus diserahkan"><textarea name="deliverable" className={field} maxLength={1000} defaultValue={task?.deliverable} placeholder="Contoh: tiga versi logo dalam SVG" /></Label>
+    <Label title="Kriteria penerimaan"><textarea name="criteria" className={field} maxLength={2000} defaultValue={task?.acceptance_criteria} placeholder="Contoh: logo tetap terbaca pada ukuran kecil" /></Label>
+    <Label title="Checklist pekerjaan"><textarea name="checklist" className={field} rows={3} maxLength={3220}
+      defaultValue={task?.checklist?.map(item => item.label).join('\n')} placeholder="Tulis satu langkah per baris" /></Label>
+    <Label title="Catatan bukti hasil"><textarea name="evidence" className={field} maxLength={2000} defaultValue={task?.completion_note} placeholder="Isi catatan atau lampirkan tautan hasil sebelum review" /></Label>
     <Label title="Tautan hasil / aset"><input name="url" className={field} type="url" maxLength={1024} defaultValue={task?.output_url} /></Label>
   </Editor>;
 }
