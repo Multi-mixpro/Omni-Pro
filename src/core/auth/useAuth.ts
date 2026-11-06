@@ -16,12 +16,13 @@ async function loadAuth(): Promise<AuthState> {
   const { data } = await supabase.auth.getSession();
   if (!data.session) return { session: null, profile: null, permissions: [] };
 
-  const [{ data: profile, error: profileError }, { data: permissions }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: permissions, error: permissionsError }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', data.session.user.id).maybeSingle(),
     supabase.rpc('my_permissions'),
   ]);
 
   if (profileError) throw profileError;
+  if (permissionsError) throw permissionsError;
   return {
     session: data.session,
     profile: (profile as Profile | null) ?? null,
@@ -31,10 +32,14 @@ async function loadAuth(): Promise<AuthState> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: AUTH_KEY, queryFn: loadAuth });
+  const query = useQuery({ queryKey: AUTH_KEY, queryFn: loadAuth, refetchOnWindowFocus: true });
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        void queryClient.cancelQueries({ queryKey: AUTH_KEY });
+        queryClient.setQueryData<AuthState>(AUTH_KEY, { session: null, profile: null, permissions: [] });
+      }
       void queryClient.invalidateQueries({ queryKey: AUTH_KEY });
     });
     return () => data.subscription.unsubscribe();

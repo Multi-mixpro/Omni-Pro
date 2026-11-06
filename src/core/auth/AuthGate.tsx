@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Navigate } from '@/app/router/simpleRouter';
 import { signIn, signOut, useAuth } from './useAuth';
+import { workspaceAccess } from './workspaceAccess';
 
 export function AuthGate() {
   const auth = useAuth();
@@ -20,11 +21,11 @@ export function AuthGate() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasLaunchAccess = auth.data?.permissions.includes('launch.view') || auth.data?.permissions.includes('launch.admin');
+  const { entry } = workspaceAccess(auth.data?.permissions ?? []);
 
-  if (auth.data?.session && auth.data.profile?.is_active && hasLaunchAccess) return <Navigate to="/launch/app" replace />;
+  if (auth.data?.session && auth.data.profile?.is_active && entry) return <Navigate to={entry} replace />;
 
-  if (auth.data?.session && auth.data.profile && !hasLaunchAccess) {
+  if (auth.data?.session) {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_top_right,_rgba(8,126,121,0.16),_transparent_22rem),linear-gradient(180deg,#f7fafb,#eff4f6)] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl items-center justify-center">
@@ -34,13 +35,13 @@ export function AuthGate() {
             </div>
             <div className="mt-5 space-y-3">
               <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.22em] text-amber-700">
-                Akses Product Launch
+                Akses Omni Pro
               </span>
               <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-                Akun ini belum memiliki akses ke Product Launch OS.
+                Akun ini belum memiliki akses ke ruang kerja.
               </h1>
               <p className="text-sm leading-6 text-slate-600">
-                Gunakan akun yang sudah diberi role Product Launch oleh owner/admin, atau keluar untuk masuk dengan akun lain.
+                Minta admin menetapkan role Launching Artikel, Creative Dashboard, atau keduanya.
               </p>
             </div>
             <div className="mt-6">

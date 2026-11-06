@@ -87,11 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('id', targetId);
   if (profileUpdateError) return res.status(500).json({ error: 'Gagal memperbarui profil pengguna.' });
 
-  const { error: roleDeleteError } = await admin.from('user_roles').delete().eq('user_id', targetId);
-  if (roleDeleteError) return res.status(500).json({ error: 'Gagal menyelaraskan role pengguna.' });
-
-  const { error: roleInsertError } = await admin.from('user_roles').insert({ user_id: targetId, role_id: roleRow.id });
-  if (roleInsertError) return res.status(500).json({ error: 'Gagal menyimpan role pengguna.' });
+  const { error: roleUpdateError } = await admin.rpc('replace_workspace_user_role', { p_user: targetId, p_role: roleRow.id });
+  if (roleUpdateError) return res.status(500).json({ error: 'Gagal mengganti role pengguna. Role sebelumnya tetap berlaku.' });
 
   res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({

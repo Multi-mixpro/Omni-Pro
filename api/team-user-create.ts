@@ -117,10 +117,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // 6. Assign role in user_roles
-  await admin.from('user_roles').insert({
-    user_id: userId,
-    role_id: roleRow.id,
-  });
+  const { error: assignmentError } = await admin.rpc('replace_workspace_user_role', { p_user: userId, p_role: roleRow.id });
+  if (assignmentError) {
+    await admin.from('profiles').update({ is_active: false }).eq('id', userId);
+    await admin.auth.admin.deleteUser(userId).catch(() => {});
+    return res.status(500).json({ error: 'Gagal menetapkan role pengguna. Akun baru tidak diaktifkan.' });
+  }
 
   res.setHeader('Cache-Control', 'no-store');
   return res.status(201).json({ id: userId, username, email, full_name: fullName, role_code: roleCode });

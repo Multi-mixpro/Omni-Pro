@@ -500,6 +500,7 @@ export function SettingsPage() {
                           <option value="">Pilih role</option>
                           {roles.data?.map(role => <option value={role.code} key={role.code}>{role.name}</option>)}
                         </select>
+                        <p className="mt-1 text-xs text-slate-600">{roles.data?.find(role => role.code === editDraft.role_code)?.description}</p>
                         {person.id === auth.data?.profile?.id && (
                           <p className="mt-1 text-[10px] text-amber-700">
                             Role akun Anda dikunci di form ini untuk mencegah kehilangan akses admin.
@@ -875,6 +876,7 @@ export function SettingsPage() {
                       <option value="">Pilih role</option>
                       {roles.data?.map(role => <option value={role.code} key={role.code}>{role.name}</option>)}
                     </select>
+                    <p className="mt-1 text-xs text-slate-600">{roles.data?.find(role => role.code === draft.role_code)?.description ?? 'Pilih ruang kerja dan tingkat akses yang dibutuhkan.'}</p>
                   </label>
                 </div>
 

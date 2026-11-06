@@ -32,6 +32,7 @@ import { initOrRefreshSession } from './services/sessionManager';
 import { deriveArticleIndicators } from './utils/calculations';
 import { useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut } from '@/core/auth/useAuth';
+import { workspaceAccess } from '@/core/auth/workspaceAccess';
 import {
   Article,
   Supplier,
@@ -92,6 +93,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const initialRoute = routeState(location.pathname, location.search);
+  const access = workspaceAccess(permissions);
   const canEdit = permissions.some((permission) =>
     ['launch.edit', 'launch.admin'].includes(permission),
   );
@@ -576,6 +578,8 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
 
       {/* Main Body Layout */}
       <Sidebar
+        canSwitchWorkspace={access.both}
+        canManageAccess={access.admin}
         activeTab={activeTab}
         onSelectTab={(tab) => selectTab(tab as PatenTab)}
         isCollapsed={isSidebarCollapsed}
@@ -748,6 +752,8 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
 
         {/* Bottom Navigation for Mobile */}
         <BottomNav
+          canSwitchWorkspace={access.both}
+          canManageAccess={access.admin}
           activeTab={activeTab}
           onSelectTab={(tab) => selectTab(tab as PatenTab)}
           onOpenQuickCreate={handleOpenQuickCreate}

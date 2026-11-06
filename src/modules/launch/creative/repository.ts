@@ -175,6 +175,25 @@ export async function getTask(id: string, signal: AbortSignal) {
 }
 
 export const BOARD_PAGE_SIZE = 6;
+
+export type Workload = {
+  subject_id: string | null;
+  open_count: number;
+  review_count: number;
+  blocked_count: number;
+  overdue_count: number;
+  week_target: number;
+  week_done: number;
+};
+export async function workload(group: 'team' | 'campaign', unit: string, scope: string, today: string, signal: AbortSignal) {
+  const { data, error } = await supabase.rpc('creative_workload_summary', {
+    p_group: group, p_unit: unit === 'all' || unit === 'unassigned' ? null : unit,
+    p_unassigned: unit === 'unassigned', p_campaign: scope === 'all' || scope === 'standalone' ? null : scope,
+    p_standalone: scope === 'standalone', p_today: today,
+  }).abortSignal(signal);
+  if (error) throw error;
+  return (data ?? []) as Workload[];
+}
 export async function boardTasks(scope: string, unit: string, filters: Filters, focus: Focus, today: string, page: number, signal: AbortSignal) {
   const { data, error } = await supabase.rpc('creative_board', {
     p_unit: unit === 'all' || unit === 'unassigned' ? null : unit, p_unassigned: unit === 'unassigned',

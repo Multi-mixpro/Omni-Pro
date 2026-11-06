@@ -26,6 +26,8 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   pendingApprovalsCount: number;
   blockedTasksCount: number;
+  canSwitchWorkspace: boolean;
+  canManageAccess: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -35,6 +37,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   pendingApprovalsCount,
   blockedTasksCount,
+  canSwitchWorkspace,
+  canManageAccess,
 }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tint: 'text-sky-600', activeBg: 'bg-sky-50', activeBorder: 'border-sky-200' },
@@ -56,10 +60,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* Menu List */}
       <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
-        <Link to="/launch/app" title="Pilih ruang kerja" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50">
+        {canSwitchWorkspace && <Link to="/launch/app" title="Pilih ruang kerja" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50">
           <ChevronLeft className="h-4 w-4 shrink-0" />{!isCollapsed && 'Pilih ruang kerja'}
-        </Link>
-        {menuItems.map((item) => {
+        </Link>}
+        {menuItems.filter(item => item.id !== 'creative' || canSwitchWorkspace).map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
 
@@ -95,8 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Halaman tetap mengelola pembatasan hak akses; menu perlu selalu terlihat. */}
-      <div className="px-2 pb-1">
+      {canManageAccess && <div className="px-2 pb-1">
         <a
           href="/launch/app/settings"
           title={isCollapsed ? 'Pengaturan & Hak Akses' : undefined}
@@ -107,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="truncate flex-1 text-left tracking-tight">Pengaturan & Akses</span>
           )}
         </a>
-      </div>
+      </div>}
 
       {/* Footer Collapse Toggle */}
       <div className="p-2 border-t border-slate-200">

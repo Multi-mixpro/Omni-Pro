@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense } from 'react';
 import { AuthGate } from '@/core/auth/AuthGate';
 import { useAuth } from '@/core/auth/useAuth';
+import { workspaceAccess } from '@/core/auth/workspaceAccess';
 import PatenApp from '@/modules/launch/paten/App';
 import { SettingsPage } from '@/modules/launch/settings/SettingsPage';
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
@@ -33,11 +34,7 @@ function ProtectedPatenApp() {
   const auth = useAuth();
   if (auth.isLoading) return <BootScreen />;
 
-  const hasLaunchAccess =
-    auth.data?.permissions.includes('launch.view') ||
-    auth.data?.permissions.includes('launch.admin');
-
-  if (!auth.data?.session || !auth.data.profile || !hasLaunchAccess) {
+  if (!auth.data?.session || !auth.data.profile?.is_active || !workspaceAccess(auth.data.permissions).launch) {
     return <AuthGate />;
   }
 
@@ -58,11 +55,7 @@ function ProtectedSettingsPage() {
   const auth = useAuth();
   if (auth.isLoading) return <BootScreen />;
 
-  const hasLaunchAccess =
-    auth.data?.permissions.includes('launch.view') ||
-    auth.data?.permissions.includes('launch.admin');
-
-  if (!auth.data?.session || !auth.data.profile || !hasLaunchAccess) {
+  if (!auth.data?.session || !auth.data.profile?.is_active || !workspaceAccess(auth.data.permissions).admin) {
     return <AuthGate />;
   }
 
@@ -116,7 +109,7 @@ function ProtectedWorkspacePicker() {
   const auth = useAuth();
   if (auth.isLoading) return <BootScreen />;
   const permissions = auth.data?.permissions ?? [];
-  if (!auth.data?.session || !auth.data.profile?.is_active || !permissions.some(permission => ['launch.view', 'launch.admin'].includes(permission))) return <AuthGate />;
+  if (!auth.data?.session || !auth.data.profile?.is_active || !workspaceAccess(permissions).both) return <AuthGate />;
   return <WorkspacePicker name={auth.data.profile.full_name} userId={auth.data.profile.id}
     jobTitle={auth.data.profile.job_title} permissions={permissions} />;
 }
@@ -125,13 +118,14 @@ function ProtectedCreativeWorkspace() {
   const auth = useAuth();
   if (auth.isLoading) return <BootScreen />;
   const permissions = auth.data?.permissions ?? [];
-  if (!auth.data?.session || !auth.data.profile?.is_active || !permissions.some(permission => ['launch.view', 'launch.admin'].includes(permission))) {
+  const access = workspaceAccess(permissions);
+  if (!auth.data?.session || !auth.data.profile?.is_active || !access.creative) {
     return <AuthGate />;
   }
   return <Suspense fallback={<BootScreen />}>
     <CreativeWorkspace key={auth.data.profile.id} userId={auth.data.profile.id}
-      isAdmin={permissions.includes('launch.admin')} jobTitle={auth.data.profile.job_title}
-      canEdit={permissions.some(permission => ['launch.edit', 'launch.admin'].includes(permission))} />
+      isAdmin={access.admin} jobTitle={auth.data.profile.job_title}
+      canEdit={access.creativeEdit} canSwitchWorkspace={access.both} />
   </Suspense>;
 }
 

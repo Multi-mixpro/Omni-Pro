@@ -6,7 +6,7 @@ export interface TeamMember extends Profile {
   role_name: string | null;
 }
 
-export interface RoleOption { code: string; name: string }
+export interface RoleOption { code: string; name: string; description: string | null }
 
 export interface NewTeamUserInput {
   username: string;
@@ -48,7 +48,7 @@ async function authorizedFetch(path: string, body: unknown) {
 }
 
 export async function listRoles(): Promise<RoleOption[]> {
-  const { data, error } = await supabase.from('roles').select('code, name').order('name');
+  const { data, error } = await supabase.from('roles').select('code, name, description').order('name');
   if (error) throw error;
   return (data ?? []) as RoleOption[];
 }

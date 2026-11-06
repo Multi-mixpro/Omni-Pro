@@ -71,6 +71,12 @@ export async function publications(column: 'task_id' | 'account_id', id: string,
   return (data ?? []) as unknown as Publication[];
 }
 
+export async function publicationTaskId(id: string) {
+  const { data,error } = await supabase.from('creative_publications').select('task_id').eq('id',id).single();
+  if (error) throw error;
+  return data.task_id as string;
+}
+
 export async function recordPublication(task: Task, account: string, url: string, publishedAt: string) {
   const link = safeOutputUrl(url);
   if (!link) throw new Error('Masukkan tautan publik HTTP atau HTTPS yang valid.');

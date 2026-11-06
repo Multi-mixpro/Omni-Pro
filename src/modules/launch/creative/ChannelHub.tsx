@@ -80,21 +80,23 @@ function ActivationForm({ row, campaigns, members, scope, userId, onCancel, onSa
   </Editor>;
 }
 
-export function ChannelHub({ userId, unit, scope, today, canEdit, campaigns, members, overview, initialReview, onTask }: {
+export function ChannelHub({ userId, unit, scope, today, canEdit, campaigns, members, overview, initialReview, onTask, initialActivation }: {
   userId: string; unit: string; scope: string; today: string; canEdit: boolean; campaigns: Campaign[];
   members: TeamMember[]; overview: ChannelSummary[] | undefined; initialReview: string;
   onTask: (id: string) => void;
+  initialActivation?: string;
 }) {
   const client = useQueryClient();
   const [platform, setPlatform] = useState('');
   const [review, setReview] = useState(initialReview);
+  const [activation, setActivation] = useState(initialActivation);
   const [page, setPage] = useState(0);
   const [editor, setEditor] = useState<Activation | 'new' | null>(null);
   const [followup, setFollowup] = useState<Activation | null>(null);
   const [notice, setNotice] = useState('');
   const query = useQuery({
-    queryKey: ['creative', userId, 'activations', unit, scope, page, platform, review, today],
-    queryFn: ({ signal }) => channelActivations(unit, scope, page, platform, review, today, signal),
+    queryKey: ['creative', userId, 'activations', unit, scope, page, platform, review, today, activation],
+    queryFn: ({ signal }) => channelActivations(unit, scope, page, platform, review, today, signal, undefined, activation),
   });
   const openEditor = (item: Activation | 'new') => {
     setEditor(item); setNotice('');
@@ -117,7 +119,7 @@ export function ChannelHub({ userId, unit, scope, today, canEdit, campaigns, mem
       onSave={data => createActivationFollowup(followup.id,value(data,'person'),value(data,'due'))}
       onSaved={id => {
         setFollowup(null);
-        for (const key of ['tasks','summary','calendar']) void client.invalidateQueries({ queryKey: ['creative',userId,key] });
+        for (const key of ['tasks','summary','calendar','workload']) void client.invalidateQueries({ queryKey: ['creative',userId,key] });
         void client.invalidateQueries({ queryKey: ['business-execution',userId] });
         onTask(id);
       }}>
@@ -137,6 +139,9 @@ export function ChannelHub({ userId, unit, scope, today, canEdit, campaigns, mem
     </div>}
     <p className="text-xs text-slate-600">Ringkasan memakai seluruh lingkup kampanye terpilih. Anggaran kanal dicatat terpisah dari anggaran kampanye.</p>
     <div className={panel + ' space-y-3'}>
+      {activation && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-teal-50 p-3 text-sm">
+        <span>Aktivasi dipilih dari agenda</span><button className={button} onClick={() => { setActivation(undefined); setPage(0); }}>Tampilkan semua aktivasi</button>
+      </div>}
       <div className="grid gap-2 sm:grid-cols-2">
         <select className={field} aria-label="Filter platform iklan" value={platform} onChange={event => { setPlatform(event.target.value); setPage(0); }}><option value="">Semua platform</option><Options values={channelPlatforms} /></select>
         <select className={field} aria-label="Filter evaluasi kanal" value={review} onChange={event => { setReview(event.target.value); setPage(0); }}>

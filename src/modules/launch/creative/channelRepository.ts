@@ -31,7 +31,7 @@ export async function channelSummary(unit: string, campaign: string, today: stri
   return (data ?? []) as ChannelSummary[];
 }
 
-export async function channelActivations(unit: string, campaign: string, page: number, platform: string, review: string, today: string, signal: AbortSignal, accountId?: string) {
+export async function channelActivations(unit: string, campaign: string, page: number, platform: string, review: string, today: string, signal: AbortSignal, accountId?: string, activationId?: string) {
   const start = page * PAGE_SIZE;
   let query = supabase.from('creative_channel_activations')
     .select('id,updated_at,campaign_id,account_id,name,platform,channel_name,distribution,status,assignee_id,starts_on,ends_on,review_on,budget_idr,spent_idr,metric,target_result,actual_result,evaluation,decision,campaign:creative_campaigns!inner(name,business_unit_id),account:creative_accounts(handle)');
@@ -39,6 +39,7 @@ export async function channelActivations(unit: string, campaign: string, page: n
   if (campaign !== 'all') query = query.eq('campaign_id', campaign);
   if (platform) query = query.eq('platform', platform);
   if (accountId) query = query.eq('account_id',accountId);
+  if (activationId) query = query.eq('id',activationId);
   if (review === 'overdue') query = query.lt('review_on', today).not('status', 'in', '(evaluated,cancelled)');
   else if (review === 'open') query = query.not('status', 'in', '(evaluated,cancelled)');
   else if (review === 'evaluated') query = query.eq('status', 'evaluated');
@@ -64,8 +65,8 @@ export async function createActivationFollowup(id: string, pic: string, due: str
 
 export const eventKinds = { deadline: 'Deadline', publish: 'Jadwal tayang', evaluation: 'Evaluasi kanal', published: 'Tayang aktual' };
 export type CalendarEvent = { item_id: string; title: string; platform: keyof typeof platforms; event_day: string; kind: keyof typeof eventKinds; status: string };
-export async function calendarEvents(unit: string, scope: string, from: string, until: string, page: number, kind: string, signal: AbortSignal) {
-  const start = page * PAGE_SIZE;
+export async function calendarEvents(unit: string, scope: string, from: string, until: string, page: number, kind: string, signal: AbortSignal, size = PAGE_SIZE) {
+  const start = page * size;
   const pUnit = unit === 'all' || unit === 'unassigned' ? null : unit;
   const pCampaign = scope === 'all' || scope === 'standalone' ? null : scope;
   let query = supabase.rpc('creative_calendar_events', {
@@ -74,7 +75,7 @@ export async function calendarEvents(unit: string, scope: string, from: string, 
     p_standalone: scope === 'standalone',
   });
   if (kind) query = query.eq('kind', kind);
-  const { data, error } = await query.order('event_day').order('kind').order('item_id').range(start, start + PAGE_SIZE).abortSignal(signal);
+  const { data, error } = await query.order('event_day').order('kind').order('item_id').range(start, start + size).abortSignal(signal);
   if (error) throw error;
   return (data ?? []) as CalendarEvent[];
 }

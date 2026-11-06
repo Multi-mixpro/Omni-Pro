@@ -16,3 +16,9 @@ export function mondayWeek(today: string) {
   date.setUTCDate(date.getUTCDate() + 7);
   return { monday, nextMonday: date.toISOString().slice(0, 10) };
 }
+
+export function shiftDay(day: string, offset: number) {
+  const date = new Date(day + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}

@@ -25,7 +25,13 @@ Jika SQL Editor menampilkan `42P07: creative_channel_activations already exists`
 | Monitoring | Kotak Tindakan | Urutkan yang perlu respons; ambil, tunda sampai tanggal tertentu, atau selesaikan tindak lanjut. |
 | Monitoring | Tim & PIC | Lihat antrean per PIC dan peran; buka pekerjaan orang yang dipilih. |
 
-Desktop memakai sidebar konsisten; HP memakai menu yang dapat dibuka dari header. Unit bisnis selalu terlihat di header. Pada tampilan lintas usaha, setiap kartu menunjukkan unit asal. Menu dan tombol memakai kemampuan akun yang sudah ada; filter unit bukan pembatas akses database. Pusat Kerja berisi tindakan, halaman detail berisi data lengkap, dan formulir muncul hanya untuk membuat/mengedit sesuatu.
+Desktop memakai sidebar konsisten; HP memakai menu yang dapat dibuka dari header. Unit bisnis selalu terlihat di header. Pada tampilan lintas usaha, setiap kartu menunjukkan unit asal. Akses Launching dan Creative dipisah berdasarkan role; filter unit tetap untuk navigasi dan laporan. Pusat Kerja berisi tindakan, halaman detail berisi data lengkap, dan formulir muncul hanya untuk membuat/mengedit sesuatu.
+
+## Akses ruang kerja
+
+Admin menentukan role dari **Pengaturan & Akses → Pengguna**. Pilihan Creative Viewer dan Operator membuka Creative saja; Viewer tidak bisa mengubah data. **Launching & Creative · Operator** membuka keduanya tanpa hak admin atau keputusan approval akhir. Role Launching yang ada tetap membuka Launching saja; akun dengan izin `launch.admin` membuka keduanya. Hanya akun dengan dua akses melihat pemilih saat login. Akun dengan satu akses langsung diarahkan ke ruang kerjanya, termasuk jika membuka URL ruang kerja lain.
+
+Terapkan `20261106020000_workspace_role_access.sql` setelah migrasi Command Center dan sebelum merilis frontend/API. Tidak ada penetapan ulang role lama secara otomatis. Admin perlu menetapkan role baru untuk anggota lama yang masih harus bekerja di Creative. Uji role Launching, Creative baca saja, Creative operator, dan akses ganda, baik saat login maupun saat membuka URL ruang kerja lain secara langsung.
 
 ## Dari ide sampai evaluasi
 

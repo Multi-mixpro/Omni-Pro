@@ -9,10 +9,13 @@ import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
 import { button, CampaignForm, errorText, field, Options, primary, TaskForm } from './CreativeForms';
 import { IdeaBank, ReferenceLinks } from './IdeaBank';
 import { CreativeOverview } from './CreativeOverview';
-import { channelSummary } from './channelRepository';
+import { CreativeAgenda } from './CreativeAgenda';
+import { CreativeTeamPerformance, WeeklyProgress } from './CreativePerformance';
+import { channelSummary, type CalendarEvent } from './channelRepository';
+import { publicationTaskId } from './commandRepository';
 import { focusLabels, jakartaToday, mondayWeek, type Focus } from './schedule';
 import {
-  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, PAGE_SIZE, platforms, priorities, safeOutputUrl, summary, tasks, taskStatuses, team, workstreams,
+  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, PAGE_SIZE, platforms, priorities, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
   type Campaign, type Filters, type Idea, type Task,
 } from './repository';
 
@@ -23,7 +26,7 @@ const CreativeInbox = lazy(() => import('./CreativeActions').then(module => ({ d
 const CreativeTaskDetail = lazy(() => import('./CreativeActions').then(module => ({ default: module.CreativeTaskDetail })));
 const sectionLoading = <p role="status" className="p-4 text-sm text-slate-600">Memuat bagian ini…</p>;
 
-const panel = 'rounded-xl border border-slate-200 bg-white p-4';
+const panel = 'rounded-2xl border border-teal-100 bg-white p-4 shadow-sm';
 const defaultFilters: Filters = { platform: '', status: '', assignee: '', workstream: '', order: 'due_on' };
 const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZone: 'UTC' });
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
@@ -73,8 +76,8 @@ function EditorDialog({ children, onClose }: { children: ReactNode; onClose: () 
   </dialog>;
 }
 
-export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }: {
-  userId: string; canEdit: boolean; isAdmin: boolean; jobTitle?: string | null;
+export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle, canSwitchWorkspace }: {
+  userId: string; canEdit: boolean; isAdmin: boolean; jobTitle?: string | null; canSwitchWorkspace: boolean;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -85,6 +88,9 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
   const [showFilters, setShowFilters] = useState(false);
   const [taskView, setTaskView] = useState<'list' | 'board'>('board');
   const [adsReview, setAdsReview] = useState('');
+  const [adsActivation, setAdsActivation] = useState<string>();
+  const [calendarDay, setCalendarDay] = useState<string>();
+  const [navigationError,setNavigationError] = useState('');
   const [scope, setScope] = useState('all');
   const [unit, setUnit] = useState(() => {
     const value = new URLSearchParams(location.search).get('unit');
@@ -106,7 +112,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
   const { monday, nextMonday } = mondayWeek(today);
   const sunday = new Date(Date.parse(nextMonday + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10);
   const campaignQuery = useInfiniteQuery({
-    enabled: !['ideas','team','accounts'].includes(section) || !!editor,
+    enabled: !['ideas','accounts'].includes(section) || !!editor,
     queryKey: [...prefix, 'campaigns', unit], initialPageParam: 0,
     queryFn: ({ pageParam, signal }) => campaigns(pageParam, signal, unit),
     getNextPageParam: (last, _, lastPage) => last.length > PAGE_SIZE ? lastPage + 1 : undefined,
@@ -137,6 +143,14 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
     queryKey: [...prefix, 'summary', unit, campaignId, today], queryFn: ({ signal }) => summary(campaignId, today, signal, unit),
   });
   const counts = summaryQuery.data;
+  const group = section === 'team' ? 'team' : 'campaign';
+  const performanceScope = group === 'team' ? scope : 'all';
+  const performance = useQuery({
+    enabled: section === 'team' || section === 'campaigns',
+    queryKey: [...prefix,'workload',group,unit,performanceScope,today],
+    queryFn: ({ signal }) => workload(group,unit,performanceScope,today,signal),
+  });
+  const campaignStats = new Map(performance.data?.map(item => [item.subject_id,item]));
   const adsScope = scope === 'standalone' ? 'all' : scope;
   const channels = useQuery({
     enabled: section === 'ads' || (['overview','inbox'].includes(section) && scope !== 'standalone'),
@@ -145,7 +159,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
   });
   const overdueEvaluations = channels.data?.reduce((sum, row) => sum + Number(row.overdue), 0) ?? 0;
   const pendingEvaluations = channels.data?.reduce((sum, row) => sum + Number(row.pending_review), 0) ?? 0;
-  const loading = campaignQuery.isFetching || visibleQuery.isFetching || summaryQuery.isFetching || teamQuery.isFetching;
+  const loading = campaignQuery.isFetching || visibleQuery.isFetching || summaryQuery.isFetching || teamQuery.isFetching || performance.isFetching;
   const error = campaignQuery.error || (section === 'work' ? visibleQuery.error : null) || summaryQuery.error || teamQuery.error;
   const changeScope = (next: string) => { setScope(next); setPage(0); setEditor(null); setNotice(''); setDiscussionCampaign(null); };
   const changeFilter = (values: Partial<Filters>) => { setFilters(current => ({ ...current, ...values })); setPage(0); };
@@ -161,16 +175,26 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
   const openSection = (next: Section, review = '') => {
     if (next === 'ads') {
       setAdsReview(review);
+      setAdsActivation(undefined);
       if (scope === 'standalone') changeScope('all');
     }
+    if (next === 'calendar') setCalendarDay(undefined);
     setSection(next);
     setMenuOpen(false);
     setNotice('');
+    setNavigationError('');
+  };
+  const openCalendar = (day: string) => { openSection('calendar'); setCalendarDay(day); };
+  const openCalendarEvent = async (event: CalendarEvent) => {
+    setNavigationError('');
+    if (event.kind === 'evaluation') { openSection('ads'); setAdsActivation(event.item_id); return; }
+    try { setDetailId(event.kind === 'published' ? await publicationTaskId(event.item_id) : event.item_id); }
+    catch (reason) { setNavigationError(errorText(reason)); }
   };
   const openEditor = (next: Editor) => { setEditor(next); setNotice(''); };
   const refresh = () => void client.invalidateQueries({ queryKey: prefix });
   const taskChanged = () => {
-    for (const key of ['tasks','task-detail','task-events','publications','summary','calendar','ideas']) {
+    for (const key of ['tasks','task-detail','task-events','publications','summary','calendar','ideas','workload']) {
       void client.invalidateQueries({ queryKey: [...prefix,key] });
     }
     void client.invalidateQueries({ queryKey: ['business-execution',userId] });
@@ -180,6 +204,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
     setNotice('Perubahan tersimpan.');
     void client.invalidateQueries({ queryKey: [...prefix, 'tasks'] });
     void client.invalidateQueries({ queryKey: [...prefix, 'summary'] });
+    void client.invalidateQueries({ queryKey: [...prefix, 'workload'] });
     void client.invalidateQueries({ queryKey: [...prefix, 'calendar'] });
     if (editor?.kind === 'task') void client.invalidateQueries({ queryKey: [...prefix, 'ideas'] });
     if (editor?.kind === 'task') void client.invalidateQueries({ queryKey: [...prefix, 'task-events'] });
@@ -196,6 +221,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
       await Promise.all([
         client.invalidateQueries({ queryKey: [...prefix, 'tasks'] }),
         client.invalidateQueries({ queryKey: [...prefix, 'summary'] }),
+        client.invalidateQueries({ queryKey: [...prefix, 'workload'] }),
         client.invalidateQueries({ queryKey: [...prefix, 'calendar'] }),
         client.invalidateQueries({ queryKey: [...prefix, 'ideas'] }),
         client.invalidateQueries({ queryKey: [...prefix, 'task-events'] }),
@@ -214,18 +240,24 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
     })
     : [{ status: null, rows: tasksOnPage, total: tasksOnPage.length }];
   const hasNextTasks = taskView === 'board' ? taskGroups.some(group => group.total > (page + 1)*BOARD_PAGE_SIZE) : (taskQuery.data?.length ?? 0) > PAGE_SIZE;
+  const activeSection = navigation.flatMap(group => [...group.items]).find(item => item.id === section)?.label;
+  const highlights = (currentCampaign ? [currentCampaign] : [...campaignList]
+    .filter(item => item.status === 'active' || item.status === 'planned')
+    .sort((a,b) => Number(b.status === 'active') - Number(a.status === 'active') ||
+      (a.ends_on ?? '9999-12-31').localeCompare(b.ends_on ?? '9999-12-31'))).slice(0,3);
 
-  return <main className="min-h-screen bg-slate-50 px-4 py-5 text-slate-900 sm:px-6">
-    <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[215px_minmax(0,1fr)]">
-      <aside className="self-start space-y-2 rounded-xl border border-slate-200 bg-white p-3 lg:sticky lg:top-4">
-        <div className="flex items-center justify-between gap-2 px-2 py-1">
-          <strong className="text-teal-900">Omni Pro · Creative</strong>
+  return <main className="min-h-screen bg-[#eaf4f3] px-3 py-4 text-slate-900 sm:px-6 sm:py-6">
+    <div className="mx-auto grid max-w-[1536px] gap-4 lg:grid-cols-[218px_minmax(0,1fr)] xl:gap-5">
+      <aside className="self-start space-y-4 rounded-3xl border border-teal-100 bg-white p-3 shadow-sm lg:sticky lg:top-4">
+        <div className="flex items-center justify-between gap-2 px-2 py-2">
+          <div className="flex min-w-0 items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-900 text-white"><Megaphone size={17} /></span>
+            <div><strong className="block text-teal-950">Omni Pro</strong><span className="block text-xs text-slate-600">Creative workspace</span></div></div>
           <button className={button + ' inline-flex items-center gap-1 lg:hidden'} aria-expanded={menuOpen} aria-controls="creative-navigation"
             onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> Menu</button>
         </div>
         <nav id="creative-navigation" aria-label="Bagian Creative Dashboard" className={(menuOpen ? 'block' : 'hidden') + ' space-y-3 lg:block'}>
           {navigation.map(group => <div key={group.label} className="space-y-1">
-            <p className="px-2 text-xs font-bold uppercase tracking-wide text-slate-600">{group.label}</p>
+            <p className="px-2 text-xs font-bold uppercase tracking-wide text-teal-900/75">{group.label}</p>
             {group.items.map(({ id,label,icon:Icon }) => <button key={id} aria-current={section === id ? 'page' : undefined}
               className={'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold ' + (section === id ? 'bg-teal-800 text-white' : 'text-slate-700 hover:bg-slate-100')}
               onClick={() => openSection(id)}><Icon className="shrink-0" size={16} />{label}</button>)}
@@ -233,25 +265,23 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
         </nav>
       </aside>
       <div className="min-w-0 space-y-4">
-      <nav aria-label="Ruang kerja" className="flex flex-wrap items-center justify-between gap-2">
-        <Link to="/launch/app" className={button + ' inline-flex items-center gap-2'}><ArrowLeft size={16} /> Pilih ruang kerja</Link>
-        <button className={button} onClick={async () => { await signOut(); navigate('/launch/login'); }}>Keluar</button>
-      </nav>
-      <header className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-teal-100 bg-white p-5 shadow-sm sm:p-6">
         <div>
-          <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-teal-800"><Megaphone size={17} /> Ruang kerja tim kreatif</p>
-          <h1 className="text-2xl font-bold sm:text-3xl">Creative Dashboard</h1>
+          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-teal-800">Creative Dashboard</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{activeSection}</h1>
           <p className="mt-1 text-sm text-slate-600">{jobTitle || (isAdmin ? 'Admin / Owner' : 'Anggota tim')} · {canEdit ? 'Kelola tugas dan kampanye' : 'Pantau pekerjaan'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canSwitchWorkspace && <Link to="/launch/app" className={button + ' inline-flex items-center gap-2'}><ArrowLeft size={16} /> Pilih ruang kerja</Link>}
+          <button className={button} onClick={async () => { await signOut(); navigate('/launch/login'); }}>Keluar</button>
           <button className={button + ' inline-flex items-center gap-2'} disabled={loading} onClick={refresh}><RefreshCw size={15} /> Segarkan</button>
           {canEdit && section === 'campaigns' && <button className={primary + ' inline-flex items-center gap-2'} onClick={() => openEditor({ kind: 'campaign' })}><Plus size={16} /> Kampanye baru</button>}
           {canEdit && (section === 'overview' || section === 'work') && <button className={primary + ' inline-flex items-center gap-2'} disabled={currentCampaign?.status === 'archived'} onClick={() => openEditor({ kind: 'task' })}><Plus size={16} /> Tugas baru</button>}
         </div>
       </header>
 
-      <div className={panel + ' flex flex-wrap items-end gap-3'}>
-        <label className="min-w-0 flex-1 space-y-1 text-sm font-semibold">Unit bisnis
+      <div className={panel + ' flex flex-wrap items-end gap-3'} aria-label="Filter ruang kerja">
+        <label className="min-w-0 flex-[1_1_12rem] space-y-1 text-sm font-semibold">Unit bisnis
           <select className={field} value={unit} onChange={event => { setUnit(event.target.value); changeScope('all'); }}>
             <option value="all">Semua unit bisnis</option>
             <option value="unassigned">Unit belum ditetapkan</option>
@@ -259,6 +289,16 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
             {units.data?.map(row => <option key={row.id} value={row.id}>{row.name} · {unitSectors[row.sector]}{row.is_active ? '' : ' (arsip)'}</option>)}
           </select>
         </label>
+        {!['campaigns','accounts','ideas'].includes(section) && <>
+          <label className="min-w-0 flex-[1_1_14rem] space-y-1 text-sm font-semibold">Lingkup pekerjaan
+            <select className={field} value={scope} onChange={event => changeScope(event.target.value)}>
+              <option value="all">Semua pekerjaan</option>
+              {section !== 'ads' && <option value="standalone">Tanpa kampanye</option>}
+              {campaignList.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}{campaign.status === 'archived' ? ' (arsip)' : ''}</option>)}
+            </select>
+          </label>
+          {campaignQuery.hasNextPage && <button className={button} disabled={campaignQuery.isFetchingNextPage} onClick={() => void campaignQuery.fetchNextPage()}>Muat kampanye lain</button>}
+        </>}
         {isAdmin && <Link to="/launch/app/settings" className={button}>Kelola unit bisnis</Link>}
         {units.isError && <p role="alert" className="w-full text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
       </div>
@@ -271,26 +311,15 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
         window.scrollTo({ top: 0 });
       }} /> : <>
       {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">Data belum dapat dimuat: {errorText(error)}</p>}
+      {navigationError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{navigationError}</p>}
       {notice && <p className="text-sm font-medium text-teal-800" role="status">{notice}</p>}
 
-      {!['campaigns','team','accounts'].includes(section) && <section className={panel + ' space-y-3'} aria-label="Lingkup kampanye">
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="min-w-[14rem] flex-1 space-y-1 text-sm font-semibold">Lingkup pekerjaan
-            <select className={field} value={scope} onChange={event => changeScope(event.target.value)}>
-              <option value="all">Semua pekerjaan</option>
-              {section !== 'ads' && <option value="standalone">Tanpa kampanye</option>}
-              {campaignList.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}{campaign.status === 'archived' ? ' (arsip)' : ''}</option>)}
-            </select>
-          </label>
-          {campaignQuery.hasNextPage && <button className={button} disabled={campaignQuery.isFetchingNextPage} onClick={() => void campaignQuery.fetchNextPage()}>Muat kampanye lain</button>}
-        </div>
-      </section>}
-
       {section === 'campaigns' && <section className="space-y-3" aria-label="Daftar kampanye">
-        <h2 className="text-lg font-bold">Daftar kampanye</h2>
+        <div><h2 className="text-lg font-bold">Portofolio kampanye</h2><p className="text-sm text-slate-600">Target tugas, PIC, anggaran, dan aksi berikutnya per kampanye.</p></div>
+        {performance.isError && <p role="alert" className="text-sm text-rose-800">Target kampanye belum dapat dimuat. Informasi kampanye tetap tersedia.</p>}
         {campaignQuery.isPending && <p role="status" className={panel}>Memuat kampanye…</p>}
         {campaignQuery.isSuccess && !campaignList.length && <p className={panel + ' text-sm text-slate-600'}>Belum ada kampanye pada unit ini.</p>}
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {campaignList.map(campaign => <article key={campaign.id} className={panel + ' min-w-0 space-y-3'}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <h3 className="min-w-0 break-words font-bold">{campaign.name}</h3>
@@ -298,6 +327,10 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
             </div>
             <p className="text-sm text-slate-600">{unitName(campaign.business_unit_id)} · PIC: {person(campaign.owner_id)}</p>
             <p className="text-xs text-slate-600">{date(campaign.starts_on)} – {date(campaign.ends_on)}</p>
+            {performance.data && <WeeklyProgress stats={campaignStats.get(campaign.id) ?? {
+              subject_id:campaign.id,week_done:0,week_target:0,open_count:0,review_count:0,blocked_count:0,overdue_count:0,
+            }} />}
+            {!!campaignStats.get(campaign.id)?.overdue_count && <p className="text-xs font-semibold text-rose-800">{campaignStats.get(campaign.id)?.overdue_count} tugas lewat deadline</p>}
             {campaign.objective && <details className="text-sm"><summary className="cursor-pointer font-medium">Tujuan kampanye</summary><p className="mt-1 whitespace-pre-wrap break-words">{campaign.objective}</p></details>}
             <dl className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs">
               <div><dt>Anggaran</dt><dd className="font-semibold">{rupiah.format(campaign.budget_idr)}</dd></div>
@@ -306,7 +339,7 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
             </dl>
             <div className="flex flex-wrap gap-2">
               <button className={button + ' inline-flex items-center gap-2'} onClick={() => { changeScope(campaign.id); openFocus('all'); }}>Lihat tugas <ArrowRight size={14} /></button>
-              <button className={button} onClick={() => { changeScope(campaign.id); setAdsReview(''); setSection('ads'); }}>Iklan &amp; evaluasi</button>
+              <button className={button} onClick={() => { openSection('ads'); changeScope(campaign.id); }}>Iklan &amp; evaluasi</button>
               <button className={button} aria-expanded={discussionCampaign === campaign.id}
                 onClick={() => setDiscussionCampaign(discussionCampaign === campaign.id ? null : campaign.id)}>Diskusi</button>
               {canEdit && <button className={button} onClick={() => openEditor({ kind: 'campaign', row: campaign })}>Edit</button>}
@@ -323,45 +356,54 @@ export default function CreativeWorkspace({ userId, canEdit, isAdmin, jobTitle }
             campaignId={campaignId === 'all' ? null : campaignId} campaignList={campaignList} defaultUnit={defaultUnit} members={members} onCancel={() => setEditor(null)} onSaved={saved} />}
       </EditorDialog>}
 
-      {section === 'overview' && (counts
+      {section === 'overview' && <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_350px]">
+      <div className="min-w-0 space-y-3">
+      {counts
         ? <CreativeOverview counts={counts} period={date(monday) + ' – ' + date(sunday)} onFocus={openFocus} />
-        : <p role="status" className={panel + ' text-sm text-slate-600'}>{summaryQuery.isPending ? 'Memuat ringkasan…' : 'Ringkasan belum tersedia.'}</p>)}
-      {section === 'overview' && <div className={panel + ' flex flex-wrap gap-2'} aria-label="Pintasan eksekusi">
+        : <p role="status" className={panel + ' text-sm text-slate-600'}>{summaryQuery.isPending ? 'Memuat ringkasan…' : 'Ringkasan belum tersedia.'}</p>}
+      <div className={panel + ' flex flex-wrap gap-2'} aria-label="Pintasan eksekusi">
         <button className={primary} onClick={() => { chooseFocus('all',true); changeFilter({ assignee:userId }); openSection('work'); }}>Tugas saya</button>
         <button className={button} onClick={() => openFocus('today')}>Deadline hari ini</button>
         <button className={button} onClick={() => openFocus('ready')}>Siap tayang</button>
+        <button className={button + ' xl:hidden'} onClick={() => openCalendar(today)}>Agenda hari ini</button>
         <button className={button} onClick={() => openSection('inbox')}>Kotak tindakan</button>
-      </div>}
+      </div>
+      {highlights.length > 0 && <section className={panel + ' space-y-2'} aria-label="Sorotan kampanye">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Sorotan kampanye</h2>
+          <button type="button" className="text-sm font-semibold text-teal-800 underline" onClick={() => openSection('campaigns')}>Lihat Campaign Hub</button></div>
+        {highlights.map(campaign => <button type="button" key={campaign.id} onClick={() => { changeScope(campaign.id); openFocus('all'); }}
+          className="flex w-full items-center justify-between gap-2 rounded-xl border border-teal-100 p-3 text-left hover:bg-teal-50">
+          <span className="min-w-0"><span className="block break-words text-sm font-bold">{campaign.name}</span>
+            <span className="text-xs text-slate-600">{unitName(campaign.business_unit_id)} · {campaignStatuses[campaign.status]} · {campaign.ends_on ? 'Sampai '+date(campaign.ends_on) : 'Tanpa tanggal akhir'}</span></span>
+          <ArrowRight size={16} className="shrink-0 text-teal-800" />
+        </button>)}
+      </section>}
 
-      {section === 'overview' && scope !== 'standalone' && <section className={panel + ' flex flex-wrap items-center justify-between gap-3'} aria-label="Pengingat evaluasi">
+      {scope !== 'standalone' && <section className={panel + ' flex flex-wrap items-center justify-between gap-3'} aria-label="Pengingat evaluasi">
         <div><h2 className="flex items-center gap-2 font-bold"><Bell size={16} /> Pengingat evaluasi kanal</h2>
           <p className="text-sm text-slate-600">{channels.isPending ? 'Memuat pengingat…' : channels.isError ? 'Pengingat belum dapat dimuat.' : `${pendingEvaluations} perlu dievaluasi hingga 7 hari ke depan, termasuk ${overdueEvaluations} terlambat.`}</p></div>
         <button className={button} onClick={() => openSection('ads', overdueEvaluations ? 'overdue' : 'open')}>Buka evaluasi</button>
       </section>}
+      </div>
+      <CreativeAgenda userId={userId} unit={unit} scope={scope} today={today} onOpenCalendar={openCalendar} onEvent={openCalendarEvent} />
+      </div>}
 
       {section === 'ads' && <Suspense fallback={sectionLoading}>
         {channels.isError && <p role="alert" className="text-sm text-red-700">Ringkasan kanal belum dapat dimuat.</p>}
-        <ChannelHub key={unit + ':' + adsScope + ':' + adsReview} unit={unit} scope={adsScope} userId={userId} today={today}
-          canEdit={canEdit} campaigns={campaignList} members={members} overview={channels.data} initialReview={adsReview} onTask={setDetailId} />
+        <ChannelHub key={unit + ':' + adsScope + ':' + adsReview + ':' + (adsActivation ?? '')} unit={unit} scope={adsScope} userId={userId} today={today}
+          canEdit={canEdit} campaigns={campaignList} members={members} overview={channels.data} initialReview={adsReview} initialActivation={adsActivation} onTask={setDetailId} />
       </Suspense>}
-      {section === 'calendar' && <Suspense fallback={sectionLoading}><CreativePlanner key={unit + ':' + scope} userId={userId} unit={unit} scope={scope} today={today} /></Suspense>}
+      {section === 'calendar' && <Suspense fallback={sectionLoading}><CreativePlanner key={unit + ':' + scope + ':' + (calendarDay ?? '')}
+        userId={userId} unit={unit} scope={scope} today={today} initialDay={calendarDay} onEvent={openCalendarEvent} /></Suspense>}
       {section === 'accounts' && <Suspense fallback={sectionLoading}><CreativeAccounts key={unit} userId={userId} unit={unit} today={today} members={members} canEdit={canEdit} /></Suspense>}
       {section === 'inbox' && <Suspense fallback={sectionLoading}><CreativeInbox userId={userId} counts={counts}
         evaluations={scope === 'standalone' || !channels.data ? undefined : overdueEvaluations}
         onFocus={openFocus} onAds={() => openSection('ads','overdue')} onTask={setDetailId} /></Suspense>}
       {detailId && <EditorDialog onClose={() => setDetailId(null)}><Suspense fallback={sectionLoading}><CreativeTaskDetail key={detailId} taskId={detailId} userId={userId} canEdit={canEdit}
         onClose={() => setDetailId(null)} onChanged={taskChanged} /></Suspense></EditorDialog>}
-      {section === 'team' && <section className={panel + ' space-y-3'} aria-label="Profil tim">
-        <h2 className="text-lg font-bold">Profil tim</h2>
-        <p className="text-sm text-slate-600">Anggota aktif lintas unit. Buka tugas PIC untuk unit yang sedang dipilih.</p>
-        {teamQuery.isPending && <p role="status" className="text-sm">Memuat tim…</p>}
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{members.filter(member => member.is_active).map(member => <li key={member.id}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 p-3">
-          <div className="min-w-0"><h3 className="break-words font-semibold">{member.full_name}{member.id === userId ? ' (Anda)' : ''}</h3>
-            <p className="text-sm text-slate-600">{member.job_title || 'Anggota tim'}</p></div>
-          <button className={button} onClick={() => { changeScope('all'); chooseFocus('all', true); changeFilter({ assignee: member.id }); setSection('work'); }}>Lihat tugas</button>
-        </li>)}</ul>
-      </section>}
+      {section === 'team' && <CreativeTeamPerformance members={members} stats={performance.data} userId={userId}
+        loading={teamQuery.isPending || performance.isPending} failed={teamQuery.isError || performance.isError}
+        onSelect={id => { chooseFocus('all',true); changeFilter({ assignee:id }); openSection('work'); }} />}
 
       {section === 'work' &&
       <section id="creative-task-list" className={panel + ' space-y-4'} aria-label="Daftar tugas kreatif">
