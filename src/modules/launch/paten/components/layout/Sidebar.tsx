@@ -16,7 +16,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
-  Megaphone,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -42,7 +41,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tint: 'text-sky-600', activeBg: 'bg-sky-50', activeBorder: 'border-sky-200' },
-    { id: 'creative', label: 'Konten & Kampanye', icon: Megaphone, tint: 'text-fuchsia-700', activeBg: 'bg-fuchsia-50', activeBorder: 'border-fuchsia-200' },
     { id: 'pipeline', label: 'Article Pipeline', icon: Kanban, tint: 'text-violet-600', activeBg: 'bg-violet-50', activeBorder: 'border-violet-200' },
     { id: 'implementation', label: 'Implementasi Artikel', icon: Rocket, tint: 'text-orange-600', activeBg: 'bg-orange-50', activeBorder: 'border-orange-200' },
     { id: 'tasks', label: 'Tasks & Updates', icon: CheckSquare, tint: 'text-rose-600', activeBg: 'bg-rose-50', activeBorder: 'border-rose-200', badge: blockedTasksCount > 0 ? `${blockedTasksCount}` : undefined, badgeColor: 'bg-[#C83B3B]' },
@@ -63,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {canSwitchWorkspace && <Link to="/launch/app" title="Pilih ruang kerja" className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50">
           <ChevronLeft className="h-4 w-4 shrink-0" />{!isCollapsed && 'Pilih ruang kerja'}
         </Link>}
-        {menuItems.filter(item => item.id !== 'creative' || canSwitchWorkspace).map((item) => {
+        {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
 
