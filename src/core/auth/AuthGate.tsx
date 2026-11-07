@@ -10,7 +10,8 @@ import {
   Users,
 } from 'lucide-react';
 import { Navigate } from '@/app/router/simpleRouter';
-import { signIn, signOut, useAuth } from './useAuth';
+import { signIn, useAuth } from './useAuth';
+import { AccountSignOut } from './AccountSignOut';
 import { workspaceAccess } from './workspaceAccess';
 
 export function AuthGate() {
@@ -45,12 +46,9 @@ export function AuthGate() {
               </p>
             </div>
             <div className="mt-6">
-              <button
+              <AccountSignOut
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#087E79] px-5 text-sm font-bold text-white transition hover:bg-[#066864]"
-                onClick={() => void signOut()}
-              >
-                Gunakan akun lain <ArrowRight size={18} />
-              </button>
+              />
             </div>
           </div>
         </div>

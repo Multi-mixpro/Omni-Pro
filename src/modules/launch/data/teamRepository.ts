@@ -6,7 +6,7 @@ export interface TeamMember extends Profile {
   role_name: string | null;
 }
 
-export interface RoleOption { code: string; name: string; description: string | null }
+export interface RoleOption { code: string; name: string; description: string | null; permissions: { code: string; name: string }[] }
 
 export interface NewTeamUserInput {
   username: string;
@@ -36,11 +36,17 @@ async function authorizedFetch(path: string, body: unknown) {
   const token = data.session?.access_token;
   if (!token) throw new Error('Sesi tidak tersedia. Silakan masuk ulang.');
 
-  const response = await fetch(path, {
+  const send = (accessToken: string) => fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify(body),
   });
+  let response = await send(token);
+  // A 401 is returned before the server performs any account changes.
+  if (response.status === 401) {
+    const { data: refreshed, error } = await supabase.auth.refreshSession();
+    if (!error && refreshed.session?.access_token) response = await send(refreshed.session.access_token);
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error ?? 'Permintaan gagal diproses.');
@@ -48,9 +54,13 @@ async function authorizedFetch(path: string, body: unknown) {
 }
 
 export async function listRoles(): Promise<RoleOption[]> {
-  const { data, error } = await supabase.from('roles').select('code, name, description').order('name');
+  const { data, error } = await supabase.from('roles').select('code,name,description,role_permissions(permission:permissions(code,name))').order('name');
   if (error) throw error;
-  return (data ?? []) as RoleOption[];
+  type Row = Omit<RoleOption, 'permissions'> & { role_permissions: { permission: RoleOption['permissions'][number] | null }[] };
+  return ((data ?? []) as unknown as Row[]).map(({ role_permissions, ...role }) => ({
+    ...role,
+    permissions: role_permissions.flatMap(item => item.permission ? [item.permission] : []).sort((a, b) => a.name.localeCompare(b.name, 'id')),
+  }));
 }
 
 export async function listTeamMembers(): Promise<TeamMember[]> {
@@ -109,30 +119,7 @@ export async function purgeOrphanedProfiles() {
 export const createTeamUser = (input: NewTeamUserInput) => authorizedFetch('/api/team-user-create', input);
 
 export async function deleteTeamUser(userId: string): Promise<DeleteTeamUserResult> {
-  let result: DeleteTeamUserResult = { id: userId, deleted: true, deleted_self: false };
-
-  // 1. Call serverless deletion API
-  try {
-    const apiRes = (await authorizedFetch('/api/team-user-delete', { user_id: userId })) as DeleteTeamUserResult;
-    if (apiRes) result = apiRes;
-  } catch (err) {
-    console.warn('API team-user-delete endpoint warning, running direct DB cleanup:', err);
-  }
-
-  // 2. Direct Supabase Hard Delete fallback to wipe out stuck deleted_... profiles
-  try {
-    await supabase.from('launch_project_members').delete().eq('user_id', userId);
-    await supabase.from('user_permission_overrides').delete().eq('user_id', userId);
-    await supabase.from('user_roles').delete().eq('user_id', userId);
-    await supabase.from('launch_projects').update({ created_by: null }).eq('created_by', userId);
-    await supabase.from('launch_projects').update({ owner_id: null }).eq('owner_id', userId);
-    await supabase.from('profiles').delete().eq('id', userId);
-    await purgeOrphanedProfiles();
-  } catch (dbErr) {
-    console.warn('Direct Supabase profile delete fallback error:', dbErr);
-  }
-
-  return result;
+  return await authorizedFetch('/api/team-user-delete', { user_id: userId }) as DeleteTeamUserResult;
 }
 
 export const updateTeamUser = (input: UpdateTeamUserInput) => authorizedFetch('/api/team-user-update', input);

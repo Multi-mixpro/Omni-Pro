@@ -1,7 +1,7 @@
 import { ArrowRight, Megaphone, Rocket } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from './simpleRouter';
-import { signOut } from '@/core/auth/useAuth';
+import { Link } from './simpleRouter';
+import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { businessOverview, unitSectors, useWorkspaceUnits } from '@/modules/launch/data/businessWorkspace';
 import { jakartaToday } from '@/modules/launch/creative/schedule';
 import { UNASSIGNED_BUSINESS_UNIT } from '@/modules/launch/paten/services/businessUnits';
@@ -14,15 +14,13 @@ const workspaces = [
 export function WorkspacePicker({ name, userId, jobTitle, permissions }: {
   name: string; userId: string; jobTitle?: string | null; permissions: string[];
 }) {
-  const navigate = useNavigate();
   const isAdmin = permissions.includes('launch.admin');
   const role = jobTitle || (isAdmin ? 'Admin / Owner' : permissions.includes('launch.approve') ? 'Reviewer' : 'Anggota tim');
   return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
     <div className="mx-auto max-w-4xl">
       <div className="mb-12 flex items-center justify-between gap-3">
         <span className="text-sm font-bold text-teal-800">Omni Pro</span>
-        <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold"
-          onClick={async () => { await signOut(); navigate('/launch/login'); }}>Keluar</button>
+        <AccountSignOut name={name} className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold" />
       </div>
       <p className="mb-2 text-sm font-medium text-slate-600">Halo, {name} · {role}</p>
       <h1 className="text-3xl font-bold sm:text-4xl">Pilih ruang kerja</h1>

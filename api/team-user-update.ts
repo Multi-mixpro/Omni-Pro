@@ -1,30 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
+import { authorizeTeamAdmin } from '../server/teamAdmin.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const INTERNAL_DOMAIN = 'team.ggindoapparel.internal';
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,40}$/;
 const PASSWORD_MIN_LENGTH = 6;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!supabaseUrl || !supabaseAnonKey) return res.status(500).json({ error: 'Konfigurasi Supabase belum lengkap' });
-  if (!serviceRoleKey) return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY belum diset di server' });
-
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Sesi diperlukan' });
-
-  const caller = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: userData, error: userError } = await caller.auth.getUser();
-  if (userError || !userData.user) return res.status(401).json({ error: 'Sesi tidak valid' });
-
-  const { data: allowed, error: permissionError } = await caller.rpc('has_permission', { permission_code: 'launch.admin' });
-  if (permissionError || !allowed) return res.status(403).json({ error: 'Hanya owner/admin yang dapat mengubah pengguna' });
+  const authorized = await authorizeTeamAdmin(req, res);
+  if (!authorized) return;
+  const { admin, user } = authorized;
 
   const targetId = String(req.body?.user_id ?? '').trim();
   const username = String(req.body?.username ?? '').trim().toLowerCase();
@@ -40,10 +24,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (password && password.length < PASSWORD_MIN_LENGTH) {
     return res.status(400).json({ error: 'Password baru minimal 6 karakter.' });
   }
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
 
   const [{ data: profile, error: profileError }, { data: roleRow, error: roleError }, { data: currentRoles, error: currentRolesError }, { data: duplicateUsername, error: duplicateUsernameError }] = await Promise.all([
     admin.from('profiles').select('id, username, is_active').eq('id', targetId).maybeSingle(),
@@ -62,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const currentRoleCode = ((currentRoles ?? []) as Array<{ role?: { code?: string } | null }>)
     .find(item => item.role?.code)?.role?.code ?? null;
-  if (targetId === userData.user.id && currentRoleCode && currentRoleCode !== roleCode) {
+  if (targetId === user.id && currentRoleCode && currentRoleCode !== roleCode) {
     return res.status(400).json({ error: 'Role akun sendiri tidak dapat diubah dari halaman ini.' });
   }
 

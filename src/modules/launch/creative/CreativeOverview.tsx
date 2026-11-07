@@ -6,10 +6,10 @@ export function CreativeOverview({ counts, period, onFocus }: {
   counts: Awaited<ReturnType<typeof summary>>; period: string; onFocus: (focus: Focus) => void;
 }) {
   const metrics = [
-    { focus: 'overdue', label: 'Terlambat', count: counts.overdue, icon: CalendarClock, color: 'text-rose-800 bg-rose-50' },
-    { focus: 'review', label: 'Menunggu review', count: counts.review, icon: ClipboardCheck, color: 'text-indigo-800 bg-indigo-50' },
-    { focus: 'blocked', label: 'Terhambat', count: counts.blocked, icon: CircleAlert, color: 'text-amber-800 bg-amber-50' },
-    { focus: 'unplanned', label: 'Tanpa PIC / deadline', count: counts.unplanned, icon: ListTodo, color: 'text-slate-800 bg-slate-100' },
+    { focus: 'overdue', label: 'Terlambat', count: counts.overdue, icon: CalendarClock, color: 'coral' },
+    { focus: 'review', label: 'Menunggu review', count: counts.review, icon: ClipboardCheck, color: 'blue' },
+    { focus: 'blocked', label: 'Terhambat', count: counts.blocked, icon: CircleAlert, color: 'yellow' },
+    { focus: 'unplanned', label: 'Tanpa PIC / deadline', count: counts.unplanned, icon: ListTodo, color: 'mint' },
   ] as const;
   const percent = counts.target ? Math.round(100 * counts.closed / counts.target) : 0;
   return <div className="space-y-3">
@@ -35,9 +35,9 @@ export function CreativeOverview({ counts, period, onFocus }: {
       <h2 className="font-bold">Perlu ditindak</h2>
       <p className="text-sm text-slate-600">Semua PIC pada unit dan kampanye terpilih.</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {metrics.map(({ focus, label, count, icon: Icon, color }) => <button key={focus} onClick={() => onFocus(focus)}
-          className="flex min-w-0 flex-col items-start gap-1 rounded-xl border border-slate-200 p-3 text-left hover:border-teal-500">
-          <span className={'rounded-lg p-1.5 ' + color}><Icon size={16} /></span>
+        {metrics.map(({ focus, label, count, icon: Icon, color }) => <button key={focus} onClick={() => onFocus(focus)} data-tone={color}
+          className="creative-focus-card flex min-w-0 flex-col items-start gap-1 rounded-xl border p-3 text-left">
+          <span className="rounded-lg bg-white/65 p-1.5"><Icon size={16} /></span>
           <span className="text-xl font-bold tabular-nums">{count}</span>
           <span className="text-xs font-medium text-slate-700">{label}</span>
         </button>)}

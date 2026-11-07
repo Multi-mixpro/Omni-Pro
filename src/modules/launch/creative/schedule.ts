@@ -22,3 +22,20 @@ export function shiftDay(day: string, offset: number) {
   date.setUTCDate(date.getUTCDate() + offset);
   return date.toISOString().slice(0, 10);
 }
+
+export function shiftMonth(day: string, offset: number) {
+  const date = new Date(day.slice(0, 7) + '-01T00:00:00Z');
+  date.setUTCMonth(date.getUTCMonth() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
+export function calendarMonth(day: string) {
+  const from = shiftMonth(day, 0);
+  const until = shiftMonth(day, 1);
+  const start = mondayWeek(from).monday;
+  const last = shiftDay(until, -1);
+  const end = mondayWeek(last).nextMonday;
+  const days: string[] = [];
+  for (let date = start; date < end; date = shiftDay(date, 1)) days.push(date);
+  return { from, until, days };
+}

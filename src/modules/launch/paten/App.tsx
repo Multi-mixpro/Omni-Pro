@@ -141,6 +141,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [signOutError, setSignOutError] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -521,8 +522,11 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/launch/login');
+    try {
+      setSignOutError(false);
+      await signOut();
+      navigate('/launch/login', { replace: true });
+    } catch { setSignOutError(true); }
   };
 
   const pendingApprovals = scopedApprovals.filter((a) => a.status === 'Pending');
@@ -550,6 +554,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
 
   return (
     <div className="paten-shell min-h-screen text-slate-900 font-sans antialiased selection:bg-[#087E79]/20 selection:text-[#087E79]">
+      {signOutError && <p role="alert" className="bg-rose-50 px-4 py-2 text-sm text-rose-800">Belum bisa keluar. Coba lagi dari menu akun.</p>}
       {syncError && (
         <div className="paten-floating-toast fixed right-3 z-[70] max-w-[calc(100vw-1.5rem)] sm:max-w-sm rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-900 shadow-lg">
           Perubahan tetap terlihat di layar, tetapi sinkronisasi database perlu diperiksa: {syncError}

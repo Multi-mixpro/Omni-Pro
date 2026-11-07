@@ -6,6 +6,7 @@ export function workspaceAccess(permissions: readonly string[]) {
   return {
     admin, launch, creative, both,
     creativeEdit: creative && (admin || permissions.includes('creative.edit')),
+    creativeRemove: creative && (admin || (permissions.includes('creative.edit') && permissions.includes('creative.tasks.remove'))),
     entry: both ? '/launch/app' : launch ? '/launch/app/today' : creative ? '/launch/app/creative' : null,
   };
 }

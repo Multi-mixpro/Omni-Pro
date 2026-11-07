@@ -17,4 +17,10 @@ describe('workspace permissions', () => {
     expect(workspaceAccess(['creative.edit']).entry).toBeNull();
     expect(workspaceAccess([]).entry).toBeNull();
   });
+  it('requires an explicit removal grant in addition to Creative editing', () => {
+    expect(workspaceAccess(['creative.view','creative.edit']).creativeRemove).toBe(false);
+    expect(workspaceAccess(['creative.view','creative.tasks.remove']).creativeRemove).toBe(false);
+    expect(workspaceAccess(['creative.view','creative.edit','creative.tasks.remove']).creativeRemove).toBe(true);
+    expect(workspaceAccess(['launch.admin']).creativeRemove).toBe(true);
+  });
 });

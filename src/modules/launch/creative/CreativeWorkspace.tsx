@@ -1,15 +1,15 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
-import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
-import { signOut } from '@/core/auth/useAuth';
+import { Link, useLocation } from '@/app/router/simpleRouter';
+import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
 import { isProjectId } from '../discussion/repository';
 import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
 import { button, CampaignForm, errorText, field, Options, primary, TaskForm } from './CreativeForms';
 import { IdeaBank, ReferenceLinks } from './IdeaBank';
 import { CreativeOverview } from './CreativeOverview';
-import { CreativeAgenda } from './CreativeAgenda';
+import { CreativeCalendar } from './CreativeCalendar';
 import { SavedTaskViews } from './SavedTaskViews';
 import { CreativeTeamPerformance, WeeklyProgress } from './CreativePerformance';
 import { channelSummary, type CalendarEvent } from './channelRepository';
@@ -22,7 +22,6 @@ import {
 import './creativeWorkspace.css';
 
 const ChannelHub = lazy(() => import('./ChannelHub').then(module => ({ default: module.ChannelHub })));
-const CreativePlanner = lazy(() => import('./CreativePlanner').then(module => ({ default: module.CreativePlanner })));
 const CreativeAccounts = lazy(() => import('./CreativeAccounts').then(module => ({ default: module.CreativeAccounts })));
 const CreativeInbox = lazy(() => import('./CreativeActions').then(module => ({ default: module.CreativeInbox })));
 const CreativeTaskDetail = lazy(() => import('./CreativeActions').then(module => ({ default: module.CreativeTaskDetail })));
@@ -40,14 +39,17 @@ const date = (value: string | null) => value ? dateFormat.format(new Date(value 
 type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea };
 type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'budget' | 'assets';
 const navigation = [
-  { label: 'Ruang kerja', items: [
+  { label: 'Rencana & produksi', items: [
     { id: 'overview', label: 'Pusat Kerja', icon: LayoutDashboard },
-    { id: 'work', label: 'Produksi & Publikasi', icon: ListTodo },
+    { id: 'ideas', label: 'Bank Ide', icon: Lightbulb },
+    { id: 'campaigns', label: 'Kampanye', icon: Megaphone },
     { id: 'studio', label: 'Studio Brief & Copy', icon: FileText },
+    { id: 'work', label: 'Produksi & Publikasi', icon: ListTodo },
     { id: 'decisions', label: 'Review & Persetujuan', icon: ClipboardCheck },
-    { id: 'campaigns', label: 'Campaign Hub', icon: Megaphone },
+  ] },
+  { label: 'Jadwal & tindak lanjut', items: [
     { id: 'calendar', label: 'Kalender', icon: CalendarDays },
-    { id: 'ideas', label: 'Bank Ide & Aset', icon: Lightbulb },
+    { id: 'inbox', label: 'Kotak Tindakan', icon: Bell },
   ] },
   { label: 'Pengelolaan', items: [
     { id: 'accounts', label: 'Akun & Performa', icon: AtSign },
@@ -55,7 +57,6 @@ const navigation = [
     { id: 'analytics', label: 'Analitik Creative', icon: BarChart3 },
     { id: 'budget', label: 'Anggaran Kanal', icon: Wallet },
     { id: 'assets', label: 'Pustaka Aset', icon: Images },
-    { id: 'inbox', label: 'Kotak Tindakan', icon: Bell },
     { id: 'team', label: 'Tim & PIC', icon: Users },
   ] },
 ] as const;
@@ -107,10 +108,9 @@ function EditorDialog({ children, onClose, label = 'Form pekerjaan kreatif' }: {
   </dialog>;
 }
 
-export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace }: {
-  userId: string; canEdit: boolean; canSwitchWorkspace: boolean;
+export default function CreativeWorkspace({ userId, userName, canEdit, canRemove, canSwitchWorkspace }: {
+  userId: string; userName: string; canEdit: boolean; canRemove: boolean; canSwitchWorkspace: boolean;
 }) {
-  const navigate = useNavigate();
   const location = useLocation();
   const client = useQueryClient();
   const [section, setSection] = useState<Section>(() => new URLSearchParams(location.search).get('mine') === '1' ? 'work' : 'overview');
@@ -120,7 +120,7 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
   const [taskView, setTaskView] = useState<'list' | 'board'>('board');
   const [adsReview, setAdsReview] = useState('');
   const [adsActivation, setAdsActivation] = useState<string>();
-  const [calendarDay, setCalendarDay] = useState<string>();
+  const [calendarDay, setCalendarDay] = useState(jakartaToday);
   const [navigationError,setNavigationError] = useState('');
   const [scope, setScope] = useState('all');
   const [unit, setUnit] = useState(() => {
@@ -210,13 +210,11 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
       setAdsActivation(undefined);
       if (scope === 'standalone') changeScope('all');
     }
-    if (next === 'calendar') setCalendarDay(undefined);
     setSection(next);
     setMenuOpen(false);
     setNotice('');
     setNavigationError('');
   };
-  const openCalendar = (day: string) => { openSection('calendar'); setCalendarDay(day); };
   const openCalendarEvent = async (event: CalendarEvent) => {
     setNavigationError('');
     if (event.kind === 'evaluation') { openSection('ads'); setAdsActivation(event.item_id); return; }
@@ -315,10 +313,10 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
         </div>
         <div className="creative-toolbar-actions flex flex-wrap gap-2">
           {canSwitchWorkspace && <Link to="/launch/app" className={button + ' inline-flex items-center gap-2'}><ArrowLeft size={16} /> Pilih ruang kerja</Link>}
-          <button className={button} onClick={async () => { await signOut(); navigate('/launch/login'); }}>Keluar</button>
+          <AccountSignOut name={userName} className={button + ' inline-flex items-center gap-2'} />
           <button className={button + ' inline-flex items-center gap-2'} disabled={loading} onClick={refresh}><RefreshCw size={15} /> Segarkan</button>
           {canEdit && section === 'campaigns' && <button className={primary + ' inline-flex items-center gap-2'} onClick={() => openEditor({ kind: 'campaign' })}><Plus size={16} /> Kampanye baru</button>}
-          {canEdit && (section === 'overview' || section === 'work' || section === 'studio') && <button className={primary + ' inline-flex items-center gap-2'} disabled={currentCampaign?.status === 'archived'} onClick={() => openEditor({ kind: 'task' })}><Plus size={16} /> Tugas baru</button>}
+          {canEdit && (section === 'overview' || section === 'work') && <button className={primary + ' inline-flex items-center gap-2'} disabled={currentCampaign?.status === 'archived'} onClick={() => openEditor({ kind: 'task' })}><Plus size={16} /> Tugas baru</button>}
         </div>
       </header>
 
@@ -417,23 +415,19 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
             campaignId={campaignId === 'all' ? null : campaignId} campaignList={campaignList} defaultUnit={defaultUnit} members={members} onCancel={() => setEditor(null)} onSaved={saved} />}
       </EditorDialog>}
 
-      {section === 'overview' && <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_350px]">
+      {section === 'overview' && <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,.75fr)]">
       <div className="min-w-0 space-y-3">
       {counts
         ? <CreativeOverview counts={counts} period={date(monday) + ' – ' + date(sunday)} onFocus={openFocus} />
         : <p role="status" className={panel + ' text-sm text-slate-600'}>{summaryQuery.isPending ? 'Memuat ringkasan…' : 'Ringkasan belum tersedia.'}</p>}
       <div className={panel + ' flex flex-wrap gap-2'} aria-label="Pintasan eksekusi">
         <button className={primary} onClick={() => { chooseFocus('all',true); changeFilter({ assignee:userId }); openSection('work'); }}>Tugas saya</button>
-        <button className={button} onClick={() => openFocus('today')}>Deadline hari ini</button>
         <button type="button" className={button} onClick={() => openSection('decisions')}>Review saya</button>
-        <button type="button" className={button} onClick={() => openSection('studio')}>Brief &amp; copy</button>
-        <button className={button} onClick={() => openFocus('ready')}>Siap tayang</button>
-        <button className={button + ' xl:hidden'} onClick={() => openCalendar(today)}>Agenda hari ini</button>
         <button className={button} onClick={() => openSection('inbox')}>Kotak tindakan</button>
       </div>
       {highlights.length > 0 && <section className={panel + ' space-y-2'} aria-label="Sorotan kampanye">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Sorotan kampanye</h2>
-          <button type="button" className="text-sm font-semibold text-teal-800 underline" onClick={() => openSection('campaigns')}>Lihat Campaign Hub</button></div>
+          <button type="button" className="text-sm font-semibold text-teal-800 underline" onClick={() => openSection('campaigns')}>Lihat kampanye</button></div>
         {highlights.map(campaign => <button type="button" key={campaign.id} onClick={() => { changeScope(campaign.id); openFocus('all'); }}
           className="flex w-full items-center justify-between gap-2 rounded-xl border border-teal-100 p-3 text-left hover:bg-teal-50">
           <span className="min-w-0"><span className="block break-words text-sm font-bold">{campaign.name}</span>
@@ -448,7 +442,8 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
         <button className={button} onClick={() => openSection('ads', overdueEvaluations ? 'overdue' : 'open')}>Buka evaluasi</button>
       </section>}
       </div>
-      <CreativeAgenda userId={userId} unit={unit} scope={scope} today={today} onOpenCalendar={openCalendar} onEvent={openCalendarEvent} />
+      <CreativeCalendar userId={userId} unit={unit} scope={scope} today={today} selected={calendarDay}
+        onSelect={setCalendarDay} onOpenCalendar={() => openSection('calendar')} onEvent={openCalendarEvent} />
       </div>}
 
       {section === 'ads' && <Suspense fallback={sectionLoading}>
@@ -456,8 +451,8 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
         <ChannelHub key={unit + ':' + adsScope + ':' + adsReview + ':' + (adsActivation ?? '')} unit={unit} scope={adsScope} userId={userId} today={today}
           canEdit={canEdit} campaigns={campaignList} members={members} overview={channels.data} initialReview={adsReview} initialActivation={adsActivation} onTask={setDetailId} />
       </Suspense>}
-      {section === 'calendar' && <Suspense fallback={sectionLoading}><CreativePlanner key={unit + ':' + scope + ':' + (calendarDay ?? '')}
-        userId={userId} unit={unit} scope={scope} today={today} initialDay={calendarDay} onEvent={openCalendarEvent} /></Suspense>}
+      {section === 'calendar' && <CreativeCalendar userId={userId} unit={unit} scope={scope} today={today} selected={calendarDay}
+        onSelect={setCalendarDay} onEvent={openCalendarEvent} />}
       {section === 'accounts' && <Suspense fallback={sectionLoading}><CreativeAccounts key={unit} userId={userId} unit={unit} today={today} members={members} canEdit={canEdit}
         onActivation={(id, campaignId) => { openSection('ads'); changeScope(campaignId); setAdsActivation(id); }} /></Suspense>}
       {section === 'inbox' && <Suspense fallback={sectionLoading}><CreativeInbox userId={userId} counts={counts}
@@ -465,7 +460,7 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
         onFocus={openFocus} onAds={() => openSection('ads','overdue')} onTask={setDetailId} onDecisions={() => openSection('decisions')} /></Suspense>}
       {detailId && <EditorDialog onClose={() => setDetailId(null)}><Suspense fallback={sectionLoading}><CreativeTaskDetail key={detailId} taskId={detailId} userId={userId} canEdit={canEdit}
         onClose={() => setDetailId(null)} onChanged={taskChanged} /></Suspense></EditorDialog>}
-      {canEdit && taskToRemove && <EditorDialog label="Hapus tugas kreatif" onClose={() => setTaskToRemove(null)}>
+      {canRemove && taskToRemove && <EditorDialog label="Hapus tugas kreatif" onClose={() => setTaskToRemove(null)}>
         <form className="space-y-4 p-5 sm:p-6" aria-busy={removal.isPending} onSubmit={event => {
           event.preventDefault();
           if (!removal.isPending) removal.mutate(taskToRemove);
@@ -565,7 +560,7 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
                   onClick={() => { setNotice(''); quickUpdate.mutate({ task, status: action.status }); }}>{updating ? 'Menyimpan…' : action.label}</button>}
                 <button className={canEdit && publishable && task.status === 'ready' && !awaitingApproval ? primary : button} onClick={() => setDetailId(task.id)}>{canEdit && publishable && task.status === 'ready' && !awaitingApproval ? 'Catat tayang' : 'Detail'}</button>
                 {canEdit && <button className={button} disabled={updating} aria-label={'Edit ' + task.title} onClick={() => openEditor({ kind: 'task', row: task })}>Edit</button>}
-                {canEdit && <button className={button + ' inline-flex items-center gap-1.5 !text-red-700 hover:!bg-red-50'} disabled={updating}
+                {canRemove && <button className={button + ' inline-flex items-center gap-1.5 !text-red-700 hover:!bg-red-50'} disabled={updating}
                   aria-label={'Hapus ' + task.title} onClick={() => { removal.reset(); setNotice(''); setTaskToRemove(task); }}><Trash2 size={14} aria-hidden="true" /> Hapus</button>}
               </div>
             </li>;

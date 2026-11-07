@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense } from 'react';
 import { AuthGate } from '@/core/auth/AuthGate';
 import { useAuth } from '@/core/auth/useAuth';
+import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { workspaceAccess } from '@/core/auth/workspaceAccess';
 import PatenApp from '@/modules/launch/paten/App';
 import { SettingsPage } from '@/modules/launch/settings/SettingsPage';
@@ -62,13 +63,14 @@ function ProtectedSettingsPage() {
   return (
     <div className="paten-shell min-h-screen text-slate-900 font-sans antialiased">
       <main className="py-4">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6">
           <a
             href="/launch/app/today"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-600 hover:text-slate-900 hover:border-slate-300 shadow-2xs transition-colors"
           >
             ← Kembali ke Product Launch OS
           </a>
+          <AccountSignOut name={auth.data.profile.full_name} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold" />
         </div>
         <SettingsPage />
       </main>
@@ -123,8 +125,8 @@ function ProtectedCreativeWorkspace() {
     return <AuthGate />;
   }
   return <Suspense fallback={<BootScreen />}>
-    <CreativeWorkspace key={auth.data.profile.id} userId={auth.data.profile.id}
-      canEdit={access.creativeEdit} canSwitchWorkspace={access.both} />
+    <CreativeWorkspace key={auth.data.profile.id} userId={auth.data.profile.id} userName={auth.data.profile.full_name}
+      canEdit={access.creativeEdit} canRemove={access.creativeRemove} canSwitchWorkspace={access.both} />
   </Suspense>;
 }
 

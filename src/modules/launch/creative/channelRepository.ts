@@ -65,17 +65,27 @@ export async function createActivationFollowup(id: string, pic: string, due: str
 
 export const eventKinds = { deadline: 'Deadline', publish: 'Jadwal tayang', evaluation: 'Evaluasi kanal', published: 'Tayang aktual' };
 export type CalendarEvent = { item_id: string; title: string; platform: keyof typeof platforms; event_day: string; kind: keyof typeof eventKinds; status: string };
-export async function calendarEvents(unit: string, scope: string, from: string, until: string, page: number, kind: string, signal: AbortSignal, size = PAGE_SIZE) {
+async function calendarEvents(unit: string, scope: string, from: string, until: string, page: number, signal: AbortSignal, size: number) {
   const start = page * size;
   const pUnit = unit === 'all' || unit === 'unassigned' ? null : unit;
   const pCampaign = scope === 'all' || scope === 'standalone' ? null : scope;
-  let query = supabase.rpc('creative_calendar_events', {
+  const query = supabase.rpc('creative_calendar_events', {
     p_from: from, p_until: until, p_unit_id: pUnit,
     p_unassigned: unit === 'unassigned', p_campaign_id: pCampaign,
     p_standalone: scope === 'standalone',
   });
-  if (kind) query = query.eq('kind', kind);
   const { data, error } = await query.order('event_day').order('kind').order('item_id').range(start, start + size).abortSignal(signal);
   if (error) throw error;
   return (data ?? []) as CalendarEvent[];
+}
+
+export async function monthEvents(unit: string, scope: string, from: string, until: string, signal: AbortSignal) {
+  const size = 200;
+  const rows: CalendarEvent[] = [];
+  for (let page = 0; ; page += 1) {
+    const batch = await calendarEvents(unit, scope, from, until, page, signal, size);
+    rows.push(...batch.slice(0, size));
+    if (batch.length <= size) return rows;
+    signal.throwIfAborted();
+  }
 }

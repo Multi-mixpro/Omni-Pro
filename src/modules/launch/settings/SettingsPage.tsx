@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from '@/app/router/simpleRouter';
 import { signOut, useAuth } from '@/core/auth/useAuth';
+import { RoleAccessField } from './RoleAccessField';
 import {
   createTeamUser, deleteTeamUser, listAllProfiles, listProjectAccess, listRoles, listTeamMembers,
   purgeOrphanedProfiles,
@@ -506,25 +507,16 @@ export function SettingsPage() {
                           Opsional. Isi hanya jika ingin mengganti password login pengguna.
                         </p>
                       </label>
-                      <label className="block">
-                        <span className="block font-bold text-slate-700 mb-1">Role *</span>
-                        <select
-                          required
-                          className={inputClass}
-                          value={editDraft.role_code}
-                          onChange={e => setEditDraft(current => ({ ...current, role_code: e.target.value }))}
-                          disabled={person.id === auth.data?.profile?.id}
-                        >
-                          <option value="">Pilih role</option>
-                          {roles.data?.map(role => <option value={role.code} key={role.code}>{role.name}</option>)}
-                        </select>
-                        <p className="mt-1 text-xs text-slate-600">{roles.data?.find(role => role.code === editDraft.role_code)?.description}</p>
+                      <div>
+                        <RoleAccessField roles={roles.data} value={editDraft.role_code} className={inputClass}
+                          unavailable={roles.isError} disabled={person.id === auth.data?.profile?.id}
+                          onChange={role_code => setEditDraft(current => ({ ...current, role_code }))} />
                         {person.id === auth.data?.profile?.id && (
                           <p className="mt-1 text-[10px] text-amber-700">
                             Role akun Anda dikunci di form ini untuk mencegah kehilangan akses admin.
                           </p>
                         )}
-                      </label>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
@@ -872,6 +864,8 @@ export function SettingsPage() {
                       <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                       <input
                         required
+                        type="password"
+                        autoComplete="new-password"
                         inputMode="numeric"
                         pattern="\d{6,12}"
                         placeholder="6-12 digit angka"
@@ -890,19 +884,10 @@ export function SettingsPage() {
                       onChange={e => setDraft({ ...draft, job_title: e.target.value })}
                     />
                   </label>
-                  <label className="block sm:col-span-2">
-                    <span className="block font-bold text-slate-700 mb-1">Role *</span>
-                    <select
-                      required
-                      className={inputClass}
-                      value={draft.role_code}
-                      onChange={e => setDraft({ ...draft, role_code: e.target.value })}
-                    >
-                      <option value="">Pilih role</option>
-                      {roles.data?.map(role => <option value={role.code} key={role.code}>{role.name}</option>)}
-                    </select>
-                    <p className="mt-1 text-xs text-slate-600">{roles.data?.find(role => role.code === draft.role_code)?.description ?? 'Pilih ruang kerja dan tingkat akses yang dibutuhkan.'}</p>
-                  </label>
+                  <div className="sm:col-span-2">
+                    <RoleAccessField roles={roles.data} value={draft.role_code} className={inputClass}
+                      unavailable={roles.isError} onChange={role_code => setDraft({ ...draft, role_code })} />
+                  </div>
                 </div>
 
                 {createError && (
@@ -914,7 +899,7 @@ export function SettingsPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="submit"
-                    disabled={createUser.isPending}
+                    disabled={createUser.isPending || !roles.isSuccess || !draft.role_code}
                     className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-[#087E79] hover:bg-[#066864] text-white font-bold transition-colors shadow-2xs disabled:opacity-50"
                   >
                     {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}

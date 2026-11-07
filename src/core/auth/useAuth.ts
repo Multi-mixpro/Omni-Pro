@@ -39,6 +39,8 @@ export function useAuth() {
       if (event === 'SIGNED_OUT') {
         void queryClient.cancelQueries({ queryKey: AUTH_KEY });
         queryClient.setQueryData<AuthState>(AUTH_KEY, { session: null, profile: null, permissions: [] });
+        queryClient.removeQueries({ predicate: query => query.queryKey[0] !== AUTH_KEY[0] });
+        queryClient.getMutationCache().clear();
       }
       void queryClient.invalidateQueries({ queryKey: AUTH_KEY });
     });
@@ -64,5 +66,6 @@ export async function signIn(identifier: string, password: string) {
 }
 
 export async function signOut() {
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  if (error) throw new Error('Belum bisa keluar. Coba lagi.');
 }
