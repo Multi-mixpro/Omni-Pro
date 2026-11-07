@@ -48,7 +48,7 @@ export type Task = Row & {
   priority: keyof typeof priorities; due_on: string | null; publish_on: string | null;
   output_url: string; blocker: string;
 };
-export type TeamMember = { id: string; full_name: string; is_active: boolean; job_title: string | null };
+export type TeamMember = { id: string; full_name: string; is_active: boolean; job_title: string | null; can_decide?: boolean };
 export type ListedTask = Task & {
   campaign: { name: string } | null;
   source_idea: { title: string; reference_urls: string[] } | null;
@@ -77,10 +77,15 @@ export async function campaigns(page: number, signal: AbortSignal, unit = 'all')
 }
 
 export async function team(signal: AbortSignal) {
-  const { data, error } = await supabase.from('profiles').select('id,full_name,is_active,job_title')
+  const { data, error } = await supabase.from('profiles')
+    .select('id,full_name,is_active,job_title,user_roles(role:roles(role_permissions(permission:permissions(code))))')
     .order('full_name').abortSignal(signal);
   if (error) throw error;
-  return data as TeamMember[];
+  type Assignment = { role: { role_permissions: { permission: { code: string } | null }[] } | null };
+  return ((data ?? []) as unknown as (TeamMember & { user_roles: Assignment[] })[]).map(({ user_roles, ...member }) => {
+    const codes = new Set(user_roles.flatMap(({ role }) => role?.role_permissions.map(item => item.permission?.code) ?? []));
+    return { ...member, can_decide: member.is_active && (codes.has('launch.admin') || (codes.has('creative.view') && codes.has('creative.edit'))) };
+  });
 }
 
 export type Filters = {

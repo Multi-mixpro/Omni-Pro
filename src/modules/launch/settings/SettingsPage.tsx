@@ -13,14 +13,12 @@ import {
   Trash2,
   Users,
   X,
-  Sparkles,
 } from 'lucide-react';
 import { useNavigate } from '@/app/router/simpleRouter';
 import { signOut, useAuth } from '@/core/auth/useAuth';
 import { RoleAccessField } from './RoleAccessField';
 import {
-  createTeamUser, deleteTeamUser, listAllProfiles, listProjectAccess, listRoles, listTeamMembers,
-  purgeOrphanedProfiles,
+  createTeamUser, deleteTeamUser, listProjectAccess, listRoles, listTeamMembers,
   setMemberCanLaunch,
   setProjectMember,
   updateTeamUser,
@@ -72,7 +70,8 @@ function SectionHead({
   );
 }
 
-export function SettingsPage() {
+export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'creative' }) {
+  const creative = variant === 'creative';
   const auth = useAuth();
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -80,8 +79,7 @@ export function SettingsPage() {
 
   const roles = useQuery({ queryKey: ['launch-roles'], queryFn: listRoles, enabled: isAdmin });
   const members = useQuery({ queryKey: ['launch-team'], queryFn: listTeamMembers, enabled: isAdmin });
-  const allProfiles = useQuery({ queryKey: ['launch-all-profiles'], queryFn: listAllProfiles, enabled: isAdmin });
-  const projects = useProjects();
+  const projects = useProjects('ALL', isAdmin && !creative);
 
   const [draft, setDraft] = useState<NewTeamUserInput>(emptyUser());
   const [editDraft, setEditDraft] = useState<UpdateTeamUserInput>(emptyEditUser());
@@ -181,16 +179,8 @@ export function SettingsPage() {
 
   const refreshTeam = () => {
     client.invalidateQueries({ queryKey: ['launch-team'] });
-    client.invalidateQueries({ queryKey: ['launch-all-profiles'] });
   };
 
-  async function handlePurgeOrphaned() {
-    setMemberFeedbackTone('success');
-    setMemberFeedback('Memproses pembersihan profil tersangkut...');
-    await purgeOrphanedProfiles();
-    await refreshTeam();
-    setMemberFeedback('Semua profil tersangkut/inaktif berhasil dibersihkan permanen!');
-  }
   const refreshAccess = () => client.invalidateQueries({ queryKey: ['launch-access', projectId] });
 
   const createUser = useMutation({
@@ -265,7 +255,7 @@ export function SettingsPage() {
       username: person.username,
       full_name: person.full_name,
       job_title: person.job_title ?? '',
-      role_code: person.role_code ?? '',
+      role_code: person.role_count > 1 && person.id !== auth.data?.profile?.id ? '' : person.role_code ?? '',
       password: '',
     });
   }
@@ -296,11 +286,7 @@ export function SettingsPage() {
   }
 
   async function handleDeleteUser(person: TeamMember) {
-    const confirmed = window.confirm(
-      person.id === auth.data?.profile?.id
-        ? `Hapus akun Anda sendiri (@${person.username})? Setelah dihapus Anda akan langsung keluar dari Product Launch OS.`
-        : `Hapus pengguna @${person.username}? Tindakan ini akan menghapus akun login dan akses pengguna tersebut.`,
-    );
+    const confirmed = window.confirm(`Hapus pengguna @${person.username}? Tindakan ini akan menghapus akun login dan akses pengguna tersebut.`);
     if (!confirmed) return;
 
     setMemberFeedbackTone('success');
@@ -318,7 +304,7 @@ export function SettingsPage() {
   const activeMembers = members.data?.filter(person => person.is_active) ?? [];
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4 text-xs text-slate-900">
+    <div className={'space-y-4 text-xs text-slate-900 ' + (creative ? '' : 'max-w-6xl mx-auto p-4 sm:p-6')}>
       {/* Hero */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs">
         <div className="flex items-center gap-3">
@@ -333,7 +319,7 @@ export function SettingsPage() {
               <h1 className="font-extrabold text-base sm:text-lg text-slate-900">Pengguna &amp; Hak Akses</h1>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Buat akun tim dengan username dan PIN, lalu tentukan siapa yang boleh merilis tiap artikel.
+              {creative ? 'Buat akun dan tetapkan role untuk Creative. Role berlaku untuk seluruh akun.' : 'Buat akun tim dengan username dan PIN, lalu tentukan siapa yang boleh merilis tiap artikel.'}
             </p>
           </div>
         </div>
@@ -433,12 +419,12 @@ export function SettingsPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={deleteUser.isPending}
+                    disabled={deleteUser.isPending || person.id === auth.data?.profile?.id}
                     onClick={() => void handleDeleteUser(person)}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-rose-200 bg-rose-50 text-[10px] font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    {person.id === auth.data?.profile?.id ? 'Hapus akun utama' : 'Hapus pengguna'}
+                    Hapus pengguna
                   </button>
                 </div>
 
@@ -511,6 +497,9 @@ export function SettingsPage() {
                         <RoleAccessField roles={roles.data} value={editDraft.role_code} className={inputClass}
                           unavailable={roles.isError} disabled={person.id === auth.data?.profile?.id}
                           onChange={role_code => setEditDraft(current => ({ ...current, role_code }))} />
+                        {person.role_count > 1 && person.id !== auth.data?.profile?.id && <p className="mt-2 text-xs text-amber-800">
+                          Role saat ini: {person.role_name}. Jika disimpan, role yang dipilih akan menggantikan semuanya.
+                        </p>}
                         {person.id === auth.data?.profile?.id && (
                           <p className="mt-1 text-[10px] text-amber-700">
                             Role akun Anda dikunci di form ini untuk mencegah kehilangan akses admin.
@@ -549,51 +538,10 @@ export function SettingsPage() {
           </div>
         )}
 
-        {/* Inspection Panel for All Profiles in Database */}
-        <div className="mt-4 pt-3 border-t border-slate-200 space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span className="text-[11px] font-extrabold text-slate-700">
-              🔍 Inspect Database: {allProfiles.data?.length ?? 0} Profil Aktif Tersimpan di Database
-            </span>
-            <button
-              type="button"
-              onClick={handlePurgeOrphaned}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[10px] transition-colors cursor-pointer shadow-2xs"
-            >
-              <Sparkles className="w-3 h-3 text-rose-600" />
-              <span>🧹 Bersihkan Semua Profil Tersangkut / Inaktif</span>
-            </button>
-          </div>
-
-          {allProfiles.data && allProfiles.data.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-1">
-              {allProfiles.data.map(p => (
-                <div key={p.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px]">
-                  <div className="min-w-0 flex-1 pr-2">
-                    <span className="font-mono font-extrabold text-slate-900">@{p.username}</span>
-                    <span className="text-slate-500 ml-1.5 truncate inline-block max-w-[120px] align-bottom">({p.full_name})</span>
-                    <span className={`ml-1.5 px-1.5 py-0.5 text-[9px] font-extrabold rounded-full ${p.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                      {p.is_active ? 'Aktif' : 'Tersangkut/Inaktif'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteUser(p)}
-                    className="shrink-0 px-2.5 py-1 text-[10px] font-extrabold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors cursor-pointer"
-                  >
-                    Hapus Permanen
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[11px] text-slate-400 italic">Database bersih, tidak ada akun tersangkut.</p>
-          )}
-        </div>
       </div>
 
       {/* Langkah 3 — Hak akses per artikel */}
-      <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4 space-y-3">
+      {!creative && <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4 space-y-3">
         <SectionHead
           step={3}
           icon={<Rocket className="w-5 h-5" />}
@@ -659,13 +607,13 @@ export function SettingsPage() {
             })}
           </div>
         )}
-      </div>
+      </div>}
 
-      {isAdmin && auth.data?.profile && <BusinessAccessSettings key={auth.data.profile.id}
-        userId={auth.data.profile.id} profiles={allProfiles.data ?? []} />}
+      {!creative && isAdmin && auth.data?.profile && <BusinessAccessSettings key={auth.data.profile.id}
+        userId={auth.data.profile.id} profiles={activeMembers} />}
 
       {/* Langkah 4 — Kelola Unit Bisnis / Brand Studio */}
-      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl p-4 space-y-3 shadow-2xs">
+      {!creative && <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl p-4 space-y-3 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <SectionHead
             step={4}
@@ -728,10 +676,10 @@ export function SettingsPage() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Modal Form Tambah / Edit Unit Bisnis */}
-      {showBuModal && (
+      {!creative && showBuModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm p-4 flex items-center justify-center">
           <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-indigo-900 text-white">
@@ -818,7 +766,7 @@ export function SettingsPage() {
               <div className="flex items-start justify-between gap-4 p-5 sm:p-6 border-b border-slate-100">
                 <div>
                   <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#087E79]">Modal Pengguna Baru</p>
-                  <h2 className="mt-2 text-lg font-extrabold text-slate-900">Buat pengguna Product Launch</h2>
+                  <h2 className="mt-2 text-lg font-extrabold text-slate-900">Buat pengguna {creative ? 'Creative' : 'Product Launch'}</h2>
                   <p className="mt-1 text-[12px] text-slate-500">
                     Isi identitas, username, PIN, dan role untuk menambahkan akun tim baru.
                   </p>

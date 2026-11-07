@@ -196,8 +196,8 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
         </div>
       </details>
     </div>
-    <Label title="Reviewer"><People name="reviewer" members={members} current={task?.reviewer_id} /></Label>
-    <Label title="Pemberi persetujuan"><People name="approver" members={members} current={task?.approver_id} /></Label>
+    <Label title="Reviewer"><People name="reviewer" members={members.filter(member => member.can_decide || member.id === task?.reviewer_id)} current={task?.reviewer_id} /></Label>
+    <Label title="Pemberi persetujuan"><People name="approver" members={members.filter(member => member.can_decide || member.id === task?.approver_id)} current={task?.approver_id} /></Label>
     <Label title="Prioritas"><select name="priority" className={field} defaultValue={task?.priority ?? 'normal'}><Options values={priorities} /></select></Label>
     <Label title={sourceIdea ? 'Deadline pengerjaan (wajib)' : 'Deadline pengerjaan'}><input name="due" className={field} required={!!sourceIdea} type="date" defaultValue={task?.due_on ?? ''} /></Label>
     <Label title="Jadwal tayang"><input name="publish" className={field} type="date" defaultValue={task?.publish_on ?? ''} /></Label>

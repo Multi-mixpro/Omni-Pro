@@ -5,4 +5,4 @@ const launchKeys = {
   projects: (status = 'ALL') => ['launch-projects', status] as const,
 };
 
-export function useProjects(status = 'ALL') { return useQuery({ queryKey: launchKeys.projects(status), queryFn: () => listProjects(status) }); }
+export function useProjects(status = 'ALL', enabled = true) { return useQuery({ queryKey: launchKeys.projects(status), queryFn: () => listProjects(status), enabled }); }

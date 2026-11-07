@@ -8,6 +8,7 @@ import PatenApp from '@/modules/launch/paten/App';
 import { SettingsPage } from '@/modules/launch/settings/SettingsPage';
 import { Navigate, RouterProvider, useLocation } from './simpleRouter';
 import { WorkspacePicker } from './WorkspacePicker';
+import { ThemeControl } from './ThemeControl';
 
 const CreativeWorkspace = lazy(() => import('@/modules/launch/creative/CreativeWorkspace'));
 
@@ -126,7 +127,8 @@ function ProtectedCreativeWorkspace() {
   }
   return <Suspense fallback={<BootScreen />}>
     <CreativeWorkspace key={auth.data.profile.id} userId={auth.data.profile.id} userName={auth.data.profile.full_name}
-      canEdit={access.creativeEdit} canRemove={access.creativeRemove} canSwitchWorkspace={access.both} />
+      canEdit={access.creativeEdit} canRemove={access.creativeRemove} canSwitchWorkspace={access.both}
+      permissions={permissions} />
   </Suspense>;
 }
 
@@ -135,6 +137,7 @@ export function AppRouter() {
     <QueryClientProvider client={queryClient}>
       <RouterProvider>
         <RouteView />
+        <ThemeControl />
       </RouterProvider>
     </QueryClientProvider>
   );

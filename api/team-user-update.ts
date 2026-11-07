@@ -40,9 +40,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (duplicateUsernameError) return res.status(500).json({ error: 'Gagal memeriksa ketersediaan username.' });
   if (duplicateUsername) return res.status(409).json({ error: 'Username sudah dipakai pengguna lain.' });
 
-  const currentRoleCode = ((currentRoles ?? []) as Array<{ role?: { code?: string } | null }>)
-    .find(item => item.role?.code)?.role?.code ?? null;
-  if (targetId === user.id && currentRoleCode && currentRoleCode !== roleCode) {
+  const self = targetId.toLowerCase() === user.id.toLowerCase();
+  const assignedCodes = ((currentRoles ?? []) as Array<{ role?: { code?: string } | null }>)
+    .map(item => item.role?.code).filter(Boolean);
+  if (self && !assignedCodes.includes(roleCode)) {
     return res.status(400).json({ error: 'Role akun sendiri tidak dapat diubah dari halaman ini.' });
   }
 
@@ -67,8 +68,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('id', targetId);
   if (profileUpdateError) return res.status(500).json({ error: 'Gagal memperbarui profil pengguna.' });
 
-  const { error: roleUpdateError } = await admin.rpc('replace_workspace_user_role', { p_user: targetId, p_role: roleRow.id });
-  if (roleUpdateError) return res.status(500).json({ error: 'Gagal mengganti role pengguna. Role sebelumnya tetap berlaku.' });
+  if (!self && (assignedCodes.length !== 1 || assignedCodes[0] !== roleCode)) {
+    const { error: roleUpdateError } = await admin.rpc('replace_workspace_user_role', { p_user: targetId, p_role: roleRow.id });
+    if (roleUpdateError) return res.status(500).json({ error: 'Gagal mengganti role pengguna. Role sebelumnya tetap berlaku.' });
+  }
 
   res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({

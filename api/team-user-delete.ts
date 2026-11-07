@@ -11,6 +11,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const targetId = String(req.body?.user_id ?? '').trim();
   if (!targetId) return res.status(400).json({ error: 'user_id wajib diisi.' });
+  if (targetId.toLowerCase() === user.id.toLowerCase()) {
+    return res.status(400).json({ error: 'Akun yang sedang digunakan tidak dapat dihapus.' });
+  }
 
   const { data: profile, error: profileError } = await admin
     .from('profiles')
@@ -24,7 +27,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const deletedEmail = `${deletedUsername}@${DELETED_DOMAIN}`;
 
   // 1. Rename profile username FIRST to release the UNIQUE constraint index immediately
-  await admin.from('profiles').update({ username: deletedUsername, is_active: false }).eq('id', targetId);
+  const { error: deactivateError } = await admin.from('profiles').update({ username: deletedUsername, is_active: false }).eq('id', targetId);
+  if (deactivateError) return res.status(500).json({ error: 'Gagal menonaktifkan akses pengguna.' });
 
   // 2. Delete dependent tables & FK references
   await admin.from('team_invites').delete().or(`username.eq.${profile.username},email.eq.${profile.username}@team.ggindoapparel.internal`);
@@ -36,13 +40,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // 3. Hard delete profile from profiles table
   await admin.from('profiles').delete().eq('id', targetId);
-  // Also clean up any orphaned deleted_ profiles
-  await admin.from('profiles').delete().or('is_active.eq.false,username.ilike.deleted_%');
-
   // 3. Delete from Auth or update auth user email
   const authDeleteRes = await admin.auth.admin.deleteUser(targetId);
   if (authDeleteRes.error) {
-    await admin.auth.admin.updateUserById(targetId, {
+    const { error: authUpdateError } = await admin.auth.admin.updateUserById(targetId, {
       email: deletedEmail,
       password: `${randomUUID()}${randomUUID()}`,
       user_metadata: {
@@ -52,8 +53,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       email_confirm: true,
     });
+    if (authUpdateError) return res.status(500).json({ error: 'Akses pengguna sudah dinonaktifkan, tetapi penghapusan akun login belum selesai.' });
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ id: targetId, deleted: true, deleted_self: targetId === user.id });
+  return res.status(200).json({ id: targetId, deleted: true, deleted_self: false });
 }

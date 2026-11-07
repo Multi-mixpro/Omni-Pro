@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ShieldCheck, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
 import { Link, useLocation } from '@/app/router/simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
@@ -29,6 +29,7 @@ const CreativeDecisionQueue = lazy(() => import('./CreativeActions').then(module
 const CreativeStudio = lazy(() => import('./CreativeStudio').then(module => ({ default: module.CreativeStudio })));
 const CreativeManagement = lazy(() => import('./CreativeManagement').then(module => ({ default: module.CreativeManagement })));
 const CreativeAssetLibrary = lazy(() => import('./CreativeAssetLibrary').then(module => ({ default: module.CreativeAssetLibrary })));
+const CreativeAccess = lazy(() => import('./CreativeAccess').then(module => ({ default: module.CreativeAccess })));
 const sectionLoading = <p role="status" className="p-4 text-sm text-slate-600">Memuat bagian ini…</p>;
 
 const panel = 'rounded-2xl border border-teal-100 bg-white p-4 shadow-sm';
@@ -37,7 +38,7 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZ
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const date = (value: string | null) => value ? dateFormat.format(new Date(value + 'T00:00:00Z')) : '—';
 type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea };
-type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'budget' | 'assets';
+type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'budget' | 'assets' | 'access';
 const navigation = [
   { label: 'Rencana & produksi', items: [
     { id: 'overview', label: 'Pusat Kerja', icon: LayoutDashboard },
@@ -58,11 +59,12 @@ const navigation = [
     { id: 'budget', label: 'Anggaran Kanal', icon: Wallet },
     { id: 'assets', label: 'Pustaka Aset', icon: Images },
     { id: 'team', label: 'Tim & PIC', icon: Users },
+    { id: 'access', label: 'Pengaturan Akses', icon: ShieldCheck },
   ] },
 ] as const;
 const sectionColors: Record<Section, string> = {
   overview: 'blue', work: 'blue', studio: 'pink', decisions: 'green', campaigns: 'orange', calendar: 'red',
-  ideas: 'orange', accounts: 'mint', ads: 'pink', inbox: 'red', team: 'blue', analytics: 'pink', budget: 'green', assets: 'mint',
+  ideas: 'orange', accounts: 'mint', ads: 'pink', inbox: 'red', team: 'blue', analytics: 'pink', budget: 'green', assets: 'mint', access: 'mint',
 };
 const sectionDescriptions: Record<Section, string> = {
   overview: 'Lihat target, jadwal, dan pekerjaan yang perlu ditindak.',
@@ -79,6 +81,7 @@ const sectionDescriptions: Record<Section, string> = {
   analytics: 'Pantau hasil produksi, publikasi aktual, dan evaluasi kanal.',
   budget: 'Bandingkan rencana dan realisasi biaya aktivitas kanal.',
   assets: 'Temukan tautan hasil produksi dan buka tugas asalnya.',
+  access: 'Lihat izin akun dan aturan akses ruang kerja Creative.',
 };
 const nextAction = {
   todo: { status: 'doing', label: 'Mulai' },
@@ -108,13 +111,16 @@ function EditorDialog({ children, onClose, label = 'Form pekerjaan kreatif' }: {
   </dialog>;
 }
 
-export default function CreativeWorkspace({ userId, userName, canEdit, canRemove, canSwitchWorkspace }: {
-  userId: string; userName: string; canEdit: boolean; canRemove: boolean; canSwitchWorkspace: boolean;
+export default function CreativeWorkspace({ userId, userName, canEdit, canRemove, canSwitchWorkspace, permissions }: {
+  userId: string; userName: string; canEdit: boolean; canRemove: boolean; canSwitchWorkspace: boolean; permissions: string[];
 }) {
   const location = useLocation();
   const client = useQueryClient();
   const [section, setSection] = useState<Section>(() => new URLSearchParams(location.search).get('mine') === '1' ? 'work' : 'overview');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarCompact, setSidebarCompact] = useState(() => {
+    try { return localStorage.getItem('creative-sidebar-compact') === 'true'; } catch { return false; }
+  });
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [taskView, setTaskView] = useState<'list' | 'board'>('board');
@@ -144,7 +150,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const { monday, nextMonday } = mondayWeek(today);
   const sunday = new Date(Date.parse(nextMonday + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10);
   const campaignQuery = useInfiniteQuery({
-    enabled: !['ideas','accounts'].includes(section) || !!editor,
+    enabled: !['ideas','accounts','access'].includes(section) || !!editor,
     queryKey: [...prefix, 'campaigns', unit], initialPageParam: 0,
     queryFn: ({ pageParam, signal }) => campaigns(pageParam, signal, unit),
     getNextPageParam: (last, _, lastPage) => last.length > PAGE_SIZE ? lastPage + 1 : undefined,
@@ -287,20 +293,26 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       (a.ends_on ?? '9999-12-31').localeCompare(b.ends_on ?? '9999-12-31'))).slice(0,3);
 
   return <main className="creative-shell min-h-screen px-3 py-4 text-slate-900 sm:px-6 sm:py-6">
-    <div className="mx-auto grid max-w-[1536px] gap-4 lg:grid-cols-[228px_minmax(0,1fr)] xl:gap-5">
-      <aside className="creative-sidebar self-start space-y-4 rounded-3xl p-3 lg:sticky lg:top-4">
-        <div className="flex items-center justify-between gap-2 px-2 py-2">
-          <div className="flex min-w-0 items-center gap-3"><span className="creative-mark grid h-10 w-10 shrink-0 place-items-center rounded-[13px] text-white"><Command size={19} /></span>
-            <div><strong className="block text-slate-900">GG Workspace</strong><span className="creative-sidebar-caption block text-xs">Creative Hub</span></div></div>
+    <div className="creative-layout mx-auto grid max-w-[1536px] gap-4 xl:gap-5" data-compact={sidebarCompact}>
+      <aside className="creative-sidebar self-start space-y-3 rounded-3xl p-3 lg:sticky lg:top-4" data-mobile-expanded={menuOpen}>
+        <div className="creative-sidebar-head flex items-center justify-between gap-2 px-1 py-1">
+          <div className="flex min-w-0 items-center gap-2"><span className="creative-mark grid h-9 w-9 shrink-0 place-items-center rounded-[12px] text-white"><Command size={17} /></span>
+            <div className="creative-nav-label-text"><strong className="block text-sm text-slate-900">GG Workspace</strong><span className="creative-sidebar-caption block text-xs">Creative Hub</span></div></div>
           <button type="button" className={button + ' creative-menu-toggle inline-flex items-center gap-1.5 lg:hidden'} aria-expanded={menuOpen} aria-controls="creative-navigation"
-            onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> {menuOpen ? 'Tutup menu' : 'Menu'}</button>
+            onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> {menuOpen ? 'Ciutkan menu' : 'Perluas menu'}</button>
+          <button type="button" className="creative-sidebar-toggle hidden lg:grid" aria-expanded={!sidebarCompact} aria-controls="creative-navigation"
+            aria-label={sidebarCompact ? 'Perluas sidebar' : 'Ciutkan sidebar'} title={sidebarCompact ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+            onClick={() => {
+              setSidebarCompact(!sidebarCompact);
+              try { localStorage.setItem('creative-sidebar-compact', String(!sidebarCompact)); } catch { /* Available for this page. */ }
+            }}>{sidebarCompact ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
         </div>
-        <nav id="creative-navigation" aria-label="Bagian Creative Dashboard" className={(menuOpen ? 'block' : 'hidden') + ' space-y-3 lg:block'}>
-          {navigation.map(group => <div key={group.label} className="space-y-1">
+        <nav id="creative-navigation" aria-label="Bagian Creative Dashboard" className="creative-navigation">
+          {navigation.map(group => <div key={group.label} className="creative-nav-group">
             <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">{group.label}</p>
-            {group.items.map(({ id,label,icon:Icon }) => <button key={id} aria-current={section === id ? 'page' : undefined}
+            {group.items.map(({ id,label,icon:Icon }) => <button key={id} aria-current={section === id ? 'page' : undefined} aria-label={label} title={label}
               className="creative-nav-item flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold"
-              onClick={() => openSection(id)}><span className="creative-color-icon" data-color={sectionColors[id]}><Icon size={15} /></span>{label}</button>)}
+              onClick={() => openSection(id)}><span className="creative-color-icon" data-color={sectionColors[id]}><Icon size={15} /></span><span className="creative-nav-label-text">{label}</span></button>)}
           </div>)}
         </nav>
       </aside>
@@ -320,7 +332,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         </div>
       </header>
 
-      <div className={panel + ' creative-filter'} aria-label="Filter ruang kerja">
+      {section !== 'access' && <div className={panel + ' creative-filter'} aria-label="Filter ruang kerja">
         <div className="creative-filter-heading"><strong>Lingkup ruang kerja</strong><span>Pilih unit bisnis dan kampanye yang ingin dilihat.</span></div>
         <div className="creative-filter-fields flex flex-wrap items-end gap-3">
         <label className="min-w-0 flex-[1_1_12rem] space-y-1 text-sm font-semibold">Unit bisnis
@@ -343,9 +355,10 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         </>}
         {units.isError && <p role="alert" className="w-full text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
         </div>
-      </div>
+      </div>}
 
-      {!canEdit && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
+      {!canEdit && section !== 'access' && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
+      {section === 'access' && <Suspense fallback={sectionLoading}><CreativeAccess permissions={permissions} userName={userName} /></Suspense>}
       {(section === 'analytics' || section === 'budget') && <Suspense fallback={sectionLoading}>
         <CreativeManagement mode={section} counts={section === 'analytics' ? counts : undefined}
           channels={scope === 'standalone' ? undefined : channels.data} standalone={scope === 'standalone'}
@@ -534,7 +547,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
             const awaitingApproval = task.status === 'ready' && task.approver_id && !task.approved_at;
             const action = task.status in nextAction && !waitingForReviewer && !awaitingApproval && !(task.status === 'ready' && publishable) ? nextAction[task.status as keyof typeof nextAction] : null;
             const updating = quickUpdate.isPending && quickUpdate.variables?.task.id === task.id;
-            return <li key={task.id} className={'flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 ' + (taskView === 'list' ? 'sm:flex-row sm:p-4' : '')}>
+            return <li key={task.id} data-status={task.status} className={'creative-task-card flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 ' + (taskView === 'list' ? 'sm:flex-row sm:p-4' : '')}>
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="mb-1 flex flex-wrap items-center gap-1.5">
                   <span className={'rounded-full px-2 py-0.5 text-xs font-semibold ' + statusColor[task.status]}>{taskStatuses[task.status]}</span>

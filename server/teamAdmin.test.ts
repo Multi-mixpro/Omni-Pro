@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import createTeamUser from '../api/team-user-create';
+import deleteTeamUser from '../api/team-user-delete';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 
@@ -84,4 +85,11 @@ describe('team user creation', () => {
     expect(rpc).toHaveBeenCalledWith('replace_workspace_user_role', { p_user: 'new-user', p_role: 'producer-role' });
     expect(status).toHaveBeenCalledWith(201);
   });
+});
+
+it('rejects deleting the signed-in administrator before changing any records', async () => {
+  const { status, response } = result();
+  await deleteTeamUser({ ...req, body: { user_id: 'admin' } }, response);
+  expect(status).toHaveBeenCalledWith(400);
+  expect(from).not.toHaveBeenCalled();
 });

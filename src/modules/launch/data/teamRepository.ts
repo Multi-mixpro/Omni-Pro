@@ -4,6 +4,7 @@ import type { Profile } from '../domain/types';
 export interface TeamMember extends Profile {
   role_code: string | null;
   role_name: string | null;
+  role_count: number;
 }
 
 export interface RoleOption { code: string; name: string; description: string | null; permissions: { code: string; name: string }[] }
@@ -73,47 +74,9 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
 
   type Row = Profile & { user_roles?: Array<{ role?: { code: string; name: string } | null }> };
   return ((data ?? []) as unknown as Row[]).map(row => {
-    const role = row.user_roles?.find(item => item.role)?.role ?? null;
-    return { ...row, role_code: role?.code ?? null, role_name: role?.name ?? null };
+    const roles = row.user_roles?.flatMap(item => item.role ? [item.role] : []) ?? [];
+    return { ...row, role_code: roles[0]?.code ?? null, role_name: roles.map(role => role.name).join(' + ') || null, role_count: roles.length };
   });
-}
-
-export async function listAllProfiles(): Promise<TeamMember[]> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*, user_roles(role:roles(code, name))')
-    .eq('is_active', true)
-    .not('username', 'ilike', 'deleted_%')
-    .order('full_name');
-  if (error) throw error;
-
-  type Row = Profile & { user_roles?: Array<{ role?: { code: string; name: string } | null }> };
-  return ((data ?? []) as unknown as Row[]).map(row => {
-    const role = row.user_roles?.find(item => item.role)?.role ?? null;
-    return { ...row, role_code: role?.code ?? null, role_name: role?.name ?? null };
-  });
-}
-
-export async function purgeOrphanedProfiles() {
-  try {
-    const { data: orphaned } = await supabase
-      .from('profiles')
-      .select('id')
-      .or('is_active.eq.false,username.ilike.deleted_%');
-
-    if (orphaned && orphaned.length > 0) {
-      for (const p of orphaned) {
-        await supabase.from('launch_project_members').delete().eq('user_id', p.id);
-        await supabase.from('user_permission_overrides').delete().eq('user_id', p.id);
-        await supabase.from('user_roles').delete().eq('user_id', p.id);
-        await supabase.from('launch_projects').update({ created_by: null }).eq('created_by', p.id);
-        await supabase.from('launch_projects').update({ owner_id: null }).eq('owner_id', p.id);
-        await supabase.from('profiles').delete().eq('id', p.id);
-      }
-    }
-  } catch (err) {
-    console.warn('Purge orphaned profiles warning:', err);
-  }
 }
 
 export const createTeamUser = (input: NewTeamUserInput) => authorizedFetch('/api/team-user-create', input);
