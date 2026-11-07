@@ -192,6 +192,13 @@ export async function saveTask(values: Draft<Task>, previous?: Task, sourceIdeaI
     throw error;
   }
 }
+export async function removeTask(task: Pick<Task, 'id' | 'updated_at'>) {
+  const { error } = await supabase.rpc('remove_creative_task', {
+    p_task: task.id, p_version: task.updated_at,
+  });
+  if (error?.code === 'PGRST202') throw new Error('Fitur hapus belum aktif di database.');
+  if (error) throw error;
+}
 export async function saveIdea(values: Draft<Idea>, previous?: Idea) {
   const { additional_platforms, ...fields } = values;
   const payload = additional_platforms?.length || previous?.additional_platforms?.length

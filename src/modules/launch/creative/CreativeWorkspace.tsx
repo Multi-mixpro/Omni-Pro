@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, TrendingUp, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Plus, RefreshCw, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { signOut } from '@/core/auth/useAuth';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
@@ -16,7 +16,7 @@ import { channelSummary, type CalendarEvent } from './channelRepository';
 import { publicationTaskId } from './commandRepository';
 import { focusLabels, jakartaToday, mondayWeek, type Focus } from './schedule';
 import {
-  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, PAGE_SIZE, platforms, priorities, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
+  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, PAGE_SIZE, platforms, priorities, removeTask, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
   type Campaign, type Filters, type Idea, type Task,
 } from './repository';
 import './creativeWorkspace.css';
@@ -91,14 +91,14 @@ const statusColor: Record<Task['status'], string> = {
   blocked: 'bg-amber-100 text-amber-900', cancelled: 'bg-slate-100 text-slate-600',
 };
 
-function EditorDialog({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+function EditorDialog({ children, onClose, label = 'Form pekerjaan kreatif' }: { children: ReactNode; onClose: () => void; label?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
     return () => dialog?.close();
   }, []);
-  return <dialog ref={ref} aria-label="Form pekerjaan kreatif" onCancel={event => {
+  return <dialog ref={ref} aria-label={label} onCancel={event => {
     event.preventDefault();
     if (!ref.current?.querySelector('form[aria-busy="true"]')) onClose();
   }}
@@ -133,6 +133,7 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
   const [focus, setFocus] = useState<Focus>('all');
   const [page, setPage] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [taskToRemove, setTaskToRemove] = useState<Task | null>(null);
   const [discussionCampaign, setDiscussionCampaign] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const prefix = ['creative', userId];
@@ -260,6 +261,16 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
         client.invalidateQueries({ queryKey: ['business-execution', userId] }),
       ]);
       setNotice('Progres tersimpan.');
+    },
+  });
+  const removal = useMutation({
+    mutationFn: removeTask,
+    onSuccess: () => {
+      setTaskToRemove(null);
+      setPage(0);
+      setNotice('Tugas dihapus dari daftar.');
+      refresh();
+      void client.invalidateQueries({ queryKey: ['business-execution', userId] });
     },
   });
   const tasksOnPage = taskQuery.data?.slice(0, PAGE_SIZE) ?? [];
@@ -454,6 +465,25 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
         onFocus={openFocus} onAds={() => openSection('ads','overdue')} onTask={setDetailId} onDecisions={() => openSection('decisions')} /></Suspense>}
       {detailId && <EditorDialog onClose={() => setDetailId(null)}><Suspense fallback={sectionLoading}><CreativeTaskDetail key={detailId} taskId={detailId} userId={userId} canEdit={canEdit}
         onClose={() => setDetailId(null)} onChanged={taskChanged} /></Suspense></EditorDialog>}
+      {canEdit && taskToRemove && <EditorDialog label="Hapus tugas kreatif" onClose={() => setTaskToRemove(null)}>
+        <form className="space-y-4 p-5 sm:p-6" aria-busy={removal.isPending} onSubmit={event => {
+          event.preventDefault();
+          if (!removal.isPending) removal.mutate(taskToRemove);
+        }}>
+          <h2 className="text-lg font-bold">Hapus tugas ini?</h2>
+          <p className="break-words text-sm text-slate-700"><strong>{taskToRemove.title}</strong> akan keluar dari daftar aktif. Riwayat dan bukti tayang tetap tersimpan.</p>
+          {removal.isError && <p role="alert" className="text-sm text-red-700">{errorText(removal.error)}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" autoFocus className={button} disabled={removal.isPending} onClick={() => {
+              if (removal.isError) refresh();
+              setTaskToRemove(null);
+            }}>Batal</button>
+            <button type="submit" className={button + ' !border-red-700 !bg-red-700 !text-white hover:!bg-red-800'} disabled={removal.isPending}>
+              {removal.isPending ? 'Menghapus…' : 'Hapus tugas'}
+            </button>
+          </div>
+        </form>
+      </EditorDialog>}
       {section === 'team' && <CreativeTeamPerformance members={members} stats={performance.data} userId={userId}
         loading={teamQuery.isPending || performance.isPending} failed={teamQuery.isError || performance.isError}
         onSelect={id => { chooseFocus('all',true); changeFilter({ assignee:id }); openSection('work'); }} />}
@@ -535,6 +565,8 @@ export default function CreativeWorkspace({ userId, canEdit, canSwitchWorkspace 
                   onClick={() => { setNotice(''); quickUpdate.mutate({ task, status: action.status }); }}>{updating ? 'Menyimpan…' : action.label}</button>}
                 <button className={canEdit && publishable && task.status === 'ready' && !awaitingApproval ? primary : button} onClick={() => setDetailId(task.id)}>{canEdit && publishable && task.status === 'ready' && !awaitingApproval ? 'Catat tayang' : 'Detail'}</button>
                 {canEdit && <button className={button} disabled={updating} aria-label={'Edit ' + task.title} onClick={() => openEditor({ kind: 'task', row: task })}>Edit</button>}
+                {canEdit && <button className={button + ' inline-flex items-center gap-1.5 !text-red-700 hover:!bg-red-50'} disabled={updating}
+                  aria-label={'Hapus ' + task.title} onClick={() => { removal.reset(); setNotice(''); setTaskToRemove(task); }}><Trash2 size={14} aria-hidden="true" /> Hapus</button>}
               </div>
             </li>;
           })}

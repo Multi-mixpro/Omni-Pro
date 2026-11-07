@@ -97,7 +97,8 @@ export async function nudgeTask(task: string) {
 }
 
 export async function taskEvents(scope: 'task' | 'inbox', id: string, signal: AbortSignal, page = 0) {
-  let query = supabase.from('creative_task_events').select('id,kind,detail,created_at,task_id,task:creative_tasks(title)');
+  const taskRelation = scope === 'inbox' ? 'creative_tasks!inner' : 'creative_tasks';
+  let query = supabase.from('creative_task_events').select('id,kind,detail,created_at,task_id,task:' + taskRelation + '(title)');
   query = scope === 'task' ? query.eq('task_id', id) : query.eq('recipient_id', id).eq('kind', 'nudge');
   const { data, error } = await query.order('created_at', { ascending: false }).order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
