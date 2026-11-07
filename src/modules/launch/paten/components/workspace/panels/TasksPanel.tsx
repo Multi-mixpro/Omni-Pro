@@ -115,7 +115,7 @@ export const TasksPanel: React.FC<TasksPanelProps> = ({
                         ? 'bg-rose-50 text-rose-700'
                         : upd.updateType === 'Selesai'
                         ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-[#DDF4F1] text-[#087E79]'
+                        : 'bg-teal-100 text-[#087E79]'
                     }`}
                   >
                     {upd.updateType}

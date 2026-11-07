@@ -863,7 +863,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="font-mono text-[10px] font-bold text-[#087E79] bg-[#DDF4F1] px-1.5 py-0.2 rounded">
+                      <span className="font-mono text-[10px] font-bold text-[#087E79] bg-teal-100 px-1.5 py-0.2 rounded">
                         {mat.code}
                       </span>
                       <h3 className="font-extrabold text-xs text-slate-900 mt-1">{mat.name}</h3>

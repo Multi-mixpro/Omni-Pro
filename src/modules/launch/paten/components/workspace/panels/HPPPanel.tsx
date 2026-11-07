@@ -253,7 +253,7 @@ export const HPPPanel: React.FC<HPPPanelProps> = ({
               />
             </div>
 
-            <div className="p-3 rounded-xl bg-[#DDF4F1]/60 border border-[#087E79]/20 space-y-2">
+            <div className="p-3 rounded-xl bg-teal-100/60 border border-[#087E79]/20 space-y-2">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-600 font-medium">HPP Produksi Fix</span>
                 <span className="font-mono font-bold text-slate-900">{formatIDR(currentHPP)}</span>

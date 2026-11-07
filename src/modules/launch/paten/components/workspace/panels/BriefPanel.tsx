@@ -119,7 +119,7 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ article, onUpdateArticle
       </div>
 
       {/* Varian Warna & Rentang Ukuran Brief */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gradient-to-br from-[#DDF4F1]/60 to-teal-50/80 p-3.5 rounded-2xl border border-teal-200 shadow-2xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gradient-to-br from-teal-50/60 to-teal-50/80 p-3.5 rounded-2xl border border-teal-200 shadow-2xs">
         {/* Colorways */}
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 text-[#087E79] font-extrabold text-[11px]">
@@ -185,7 +185,7 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ article, onUpdateArticle
                     }`}
                   >
                     <span>{sz}</span>
-                    {isBase && <span className="text-[8px] font-mono uppercase bg-white/30 px-1 rounded">BASE</span>}
+                    {isBase && <span className="text-[9px] font-mono uppercase bg-teal-950 px-1.5 rounded">BASE</span>}
                   </span>
                 );
               })}

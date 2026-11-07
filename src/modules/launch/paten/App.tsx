@@ -80,6 +80,7 @@ function routeState(pathname: string, search: string): { tab: PatenTab; articleI
   }
   const implementationMatch = pathname.match(/^\/launch\/app\/implementation\/([^/]+)/);
   if (implementationMatch) return { tab: 'implementation', articleId: decodeURIComponent(implementationMatch[1]) };
+  if (pathname === '/launch/app/implementation' || pathname === '/launch/app/implementation/') return { tab: 'implementation' };
   if (pathname.includes('/projects')) return { tab: 'pipeline' };
   if (pathname.includes('/approvals')) return { tab: 'approvals' };
   if (pathname.includes('/tasks')) return { tab: 'tasks' };

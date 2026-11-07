@@ -54,7 +54,7 @@ export const ArticleStickyHeader: React.FC<ArticleStickyHeaderProps> = ({
               <span className="font-mono font-bold text-[11px] text-[#087E79]">
                 {article.code}
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#DDF4F1] text-[#087E79] border border-[#087E79]/20">
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-teal-100 text-[#087E79] border border-[#087E79]/20">
                 {article.stage}
               </span>
               {article.scheduleHealth === 'At Risk' && (
@@ -118,7 +118,7 @@ export const ArticleStickyHeader: React.FC<ArticleStickyHeaderProps> = ({
         <div className="hidden sm:flex items-center gap-2">
           <button
             onClick={onRequestApproval}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#DDF4F1] border border-[#087E79]/20 text-[#087E79] text-xs font-bold hover:bg-[#087E79] hover:text-white transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-100 border border-[#087E79]/20 text-[#087E79] text-xs font-bold hover:bg-[#087E79] hover:text-white transition-all"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Minta Review / Approval</span>

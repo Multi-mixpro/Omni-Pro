@@ -105,7 +105,7 @@ export const SuppliersPanel: React.FC<SuppliersPanelProps> = ({
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     {sup.qualityScore !== null ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#DDF4F1] text-[#087E79]">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-[#087E79]">
                         {sup.qualityScore}%
                       </span>
                     ) : (

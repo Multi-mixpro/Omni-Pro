@@ -349,7 +349,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
           >
             <Settings2 className="w-3.5 h-3.5" />
             <span>Pilih &amp; Kelola Variabel</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px] font-mono">
+            <span className="px-1.5 py-0.2 rounded-full bg-indigo-800 text-[10px] font-mono">
               {currentChart.length}
             </span>
           </button>
@@ -565,7 +565,7 @@ export const SizeChartPanel: React.FC<SizeChartPanelProps> = ({
                         key={sz}
                         className={`py-1 px-0.5 text-center border-r border-slate-300 ${
                           viewMode === 'dual' ? 'min-w-[54px]' : 'min-w-[40px]'
-                        } ${isBase ? 'bg-[#DDF4F1]/70 text-[#087E79]' : ''}`}
+                        } ${isBase ? 'bg-teal-100/70 text-[#087E79]' : ''}`}
                       >
                         <div className="font-extrabold text-[11px] flex items-center justify-center gap-0.5">
                           <span>{sz}</span>

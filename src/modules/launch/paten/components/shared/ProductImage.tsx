@@ -62,7 +62,7 @@ export const ProductImage: React.FC<ProductImageProps> = ({
       {showQualityWarning && isLowRes && (
         <span
           title={`Resolusi asli hanya ${naturalWidth}px — terlalu kecil untuk ditampilkan ${displayWidth}px. Unggah foto beresolusi lebih tinggi lewat Edit Data Artikel.`}
-          className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/95 text-white text-[9px] font-bold shadow-sm"
+          className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-800/95 text-white text-[9px] font-bold shadow-sm"
         >
           <AlertTriangle className="w-3 h-3 shrink-0" />
           <span className="truncate">Resolusi rendah ({naturalWidth}px)</span>

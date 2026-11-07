@@ -220,7 +220,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   onSelectTab('implementation');
                   setShowMoreSheet(false);
                 }}
-                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[#DDF4F1] border border-[#087E79]/30 text-left text-xs font-bold text-[#087E79]"
+                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-teal-100 border border-[#087E79]/30 text-left text-xs font-bold text-[#087E79]"
               >
                 <Rocket className="w-4 h-4 text-[#087E79]" />
                 <span>Implementasi Artikel</span>
@@ -248,7 +248,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 <div className="flex-1">
                   <span>Approvals Gate</span>
                   {pendingApprovalsCount > 0 && (
-                    <span className="ml-1.5 px-1.5 py-0.2 rounded font-mono bg-amber-500 text-white text-[9px]">
+                    <span className="ml-1.5 px-1.5 py-0.2 rounded font-mono bg-amber-800 text-white text-[9px]">
                       {pendingApprovalsCount}
                     </span>
                   )}

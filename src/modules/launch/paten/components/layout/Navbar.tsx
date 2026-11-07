@@ -54,7 +54,7 @@ function formatLastSeen(dateStr: string | null): string {
 }
 
 const TeamMemberRow: React.FC<{ member: TeamMemberActivity; isMe: boolean }> = ({ member, isMe }) => (
-  <div className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors ${isMe ? 'bg-[#DDF4F1]/40' : 'hover:bg-slate-50'}`}>
+  <div className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors ${isMe ? 'bg-teal-100/40' : 'hover:bg-slate-50'}`}>
     <div className="relative flex-shrink-0">
       {member.avatar_url ? (
         <img src={member.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200" />
@@ -166,7 +166,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }}
                   className={`w-full text-left px-2.5 py-1.5 text-xs font-medium flex items-center justify-between hover:bg-slate-50 transition-colors ${
                     activeBusinessUnit === bu
-                      ? 'text-[#087E79] font-bold bg-[#DDF4F1]/50'
+                      ? 'text-[#087E79] font-bold bg-teal-100/50'
                       : 'text-slate-700'
                   }`}
                 >
@@ -229,7 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Users className="w-4 h-4" />
             {onlineCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-emerald-500 text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-emerald-700 text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center">
                 {onlineCount}
               </span>
             )}
@@ -354,7 +354,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {currentUser?.avatarUrl ? (
               <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-full border border-white object-cover shadow-sm" />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-[#DDF4F1] text-[#087E79] flex items-center justify-center font-mono font-bold text-xs border border-[#087E79]/20">
+              <div className="w-8 h-8 rounded-full bg-teal-100 text-[#087E79] flex items-center justify-center font-mono font-bold text-xs border border-[#087E79]/20">
                 {(currentUser?.name || 'U').slice(0, 1).toUpperCase()}
               </div>
             )}

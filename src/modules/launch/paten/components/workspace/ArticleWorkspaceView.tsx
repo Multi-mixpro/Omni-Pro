@@ -549,7 +549,7 @@ export const ArticleWorkspaceView: React.FC<ArticleWorkspaceViewProps> = ({
           </div>
           <button
             onClick={onNavigateToImplementation}
-            className="px-4 py-2 rounded-full bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer"
+            className="px-4 py-2 rounded-full bg-orange-700 hover:bg-orange-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer"
           >
             <span>Buka Implementasi Artikel</span>
             <ArrowRight className="w-4 h-4" />

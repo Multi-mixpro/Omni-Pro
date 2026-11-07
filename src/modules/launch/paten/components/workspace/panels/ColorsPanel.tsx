@@ -383,7 +383,7 @@ export const ColorsPanel: React.FC<ColorsPanelProps> = ({ article, onUpdateArtic
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-slate-900">{cw.name}</span>
                     {cw.isSampleColor && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#DDF4F1] text-[#087E79]">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-100 text-[#087E79]">
                         Sample
                       </span>
                     )}

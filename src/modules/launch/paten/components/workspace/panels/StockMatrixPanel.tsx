@@ -100,7 +100,7 @@ export const StockMatrixPanel: React.FC<StockMatrixPanelProps> = ({
               <span className="font-extrabold text-sm text-slate-900">
                 Total Rencana Produksi: {totalQty} Unit
               </span>
-              <span className="px-2 py-0.5 rounded bg-[#DDF4F1] text-[#087E79] text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded bg-teal-100 text-[#087E79] text-[10px] font-bold">
                 HPP Ref: {formatIDR(currentHPP)}
               </span>
             </div>

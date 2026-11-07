@@ -72,7 +72,7 @@ export function AuthGate() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_right,_rgba(8,126,121,0.16),_transparent_20rem),radial-gradient(circle_at_bottom_left,_rgba(79,95,199,0.10),_transparent_24rem),linear-gradient(180deg,#f7fafb,#eef4f6)] px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-7xl flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1.15fr)_430px] lg:items-stretch">
-        <section className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(145deg,#0e1f24,#13353a_52%,#0f2a30)] p-6 text-white shadow-[0_28px_90px_rgba(10,22,28,0.28)] sm:p-8 lg:p-10">
+        <section className="workspace-login-hero relative overflow-hidden rounded-[32px] bg-[linear-gradient(145deg,#0e1f24,#13353a_52%,#0f2a30)] p-6 text-white shadow-[0_28px_90px_rgba(10,22,28,0.28)] sm:p-8 lg:p-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,198,0.20),_transparent_18rem),radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.08),_transparent_20rem)]" />
           <div className="relative flex h-full flex-col">
             <div className="flex flex-wrap items-center justify-between gap-3">

@@ -96,7 +96,7 @@ export const LaunchPanel: React.FC<LaunchPanelProps> = ({ article, onUpdateArtic
               className="p-2.5 bg-white rounded-lg border border-slate-200 flex items-center justify-between gap-2 shadow-2xs"
             >
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-[#DDF4F1] text-[#087E79] font-bold text-[10px] flex items-center justify-center shrink-0">
+                <span className="w-5 h-5 rounded-full bg-teal-100 text-[#087E79] font-bold text-[10px] flex items-center justify-center shrink-0">
                   {idx + 1}
                 </span>
                 <span className="font-medium text-slate-800">{pt}</span>

@@ -173,7 +173,7 @@ export const ArticleBriefView: React.FC<ArticleBriefViewProps> = ({
                       }`}
                     >
                       <span>{sz}</span>
-                      {isBase && <span className="text-[8px] font-mono uppercase bg-white/30 px-1 rounded">BASE</span>}
+                      {isBase && <span className="text-[9px] font-mono uppercase bg-teal-950 px-1.5 rounded">BASE</span>}
                     </span>
                   );
                 })}

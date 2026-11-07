@@ -649,6 +649,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
             </p>
           </div>
           <button
+            type="button"
+            aria-label="Tutup formulir artikel"
             onClick={onClose}
             className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
@@ -896,7 +898,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                       Tambahkan beberapa foto untuk menampilkan detail tampak depan, belakang, samping, zoom material, & packaging (Maksimal {MAX_PHOTOS} foto).
                     </p>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#DDF4F1] text-[#087E79] border border-[#087E79]/20">
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-100 text-[#087E79] border border-[#087E79]/20">
                     Max {MAX_PHOTOS} Foto
                   </span>
                 </div>
@@ -978,8 +980,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                         title="Pilih foto dari komputer / HP Anda"
                         className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-3 text-center transition-all min-h-[120px] ${
                           isUploading
-                            ? 'border-[#087E79] bg-[#DDF4F1]/20 cursor-wait'
-                            : 'border-emerald-300 hover:border-[#087E79] bg-emerald-50/40 hover:bg-[#DDF4F1]/20 cursor-pointer shadow-2xs'
+                            ? 'border-[#087E79] bg-teal-100/20 cursor-wait'
+                            : 'border-emerald-300 hover:border-[#087E79] bg-emerald-50/40 hover:bg-teal-100/20 cursor-pointer shadow-2xs'
                         }`}
                       >
                         {isUploading ? (
