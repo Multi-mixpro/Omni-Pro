@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ShieldCheck, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
-import { Link, useLocation } from '@/app/router/simpleRouter';
+import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
 import { isProjectId } from '../discussion/repository';
@@ -40,24 +40,28 @@ const date = (value: string | null) => value ? dateFormat.format(new Date(value 
 type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea };
 type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'budget' | 'assets' | 'access';
 const navigation = [
-  { label: 'Rencana & produksi', items: [
+  { label: 'Ruang kerja', items: [
     { id: 'overview', label: 'Pusat Kerja', icon: LayoutDashboard },
-    { id: 'ideas', label: 'Bank Ide', icon: Lightbulb },
-    { id: 'campaigns', label: 'Kampanye', icon: Megaphone },
-    { id: 'studio', label: 'Studio Brief & Copy', icon: FileText },
-    { id: 'work', label: 'Produksi & Publikasi', icon: ListTodo },
-    { id: 'decisions', label: 'Review & Persetujuan', icon: ClipboardCheck },
-  ] },
-  { label: 'Jadwal & tindak lanjut', items: [
-    { id: 'calendar', label: 'Kalender', icon: CalendarDays },
     { id: 'inbox', label: 'Kotak Tindakan', icon: Bell },
   ] },
-  { label: 'Pengelolaan', items: [
+  { label: 'Perencanaan', items: [
+    { id: 'ideas', label: 'Bank Ide', icon: Lightbulb },
+    { id: 'campaigns', label: 'Kampanye', icon: Megaphone },
+  ] },
+  { label: 'Eksekusi', items: [
+    { id: 'work', label: 'Produksi & Publikasi', icon: ListTodo },
+    { id: 'studio', label: 'Studio Brief & Copy', icon: FileText },
+    { id: 'decisions', label: 'Review & Persetujuan', icon: ClipboardCheck },
+    { id: 'calendar', label: 'Kalender', icon: CalendarDays },
+    { id: 'assets', label: 'Pustaka Aset', icon: Images },
+  ] },
+  { label: 'Kanal & hasil', items: [
     { id: 'accounts', label: 'Akun & Performa', icon: AtSign },
     { id: 'ads', label: 'Iklan & Evaluasi', icon: TrendingUp },
-    { id: 'analytics', label: 'Analitik Creative', icon: BarChart3 },
     { id: 'budget', label: 'Anggaran Kanal', icon: Wallet },
-    { id: 'assets', label: 'Pustaka Aset', icon: Images },
+    { id: 'analytics', label: 'Analitik Creative', icon: BarChart3 },
+  ] },
+  { label: 'Administrasi', items: [
     { id: 'team', label: 'Tim & PIC', icon: Users },
     { id: 'access', label: 'Pengaturan Akses', icon: ShieldCheck },
   ] },
@@ -115,8 +119,17 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   userId: string; userName: string; canEdit: boolean; canRemove: boolean; canSwitchWorkspace: boolean; permissions: string[];
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const client = useQueryClient();
-  const [section, setSection] = useState<Section>(() => new URLSearchParams(location.search).get('mine') === '1' ? 'work' : 'overview');
+  const search = new URLSearchParams(location.search);
+  const requestedSection = search.get('section');
+  const section: Section = navigation.flatMap(group => [...group.items]).some(item => item.id === requestedSection)
+    ? requestedSection as Section : search.get('mine') === '1' ? 'work' : 'overview';
+  const setSection = (next: Section) => {
+    const params = new URLSearchParams(location.search);
+    params.set('section', next);
+    navigate(location.pathname + '?' + params.toString());
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCompact, setSidebarCompact] = useState(() => {
     try { return localStorage.getItem('creative-sidebar-compact') === 'true'; } catch { return false; }
@@ -198,7 +211,10 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const overdueEvaluations = channels.data?.reduce((sum, row) => sum + Number(row.overdue), 0) ?? 0;
   const pendingEvaluations = channels.data?.reduce((sum, row) => sum + Number(row.pending_review), 0) ?? 0;
   const loading = campaignQuery.isFetching || visibleQuery.isFetching || summaryQuery.isFetching || teamQuery.isFetching || performance.isFetching || channels.isFetching;
-  const error = campaignQuery.error || (section === 'work' ? visibleQuery.error : null) || summaryQuery.error || teamQuery.error;
+  const error = (!['ideas','accounts','access'].includes(section) || editor ? campaignQuery.error : null)
+    || (section === 'work' ? visibleQuery.error : null)
+    || (['overview','inbox','analytics'].includes(section) ? summaryQuery.error : null)
+    || (['work','campaigns','ads','team','accounts'].includes(section) || editor ? teamQuery.error : null);
   const changeScope = (next: string) => { setScope(next); setPage(0); setEditor(null); setNotice(''); setDiscussionCampaign(null); };
   const changeFilter = (values: Partial<Filters>) => { setFilters(current => ({ ...current, ...values })); setPage(0); };
   const chooseFocus = (next: Focus, resetFilters = false) => {
@@ -238,18 +254,12 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const saved = () => {
     setEditor(null);
     setNotice('Perubahan tersimpan.');
-    void client.invalidateQueries({ queryKey: [...prefix, 'tasks'] });
-    void client.invalidateQueries({ queryKey: [...prefix, 'summary'] });
-    void client.invalidateQueries({ queryKey: [...prefix, 'workload'] });
-    void client.invalidateQueries({ queryKey: [...prefix, 'calendar'] });
-    if (editor?.kind === 'task') void client.invalidateQueries({ queryKey: [...prefix, 'ideas'] });
-    if (editor?.kind === 'task') void client.invalidateQueries({ queryKey: [...prefix, 'task-events'] });
+    taskChanged();
     if (editor?.kind === 'campaign') {
       void client.invalidateQueries({ queryKey: [...prefix, 'campaigns'] });
       void client.invalidateQueries({ queryKey: [...prefix, 'activations'] });
       void client.invalidateQueries({ queryKey: [...prefix, 'channel-summary'] });
     }
-    void client.invalidateQueries({ queryKey: ['business-execution', userId] });
   };
   const quickUpdate = useMutation({
     mutationFn: ({ task, status }: { task: Task; status: Exclude<Task['status'], 'blocked'> }) => advanceTask(task, status),
@@ -358,7 +368,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       </div>}
 
       {!canEdit && section !== 'access' && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
-      {section === 'access' && <Suspense fallback={sectionLoading}><CreativeAccess permissions={permissions} userName={userName} /></Suspense>}
+      {section === 'access' && <Suspense fallback={sectionLoading}><CreativeAccess permissions={permissions} userName={userName} userId={userId} /></Suspense>}
       {(section === 'analytics' || section === 'budget') && <Suspense fallback={sectionLoading}>
         <CreativeManagement mode={section} counts={section === 'analytics' ? counts : undefined}
           channels={scope === 'standalone' ? undefined : channels.data} standalone={scope === 'standalone'}
@@ -377,7 +387,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
           onOpen={setDetailId} onEdit={row => openEditor({ kind: 'task', row })} />
       </Suspense>}
       {section === 'ideas' ? <IdeaBank key={unit} unit={unit} userId={userId} canEdit={canEdit} onConvert={sourceIdea => {
-        if (currentCampaign?.status === 'archived') changeScope('all');
+        changeScope('standalone');
         openEditor({ kind: 'task', sourceIdea });
         setSection('work');
         window.scrollTo({ top: 0 });

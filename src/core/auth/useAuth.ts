@@ -32,7 +32,11 @@ async function loadAuth(): Promise<AuthState> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: AUTH_KEY, queryFn: loadAuth, refetchOnWindowFocus: true });
+  const query = useQuery({
+    queryKey: AUTH_KEY, queryFn: loadAuth,
+    refetchOnWindowFocus: 'always',
+    refetchInterval: query => query.state.data?.session ? 30_000 : false,
+  });
 
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event) => {

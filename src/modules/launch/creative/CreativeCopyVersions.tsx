@@ -35,6 +35,7 @@ export function CreativeCopyVersions({ taskId, userId, canEdit, reviewerId, appr
       <h3 className="font-bold">Versi copy</h3>
       {canEdit && !draft && <button type="button" className={button} onClick={() => setDraft('new')}>Tulis versi baru</button>}
     </div>
+    <p className="text-xs text-slate-600">Keputusan di sini berlaku untuk versi naskah. Review dan persetujuan tugas dicatat melalui aksi di detail pekerjaan.</p>
     {draft && <Editor title={template ? `Revisi dari versi ${template.version}` : 'Versi copy baru'} onCancel={() => setDraft(null)}
       onSaved={() => { setDraft(null); setPage(0); void client.invalidateQueries({ queryKey: key }); }}
       onSave={async data => {

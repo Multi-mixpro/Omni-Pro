@@ -177,9 +177,11 @@ export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'cre
     enabled: isAdmin && Boolean(projectId),
   });
 
-  const refreshTeam = () => {
-    client.invalidateQueries({ queryKey: ['launch-team'] });
-  };
+  const refreshTeam = () => Promise.all([
+    client.invalidateQueries({ queryKey: ['launch-team'] }),
+    client.invalidateQueries({ queryKey: ['creative', auth.data?.profile?.id, 'access-switches'] }),
+    client.invalidateQueries({ queryKey: ['creative', auth.data?.profile?.id, 'team'] }),
+  ]);
 
   const refreshAccess = () => client.invalidateQueries({ queryKey: ['launch-access', projectId] });
 

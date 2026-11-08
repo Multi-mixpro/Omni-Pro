@@ -60,8 +60,8 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
     },
   });
   const unit = row?.business_unit_id ?? 'unassigned';
-  const taskPlatforms = row?.additional_platforms?.length ? [row.platform, ...row.additional_platforms] : undefined;
-  const accountQuery = useQuery({ queryKey: [...prefix,'accounts','active',unit,accountPage,taskPlatforms], enabled: action === 'publish',
+  const taskPlatforms = row ? [row.platform, ...(row.additional_platforms ?? [])] : [];
+  const accountQuery = useQuery({ queryKey: [...prefix,'accounts','active',unit,accountPage,taskPlatforms], enabled: action === 'publish' && Boolean(row),
     queryFn: ({ signal }) => accounts(unit,accountPage,signal,true,taskPlatforms) });
   const refresh = onChanged;
   const timestamp = new Date(Date.now() + 7*3600_000).toISOString().slice(0,16);
@@ -147,7 +147,7 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
         <Label title="Tautan video / posting publik"><input name="url" type="url" className={field} maxLength={1024} required /></Label>
         <Label title="Waktu tayang aktual (WIB)"><input name="time" type="datetime-local" className={field} defaultValue={timestamp} max={timestamp} required /></Label>
         {accountQuery.isError && <p role="alert" className="text-sm text-red-700">{errorText(accountQuery.error)}</p>}
-        {accountQuery.isSuccess && !accountQuery.data.length && <p className="text-sm text-slate-600">Belum ada akun aktif. Tambahkan akun di Akun &amp; Performa.</p>}
+        {accountQuery.isSuccess && !accountQuery.data.length && <p className="text-sm text-slate-600">Belum ada akun aktif yang cocok dengan unit dan platform tugas. Tambahkan akun di Akun &amp; Performa.</p>}
         <CreativePager page={accountPage} next={(accountQuery.data?.length ?? 0)>PAGE_SIZE} onPage={setAccountPage} />
       </Editor>}
     </>}

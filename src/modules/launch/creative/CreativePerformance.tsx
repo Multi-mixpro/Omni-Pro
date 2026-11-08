@@ -15,7 +15,7 @@ export function WeeklyProgress({ stats }: { stats: Workload }) {
   </div>;
 }
 
-const initials = (name: string) => name.trim().split(/s+/).slice(0,2).map(word => word[0]).join('').toUpperCase();
+const initials = (name: string) => name.trim().split(/\s+/).slice(0,2).map(word => word[0]).join('').toUpperCase();
 
 export function CreativeTeamPerformance({ members, stats, userId, loading, failed, onSelect }: {
   members: TeamMember[]; stats?: Workload[]; userId: string; loading: boolean; failed: boolean; onSelect: (id: string) => void;

@@ -77,12 +77,17 @@ export async function campaigns(page: number, signal: AbortSignal, unit = 'all')
 }
 
 export async function team(signal: AbortSignal) {
-  const { data, error } = await supabase.from('profiles')
+  const { data, error } = await supabase.rpc('creative_team_directory').abortSignal(signal);
+  if (!error) return (data ?? []) as TeamMember[];
+  if (error.code !== 'PGRST202') throw error;
+
+  // Older databases have role grants only, before account overrides exist.
+  const previous = await supabase.from('profiles')
     .select('id,full_name,is_active,job_title,user_roles(role:roles(role_permissions(permission:permissions(code))))')
     .order('full_name').abortSignal(signal);
-  if (error) throw error;
+  if (previous.error) throw previous.error;
   type Assignment = { role: { role_permissions: { permission: { code: string } | null }[] } | null };
-  return ((data ?? []) as unknown as (TeamMember & { user_roles: Assignment[] })[]).map(({ user_roles, ...member }) => {
+  return ((previous.data ?? []) as unknown as (TeamMember & { user_roles: Assignment[] })[]).map(({ user_roles, ...member }) => {
     const codes = new Set(user_roles.flatMap(({ role }) => role?.role_permissions.map(item => item.permission?.code) ?? []));
     return { ...member, can_decide: member.is_active && (codes.has('launch.admin') || (codes.has('creative.view') && codes.has('creative.edit'))) };
   });

@@ -149,6 +149,9 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
       }, task, sourceIdea?.id);
     }}>
     <Label title="Judul / hasil yang dibutuhkan"><input name="title" className={field} required maxLength={160} defaultValue={task?.title ?? sourceIdea?.title} /></Label>
+    {(task?.reviewed_at || task?.approved_at) && ['ready','done'].includes(task.status) && <p className="sm:col-span-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+      Brief dan hasil ini sudah disetujui. Pilih status Dikerjakan saat mengubahnya agar review dan persetujuan dapat dicatat ulang.
+    </p>}
     <Label title="Kampanye"><select name="campaign" className={field} value={selectedCampaign} onChange={event => setSelectedCampaign(event.target.value)}>
       <option value="">Tanpa kampanye</option>
       {task?.campaign_id && !campaignList.some(campaign => campaign.id === task.campaign_id) &&
