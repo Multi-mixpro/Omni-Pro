@@ -240,96 +240,416 @@ export type CopyTemplate = {
 };
 
 const LOCAL_COPY_LIBRARY_KEY = 'mix_pro_creative_copy_library_v1';
+const LEGACY_DUMMY_COPY_IDS = new Set(['template-hook-1', 'template-caption-1', 'template-script-1']);
+const COPY_TPL_PREFIX = '[COPY_TPL] ';
+const COPY_LINKS_TITLE = '[COPY_TPL_LINKS]';
+const DELETED_IDEA_PREFIX = '[DELETED_IDEA] ';
 
-const DEFAULT_COPY_TEMPLATES: CopyTemplate[] = [
-  {
-    id: 'template-hook-1',
-    title: 'Hook Before-After Masalah Pakaian / Lookbook',
-    description: 'Digunakan untuk 3 detik pembuka Reels/TikTok. Talent menghadap kamera dengan ekspresi relatable, lalu transisi cepat ke outfit rapi.',
-    format: 'hook',
-    output_type: 'video',
-    platform: 'tiktok',
-    body: '<b>[HOOK 0-3 Detik]</b><br>Pernah nggak ngerasa outfit kamu <span style="color:#dc2626"><b>kaku banget</b></span> pas dipakai seharian?<br><br><i>Ini 3 rahasia styling simpel yang bikin look kamu 10x lebih rapi tanpa ribet.</i>',
-    business_unit_id: null,
-    is_archived: false,
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'template-caption-1',
-    title: 'Caption Peluncuran Drop Baru (Storytelling)',
-    description: 'Cocok untuk postingan feed/carousel rilis koleksi baru. Menonjolkan kualitas jahitan, kenyamanan bahan breathable, dan CTA ke bio.',
-    format: 'caption',
-    output_type: 'post',
-    platform: 'instagram',
-    body: '<b>Setiap jahitan punya cerita.</b><br><br>Koleksi terbaru kami hadir dengan material <u>premium breathable</u> yang siap nemenin mobilitas harian kamu dari pagi sampai malam.<br><br><mark style="background-color:#fef08a">Stok batch pertama terbatas — klik link pembelian di bio sekarang!</mark>',
-    business_unit_id: null,
-    is_archived: false,
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'template-script-1',
-    title: 'Skrip Review Produk & Uji Detail 30 Detik',
-    description: 'Panduan shooting video produk 30 detik: ambil close-up tekstur kain di awal, lanjutkan penjelasan 3 fitur utama, dan tutup dengan fitting on-body.',
-    format: 'script',
-    output_type: 'video',
-    platform: 'instagram',
-    body: '<b>[0-5s · ADEGAN VISUAL]</b><br>Buka video dengan zoom detail jahitan &amp; tekstur bahan.<br><br><b>[6-15s · DIALOG / INTI]</b><br>Jelaskan <b>3 fitur unggulan</b>: <i>anti kusut, furing adem, dan fitting proporsional</i>.<br><br><b>[16-25s · BUKTI PEMAKAIAN]</b><br>Tunjukkan pemakaian di badan saat bergerak aktif.<br><br><b>[26-30s · CTA]</b><br><span style="color:#0f766e"><b>Cek varian warna sekarang sebelum kehabisan!</b></span>',
-    business_unit_id: null,
-    is_archived: false,
-    updated_at: new Date().toISOString(),
-  },
-];
+function isInternalIdeaRecordTitle(title?: string | null): boolean {
+  if (!title) return false;
+  const trimmed = title.trim();
+  return (
+    trimmed.startsWith(COPY_TPL_PREFIX.trim()) ||
+    trimmed === COPY_LINKS_TITLE ||
+    trimmed.startsWith(DELETED_IDEA_PREFIX.trim())
+  );
+}
 
 function getLocalCopyLibrary(): CopyTemplate[] {
   try {
     const raw = localStorage.getItem(LOCAL_COPY_LIBRARY_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as CopyTemplate[];
-      const defaultsById = new Map(DEFAULT_COPY_TEMPLATES.map(d => [d.id, d]));
-      return parsed.map(item => ({
+      const cleaned = parsed.filter(item => item && item.id && !LEGACY_DUMMY_COPY_IDS.has(item.id) && !isDemoText(item.title));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(LOCAL_COPY_LIBRARY_KEY, JSON.stringify(cleaned));
+      }
+      return cleaned.map(item => ({
         ...item,
-        description: item.description ?? defaultsById.get(item.id)?.description ?? '',
+        description: item.description ?? '',
       }));
     }
   } catch { /* ignore */ }
-  return DEFAULT_COPY_TEMPLATES;
+  return [];
 }
 
 function saveLocalCopyLibrary(items: CopyTemplate[]) {
   try {
-    localStorage.setItem(LOCAL_COPY_LIBRARY_KEY, JSON.stringify(items));
+    const cleaned = items.filter(item => item && item.id && !LEGACY_DUMMY_COPY_IDS.has(item.id));
+    localStorage.setItem(LOCAL_COPY_LIBRARY_KEY, JSON.stringify(cleaned));
   } catch { /* ignore */ }
 }
 
-export async function copyTemplates(_signal?: AbortSignal, unit = 'all'): Promise<CopyTemplate[]> {
-  const local = getLocalCopyLibrary().filter(item => !item.is_archived);
-  if (unit === 'all') return local;
-  if (unit === 'unassigned') return local.filter(item => item.business_unit_id === null);
-  return local.filter(item => item.business_unit_id === null || item.business_unit_id === unit);
+type PackedCopyMeta = {
+  v: 1;
+  title: string;
+  description?: string;
+  format: CopyTemplate['format'];
+  output_type: CopyTemplate['output_type'];
+  platform: CopyTemplate['platform'];
+  is_archived: boolean;
+  body_head: string;
+};
+
+function packCopyTemplateForIdeaRow(template: Omit<CopyTemplate, 'id' | 'updated_at'>) {
+  const fullBody = template.body ?? '';
+  const bodyHead = fullBody.slice(0, 1200);
+  const rest = fullBody.slice(1200);
+  const chunks: string[] = [];
+  for (let i = 0; i < rest.length && chunks.length < 5; i += 950) {
+    chunks.push(rest.slice(i, i + 950));
+  }
+  const meta: PackedCopyMeta = {
+    v: 1,
+    title: template.title.trim(),
+    description: template.description?.trim() ?? '',
+    format: template.format in copyFormats ? template.format : 'script',
+    output_type: template.output_type in outputTypes ? template.output_type : 'video',
+    platform: template.platform && template.platform in platforms ? template.platform : null,
+    is_archived: Boolean(template.is_archived),
+    body_head: bodyHead,
+  };
+  const safePlatform = template.platform && template.platform in platforms ? template.platform : 'internal';
+  return {
+    title: `${COPY_TPL_PREFIX}${template.title.trim()}`.slice(0, 160),
+    brief: JSON.stringify(meta).slice(0, 2000),
+    platform: safePlatform,
+    reference_urls: chunks,
+    business_unit_id: template.business_unit_id ?? null,
+    queue_state: 'parked' as const,
+    prioritized: false,
+  };
+}
+
+function unpackCopyTemplateFromIdeaRow(row: {
+  id: string;
+  title: string;
+  brief: string;
+  platform: string;
+  reference_urls?: string[] | null;
+  business_unit_id?: string | null;
+  updated_at: string;
+}): CopyTemplate | null {
+  try {
+    const parsed = JSON.parse(row.brief) as Partial<PackedCopyMeta>;
+    if (parsed && typeof parsed === 'object' && parsed.v === 1) {
+      const chunks = Array.isArray(row.reference_urls) ? row.reference_urls.join('') : '';
+      return {
+        id: row.id,
+        title: (parsed.title || row.title.replace(/^\[COPY_TPL\]\s*/i, '')).trim(),
+        description: parsed.description ?? '',
+        format: parsed.format && parsed.format in copyFormats ? parsed.format : 'script',
+        output_type: parsed.output_type && parsed.output_type in outputTypes ? parsed.output_type : 'video',
+        platform: parsed.platform && parsed.platform in platforms ? parsed.platform : null,
+        body: `${parsed.body_head ?? ''}${chunks}`,
+        business_unit_id: row.business_unit_id ?? null,
+        is_archived: Boolean(parsed.is_archived),
+        updated_at: row.updated_at || new Date().toISOString(),
+      };
+    }
+  } catch { /* fallback if plain text */ }
+  return {
+    id: row.id,
+    title: row.title.replace(/^\[COPY_TPL\]\s*/i, '').trim() || 'Skrip Tanpa Judul',
+    description: '',
+    format: 'script',
+    output_type: 'video',
+    platform: row.platform in platforms ? (row.platform as keyof typeof platforms) : null,
+    body: row.brief || '',
+    business_unit_id: row.business_unit_id ?? null,
+    is_archived: false,
+    updated_at: row.updated_at || new Date().toISOString(),
+  };
+}
+
+export async function copyTemplates(signal?: AbortSignal, unit = 'all'): Promise<CopyTemplate[]> {
+  const local = getLocalCopyLibrary();
+  let merged = local;
+
+  // 1. Try dedicated public.creative_copy_library table
+  try {
+    let libQuery = supabase
+      .from('creative_copy_library')
+      .select('id, title, description, format, output_type, platform, body, business_unit_id, is_archived, updated_at')
+      .order('updated_at', { ascending: false });
+    if (signal) libQuery = libQuery.abortSignal(signal);
+    const { data: libData, error: libErr } = await libQuery;
+
+    if (!libErr && Array.isArray(libData)) {
+      const dbTemplates: CopyTemplate[] = libData
+        .filter(row => row && row.id && !LEGACY_DUMMY_COPY_IDS.has(row.id) && !isDemoText(row.title))
+        .map(row => ({
+          id: String(row.id),
+          title: String(row.title || '').trim(),
+          description: String(row.description || '').trim(),
+          format: row.format in copyFormats ? (row.format as CopyTemplate['format']) : 'script',
+          output_type: row.output_type in outputTypes ? (row.output_type as CopyTemplate['output_type']) : 'video',
+          platform: row.platform && row.platform in platforms ? (row.platform as CopyTemplate['platform']) : null,
+          body: String(row.body || ''),
+          business_unit_id: row.business_unit_id ?? null,
+          is_archived: Boolean(row.is_archived),
+          updated_at: String(row.updated_at || new Date().toISOString()),
+        }));
+
+      const dbMap = new Map(dbTemplates.map(item => [item.id, item]));
+
+      // Migrate any local-only items (e.g. created offline or before DB migration) to Supabase
+      const unsyncedLocal = local.filter(item => !dbMap.has(item.id) && !item.is_archived);
+      for (const localItem of unsyncedLocal) {
+        try {
+          const insertPayload = {
+            title: localItem.title.trim(),
+            description: localItem.description?.trim() ?? '',
+            format: localItem.format,
+            output_type: localItem.output_type,
+            platform: localItem.platform,
+            body: localItem.body,
+            business_unit_id: localItem.business_unit_id,
+            is_archived: false,
+          };
+          const { data: inserted } = await supabase.from('creative_copy_library').insert(insertPayload).select('id, updated_at').maybeSingle();
+          if (inserted?.id) {
+            const migrated: CopyTemplate = { ...localItem, id: String(inserted.id), updated_at: String(inserted.updated_at || localItem.updated_at) };
+            dbMap.set(migrated.id, migrated);
+          } else {
+            dbMap.set(localItem.id, localItem);
+          }
+        } catch {
+          dbMap.set(localItem.id, localItem);
+        }
+      }
+
+      merged = Array.from(dbMap.values()).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+      saveLocalCopyLibrary(merged);
+      await syncIdeaScriptLinksFromDb(signal);
+
+      const active = merged.filter(item => !item.is_archived && !isDemoText(item.title));
+      if (unit === 'all') return active;
+      if (unit === 'unassigned') return active.filter(item => item.business_unit_id === null);
+      return active.filter(item => item.business_unit_id === null || item.business_unit_id === unit);
+    }
+  } catch { /* fallback to bridge below */ }
+
+  // 2. Fallback bridge via creative_ideas if creative_copy_library table is not yet created
+  try {
+    let query = supabase
+      .from('creative_ideas')
+      .select('id,title,brief,platform,reference_urls,business_unit_id,updated_at')
+      .ilike('title', `${COPY_TPL_PREFIX}%`)
+      .order('updated_at', { ascending: false });
+    if (signal) query = query.abortSignal(signal);
+    const { data, error } = await query;
+    if (!error && Array.isArray(data)) {
+      const remoteTemplates = data
+        .map(row => unpackCopyTemplateFromIdeaRow(row as never))
+        .filter((item): item is CopyTemplate => item !== null && !LEGACY_DUMMY_COPY_IDS.has(item.id));
+      const remoteById = new Map(remoteTemplates.map(item => [item.id, item]));
+      const unsyncedLocal = local.filter(item => !remoteById.has(item.id) && !item.is_archived);
+      for (const localItem of unsyncedLocal) {
+        try {
+          const packed = packCopyTemplateForIdeaRow(localItem);
+          const { data: inserted } = await supabase.from('creative_ideas').insert(packed).select('id,updated_at').maybeSingle();
+          if (inserted?.id) {
+            const migrated: CopyTemplate = { ...localItem, id: String(inserted.id), updated_at: String(inserted.updated_at || localItem.updated_at) };
+            remoteById.set(migrated.id, migrated);
+          } else {
+            remoteById.set(localItem.id, localItem);
+          }
+        } catch {
+          remoteById.set(localItem.id, localItem);
+        }
+      }
+      merged = Array.from(remoteById.values()).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+      saveLocalCopyLibrary(merged);
+    }
+  } catch { /* fallback to local cache when offline */ }
+
+  await syncIdeaScriptLinksFromDb(signal);
+
+  const active = merged.filter(item => !item.is_archived && !isDemoText(item.title));
+  if (unit === 'all') return active;
+  if (unit === 'unassigned') return active.filter(item => item.business_unit_id === null);
+  return active.filter(item => item.business_unit_id === null || item.business_unit_id === unit);
 }
 
 export async function saveCopyTemplate(template: Omit<CopyTemplate, 'id' | 'updated_at' | 'is_archived'>, id?: string): Promise<string> {
   const now = new Date().toISOString();
   const list = getLocalCopyLibrary();
+  const fullDraft: Omit<CopyTemplate, 'id' | 'updated_at'> = { ...template, is_archived: false };
+  const isUuid = Boolean(id && /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id));
+
+  // 1. Try public.creative_copy_library table
+  try {
+    const payload = {
+      title: template.title.trim(),
+      description: template.description?.trim() ?? '',
+      format: template.format,
+      output_type: template.output_type,
+      platform: template.platform,
+      body: template.body,
+      business_unit_id: template.business_unit_id,
+      is_archived: false,
+    };
+    if (id && isUuid) {
+      const { data, error } = await supabase
+        .from('creative_copy_library')
+        .update(payload)
+        .eq('id', id)
+        .select('id, updated_at')
+        .maybeSingle();
+      if (!error && data?.id) {
+        const updatedItem: CopyTemplate = { ...fullDraft, id: String(data.id), updated_at: String(data.updated_at || now) };
+        const nextList = list.some(item => item.id === id)
+          ? list.map(item => item.id === id ? updatedItem : item)
+          : [updatedItem, ...list];
+        saveLocalCopyLibrary(nextList);
+        return String(data.id);
+      }
+    } else {
+      const { data, error } = await supabase
+        .from('creative_copy_library')
+        .insert(payload)
+        .select('id, updated_at')
+        .maybeSingle();
+      if (!error && data?.id) {
+        const newId = String(data.id);
+        const created: CopyTemplate = { ...fullDraft, id: newId, updated_at: String(data.updated_at || now) };
+        const filtered = id ? list.filter(item => item.id !== id) : list;
+        saveLocalCopyLibrary([created, ...filtered]);
+        return newId;
+      }
+    }
+  } catch { /* fallback to bridge below */ }
+
+  // 2. Fallback bridge via creative_ideas if creative_copy_library table does not exist
+  const packed = packCopyTemplateForIdeaRow(fullDraft);
+  if (id && isUuid) {
+    try {
+      const { data, error } = await supabase
+        .from('creative_ideas')
+        .update(packed)
+        .eq('id', id)
+        .select('id,updated_at')
+        .maybeSingle();
+      if (!error && data?.id) {
+        const updatedItem: CopyTemplate = { ...fullDraft, id: String(data.id), updated_at: String(data.updated_at || now) };
+        const nextList = list.some(item => item.id === id)
+          ? list.map(item => item.id === id ? updatedItem : item)
+          : [updatedItem, ...list];
+        saveLocalCopyLibrary(nextList);
+        return String(data.id);
+      }
+    } catch { /* fallback below */ }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('creative_ideas')
+      .insert(packed)
+      .select('id,updated_at')
+      .maybeSingle();
+    if (!error && data?.id) {
+      const newId = String(data.id);
+      const created: CopyTemplate = { ...fullDraft, id: newId, updated_at: String(data.updated_at || now) };
+      const filtered = id ? list.filter(item => item.id !== id) : list;
+      saveLocalCopyLibrary([created, ...filtered]);
+      return newId;
+    }
+  } catch { /* fallback to local below */ }
+
   if (id) {
     const updated = list.map(item => item.id === id ? { ...item, ...template, updated_at: now } : item);
     saveLocalCopyLibrary(updated);
     return id;
   }
-  const newId = `copy-tpl-${Date.now()}`;
-  const created: CopyTemplate = { ...template, id: newId, is_archived: false, updated_at: now };
+  const fallbackId = `copy-tpl-${Date.now()}`;
+  const created: CopyTemplate = { ...template, id: fallbackId, is_archived: false, updated_at: now };
   saveLocalCopyLibrary([created, ...list]);
-  return newId;
+  return fallbackId;
 }
 
 export async function deleteCopyTemplate(id: string): Promise<void> {
-  const list = getLocalCopyLibrary().map(item => item.id === id ? { ...item, is_archived: true } : item);
-  saveLocalCopyLibrary(list);
+  const list = getLocalCopyLibrary();
+  const target = list.find(item => item.id === id);
+  const updated = list.map(item => item.id === id ? { ...item, is_archived: true } : item);
+  saveLocalCopyLibrary(updated);
+
+  const isUuid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id);
+  if (isUuid) {
+    try {
+      const { error } = await supabase.from('creative_copy_library').delete().eq('id', id);
+      if (error) {
+        await supabase.from('creative_copy_library').update({ is_archived: true }).eq('id', id);
+      }
+    } catch { /* ignore */ }
+    try {
+      const { error } = await supabase.from('creative_ideas').delete().eq('id', id);
+      if (error && target) {
+        await supabase.from('creative_ideas').update(packCopyTemplateForIdeaRow({ ...target, is_archived: true })).eq('id', id);
+      }
+    } catch { /* ignore */ }
+  }
 }
 
 const IDEA_SCRIPT_LINKS_KEY = 'mix_pro_idea_script_links_v1';
 const HIDDEN_IDEAS_KEY = 'mix_pro_hidden_ideas_v1';
 const DEMO_PURGED_KEY = 'mix_pro_demo_purged_v1';
+
+async function syncIdeaScriptLinksFromDb(signal?: AbortSignal): Promise<Record<string, string>> {
+  let localMap: Record<string, string> = {};
+  try {
+    const raw = localStorage.getItem(IDEA_SCRIPT_LINKS_KEY);
+    if (raw) localMap = JSON.parse(raw) as Record<string, string>;
+  } catch { /* ignore */ }
+
+  try {
+    let query = supabase
+      .from('creative_ideas')
+      .select('id,brief,updated_at')
+      .eq('title', COPY_LINKS_TITLE)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (signal) query = query.abortSignal(signal);
+    const { data, error } = await query;
+    if (!error && data && data[0]?.brief) {
+      const remoteMap = JSON.parse(String(data[0].brief)) as Record<string, string>;
+      if (remoteMap && typeof remoteMap === 'object') {
+        const combined = { ...remoteMap, ...localMap };
+        localStorage.setItem(IDEA_SCRIPT_LINKS_KEY, JSON.stringify(combined));
+        return combined;
+      }
+    }
+  } catch { /* ignore */ }
+  return localMap;
+}
+
+async function persistIdeaScriptLinksToDb(map: Record<string, string>) {
+  try {
+    const serialized = JSON.stringify(map).slice(0, 2000);
+    const { data: existing } = await supabase
+      .from('creative_ideas')
+      .select('id')
+      .eq('title', COPY_LINKS_TITLE)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (existing && existing[0]?.id) {
+      await supabase
+        .from('creative_ideas')
+        .update({ brief: serialized, queue_state: 'parked', prioritized: false })
+        .eq('id', existing[0].id);
+    } else {
+      await supabase
+        .from('creative_ideas')
+        .insert({
+          title: COPY_LINKS_TITLE,
+          brief: serialized,
+          platform: 'internal',
+          queue_state: 'parked',
+          prioritized: false,
+        });
+    }
+  } catch { /* ignore */ }
+}
 
 export function getIdeaAttachedScript(ideaId?: string | null): string {
   if (!ideaId) return '';
@@ -337,7 +657,8 @@ export function getIdeaAttachedScript(ideaId?: string | null): string {
     const raw = localStorage.getItem(IDEA_SCRIPT_LINKS_KEY);
     if (!raw) return '';
     const map = JSON.parse(raw) as Record<string, string>;
-    return map[ideaId] ?? '';
+    const tplId = map[ideaId] ?? '';
+    return LEGACY_DUMMY_COPY_IDS.has(tplId) ? '' : tplId;
   } catch {
     return '';
   }
@@ -348,9 +669,10 @@ export function setIdeaAttachedScript(ideaId: string, templateId: string | null)
   try {
     const raw = localStorage.getItem(IDEA_SCRIPT_LINKS_KEY);
     const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
-    if (templateId) map[ideaId] = templateId;
+    if (templateId && !LEGACY_DUMMY_COPY_IDS.has(templateId)) map[ideaId] = templateId;
     else delete map[ideaId];
     localStorage.setItem(IDEA_SCRIPT_LINKS_KEY, JSON.stringify(map));
+    void persistIdeaScriptLinksToDb(map);
   } catch { /* ignore */ }
 }
 
@@ -365,8 +687,31 @@ function getHiddenIdeaIds(): Set<string> {
 
 export async function deleteIdea(id: string): Promise<void> {
   try {
-    await supabase.from('creative_ideas').delete().eq('id', id);
-  } catch { /* fallback to local hide */ }
+    const { error } = await supabase.from('creative_ideas').delete().eq('id', id);
+    if (error) {
+      await supabase
+        .from('creative_ideas')
+        .update({
+          title: `${DELETED_IDEA_PREFIX}${id}`.slice(0, 160),
+          queue_state: 'parked',
+          prioritized: false,
+          brief: '',
+        })
+        .eq('id', id);
+    }
+  } catch {
+    try {
+      await supabase
+        .from('creative_ideas')
+        .update({
+          title: `${DELETED_IDEA_PREFIX}${id}`.slice(0, 160),
+          queue_state: 'parked',
+          prioritized: false,
+          brief: '',
+        })
+        .eq('id', id);
+    } catch { /* fallback to local hide */ }
+  }
   try {
     const hidden = getHiddenIdeaIds();
     hidden.add(id);
@@ -384,6 +729,7 @@ export function isDemoPurged(): boolean {
 
 export function isDemoText(text?: string | null): boolean {
   if (!text) return false;
+  if (isInternalIdeaRecordTitle(text)) return true;
   return /^\s*\[DEMO\]/i.test(text) || /^DEMO[\s_]/i.test(text) || /^demo\./i.test(text.trim());
 }
 
@@ -413,8 +759,13 @@ export async function purgeCreativeDemoData(): Promise<{ removedTasks: number; r
           await supabase.rpc('remove_creative_task', { p_task: t.id, p_version: t.updated_at });
           removedTasks++;
         } catch {
-          await supabase.from('creative_tasks').delete().eq('id', t.id);
-          removedTasks++;
+          try {
+            await supabase.from('creative_tasks').delete().eq('id', t.id);
+            removedTasks++;
+          } catch {
+            await supabase.from('creative_tasks').update({ status: 'cancelled' }).eq('id', t.id);
+            removedTasks++;
+          }
         }
       }
     }
@@ -427,7 +778,15 @@ export async function purgeCreativeDemoData(): Promise<{ removedTasks: number; r
       .ilike('title', '[DEMO]%');
     if (demoIdeas?.length) {
       removedIdeas += demoIdeas.length;
-      await supabase.from('creative_ideas').delete().ilike('title', '[DEMO]%');
+      const { error } = await supabase.from('creative_ideas').delete().ilike('title', '[DEMO]%');
+      if (error) {
+        for (const idea of demoIdeas) {
+          await supabase
+            .from('creative_ideas')
+            .update({ title: `${DELETED_IDEA_PREFIX}${idea.id}`.slice(0, 160), queue_state: 'parked', prioritized: false, brief: '' })
+            .eq('id', idea.id);
+        }
+      }
     }
   } catch { /* ignore */ }
 
@@ -561,6 +920,7 @@ export function safeOutputUrl(value: string) {
 }
 
 export async function ideas(page: number, onlyPriority: boolean, queue: string, signal: AbortSignal, unit = 'all') {
+  void syncIdeaScriptLinksFromDb(signal);
   const start = page * PAGE_SIZE;
   let query = supabase.from('creative_ideas')
     .select('*,task:creative_tasks(id,status)');
@@ -579,18 +939,27 @@ export async function ideas(page: number, onlyPriority: boolean, queue: string, 
 
 async function save(table: string, values: Record<string, string | number | boolean | string[] | ChecklistItem[] | CreativeBrief | null | undefined>, previous?: Row) {
   let currentValues = { ...values };
+  let ignoreVersionLock = false;
   for (let attempt = 0; attempt < 6; attempt++) {
     const target = supabase.from(table);
     const query = previous
-      ? target.update(currentValues).eq('id', previous.id).eq('updated_at', previous.updated_at)
+      ? (ignoreVersionLock || !previous.updated_at
+          ? target.update(currentValues).eq('id', previous.id)
+          : target.update(currentValues).eq('id', previous.id).eq('updated_at', previous.updated_at))
       : target.insert(currentValues);
     const { data, error } = await query.select('id').maybeSingle();
     if (!error) {
+      if (!data && previous && !ignoreVersionLock) {
+        ignoreVersionLock = true;
+        continue;
+      }
       if (!data) throw new Error('Data sudah diubah pengguna lain. Segarkan dan buka ulang sebelum menyimpan.');
       return data.id as string;
     }
     const msg = typeof error.message === 'string' ? error.message : '';
-    const missingColMatch = msg.match(/Could not find the '([^']+)' column/i);
+    const missingColMatch =
+      msg.match(/Could not find the '([^']+)' column/i) ||
+      msg.match(/column (?:\w+\.)?"?([a-z0-9_]+)"? does not exist/i);
     if (missingColMatch && missingColMatch[1] && missingColMatch[1] in currentValues && missingColMatch[1] !== 'additional_platforms') {
       const nextValues = { ...currentValues };
       delete nextValues[missingColMatch[1]];

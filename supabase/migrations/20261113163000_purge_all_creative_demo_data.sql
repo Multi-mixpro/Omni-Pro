@@ -115,7 +115,7 @@ BEGIN
 
   IF to_regclass('public.creative_copy_decisions') IS NOT NULL AND to_regclass('public.creative_copy_versions') IS NOT NULL THEN
     DELETE FROM public.creative_copy_decisions
-     WHERE copy_version_id IN (
+     WHERE version_id IN (
        SELECT id FROM public.creative_copy_versions
         WHERE task_id = ANY(v_demo_task_ids)
      );

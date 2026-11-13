@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
+import { supabase } from '@/integrations/supabase/client';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
 import { isProjectId } from '../discussion/repository';
 import { NotificationBell } from '../notifications/NotificationBell';
@@ -334,6 +335,43 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       void client.invalidateQueries({ queryKey: ['business-execution', userId] });
     },
   });
+  const autoPurgedRef = useRef(false);
+  useEffect(() => {
+    if (!canEdit || autoPurgedRef.current) return;
+    autoPurgedRef.current = true;
+    void purgeCreativeDemoData().then(res => {
+      if (res.removedTasks + res.removedIdeas + res.removedCampaigns > 0) {
+        void client.invalidateQueries({ queryKey: ['creative', userId] });
+        void client.invalidateQueries({ queryKey: ['business-execution', userId] });
+      }
+    }).catch(() => {});
+  }, [canEdit, client, userId]);
+
+  useEffect(() => {
+    if (!userId || typeof supabase.channel !== 'function') return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void client.invalidateQueries({ queryKey: ['creative', userId] });
+        void client.invalidateQueries({ queryKey: ['business-execution', userId] });
+        void client.invalidateQueries({ queryKey: ['creative-copy-library'] });
+      }, 450);
+    };
+    const channel = supabase
+      .channel(`creative-live-sync-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'creative_tasks' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'creative_ideas' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'creative_campaigns' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'creative_publications' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'creative_channel_activations' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'creative_copy_library' }, scheduleRefresh)
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [client, userId]);
   const matchRoutineFilter = (row: Task) => {
     const isRoutine = Boolean(row.routine_mode && row.routine_mode !== 'once');
     if (routineFilter === 'routine') return isRoutine;
