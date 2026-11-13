@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ShieldCheck, Sparkles, Sun, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { supabase } from '@/integrations/supabase/client';
@@ -164,6 +164,18 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const [taskToRemove, setTaskToRemove] = useState<Task | null>(null);
   const [discussionCampaign, setDiscussionCampaign] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.dataset.theme === 'dark');
+  useEffect(() => {
+    const onThemeChange = (e: Event) => {
+      const dark = (e as CustomEvent<{ dark?: boolean }>).detail?.dark;
+      if (typeof dark === 'boolean') setIsDarkMode(dark);
+    };
+    window.addEventListener('gg-theme-change', onThemeChange);
+    return () => window.removeEventListener('gg-theme-change', onThemeChange);
+  }, []);
+  const setAppTheme = (mode: 'light' | 'dark') => {
+    window.dispatchEvent(new CustomEvent('gg-theme-request', { detail: { theme: mode } }));
+  };
   const prefix = ['creative', userId];
   const notif = useWorkspaceNotifications(userId);
   const units = useWorkspaceUnits();
@@ -434,6 +446,38 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
             })}
           </div>)}
         </nav>
+        <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+          <div className={`grid gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800/80 ${sidebarCompact ? 'lg:grid-cols-1' : 'grid-cols-2'}`} role="group" aria-label="Mode tampilan">
+            <button
+              type="button"
+              onClick={() => setAppTheme('light')}
+              aria-pressed={!isDarkMode}
+              title="Mode Terang"
+              className={`inline-flex items-center justify-center gap-1.5 rounded-full py-1.5 px-2 text-xs font-bold transition-all ${
+                !isDarkMode
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+              }`}
+            >
+              <Sun size={14} className={!isDarkMode ? 'text-amber-500' : ''} />
+              {!sidebarCompact && <span>Terang</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAppTheme('dark')}
+              aria-pressed={isDarkMode}
+              title="Mode Gelap"
+              className={`inline-flex items-center justify-center gap-1.5 rounded-full py-1.5 px-2 text-xs font-bold transition-all ${
+                isDarkMode
+                  ? 'bg-[#1f6feb] text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Moon size={14} />
+              {!sidebarCompact && <span>Gelap</span>}
+            </button>
+          </div>
+        </div>
       </aside>
       <div className="min-w-0 space-y-4">
       <header className="creative-toolbar flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.05)] sm:p-6">
@@ -759,14 +803,30 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
             const awaitingApproval = task.status === 'ready' && task.approver_id && !task.approved_at;
             const action = task.status in nextAction && !waitingForReviewer && !awaitingApproval && !(task.status === 'ready' && publishable) ? nextAction[task.status as keyof typeof nextAction] : null;
             const updating = quickUpdate.isPending && quickUpdate.variables?.task.id === task.id;
-            return <li key={task.id} data-status={task.status} className={'creative-task-card flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 ' + (taskView === 'list' ? 'sm:flex-row sm:p-4' : '')}>
+            const hasAttachment = Boolean(
+              task.copy_template_id ||
+              output ||
+              (task.source_idea?.reference_urls && task.source_idea.reference_urls.length > 0) ||
+              (typeof task.creative_brief?.reference === 'string' && /https?:\/\//i.test(task.creative_brief.reference))
+            );
+            return <li key={task.id} data-status={task.status} className={'creative-task-card flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] ' + (taskView === 'list' ? 'sm:flex-row sm:p-4' : '')}>
               <div className="min-w-0 flex-1 space-y-1">
-                <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                  <span className={'rounded-full px-2 py-0.5 text-xs font-semibold ' + statusColor[task.status]}>{taskStatuses[task.status]}</span>
+                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className={'rounded-full px-2.5 py-0.5 text-xs font-bold ' + statusColor[task.status]}>{taskStatuses[task.status]}</span>
                   {task.output_type && task.output_type !== 'other' && (
-                    <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">
+                    <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-800">
                       {outputTypes[task.output_type] ?? task.output_type}
                     </span>
+                  )}
+                  {hasAttachment && (
+                    <button
+                      type="button"
+                      onClick={() => setDetailId(task.id)}
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                      title="Buka lampiran naskah / referensi di detail tugas"
+                    >
+                      📎 Lampiran
+                    </button>
                   )}
                   {task.routine_mode && task.routine_mode !== 'once' ? (
                     <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-800">

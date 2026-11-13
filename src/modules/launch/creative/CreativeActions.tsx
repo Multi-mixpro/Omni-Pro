@@ -1,13 +1,25 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, Copy, ExternalLink, Eye, FileText, Link2, Paperclip } from 'lucide-react';
 import { button, Editor, errorText, field, Label, primary } from './CreativeForms';
 import { CreativePager, PublicationList } from './CreativeAccounts';
 import { accounts, nudgeTask, publications, recordPublication, taskEvents } from './commandRepository';
 import { channelPlatforms } from './channelRepository';
-import { advanceTask, approveTask, briefFields, getTask, PAGE_SIZE, pendingTaskDecisions, platforms, recordRoutineExecution, requestRevision, safeOutputUrl, setTaskChecklistItem, taskRoutineCategories, taskRoutineModes, taskStatuses } from './repository';
+import { CopyRichTextContent, CopyScriptViewerModal, stripCopyRichText } from './CopyRichText';
+import { advanceTask, approveTask, briefFields, copyFormats, copyTemplates, getTask, outputTypes, PAGE_SIZE, pendingTaskDecisions, platforms, recordRoutineExecution, requestRevision, safeOutputUrl, setTaskChecklistItem, taskRoutineCategories, taskRoutineModes, taskStatuses, type CopyTemplate } from './repository';
 import type { Focus } from './schedule';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
 import { CreativeCopyVersions } from './CreativeCopyVersions';
+
+function extractUrlsFromText(text?: string | null): string[] {
+  if (!text) return [];
+  const matches = text.match(/https?:\/\/[^\s<>"')]+/gi) ?? [];
+  return matches.map(u => safeOutputUrl(u)).filter(Boolean);
+}
+
+function isImageUrl(url: string): boolean {
+  return /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(url) || /res\.cloudinary\.com\/.+\/image\/upload\//i.test(url);
+}
 
 const dateTime = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' });
 const when = (time: string) => dateTime.format(new Date(time)) + ' WIB';
@@ -29,10 +41,31 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
   const [notice, setNotice] = useState('');
   const [nudgeBusy, setNudgeBusy] = useState(false);
   const [routineNote, setRoutineNote] = useState('');
+  const [viewingTemplate, setViewingTemplate] = useState<CopyTemplate | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const task = useQuery({ queryKey: [...prefix,'task-detail',taskId], queryFn: ({ signal }) => getTask(taskId,signal) });
   const post = useQuery({ queryKey: [...prefix,'publications','task',taskId], queryFn: ({ signal }) => publications('task_id',taskId,0,signal) });
   const history = useQuery({ queryKey: [...prefix,'task-events','task',taskId], queryFn: ({ signal }) => taskEvents('task',taskId,signal) });
+  const templatesQuery = useQuery({
+    queryKey: ['creative-copy-library', 'all'],
+    queryFn: ({ signal }) => copyTemplates(signal, 'all'),
+  });
   const row = task.data;
+  const attachedTemplate = row?.copy_template_id
+    ? templatesQuery.data?.find(t => t.id === row.copy_template_id)
+    : undefined;
+  const referenceLinks = Array.from(new Set([
+    ...(row?.source_idea?.reference_urls ?? []).map(u => safeOutputUrl(u)).filter(Boolean),
+    ...extractUrlsFromText(typeof row?.creative_brief?.reference === 'string' ? row.creative_brief.reference : ''),
+    ...extractUrlsFromText(row?.brief),
+  ]));
+  const finalOutputUrl = safeOutputUrl(row?.output_url);
+  const copyText = (text: string, key: string) => {
+    void navigator.clipboard?.writeText(text).then(() => {
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(prev => (prev === key ? null : prev)), 2000);
+    });
+  };
   const briefEntries = (Object.keys(briefFields) as (keyof typeof briefFields)[]).flatMap(key => {
     const value = row?.creative_brief?.[key];
     return typeof value === 'string' && value ? [{ label: briefFields[key], value }] : [];
@@ -158,39 +191,191 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
           )}
         </div>
       )}
-      {taskPlatforms && <p className="text-sm text-slate-600">
+      {taskPlatforms && <p className="text-sm text-slate-600 dark:text-slate-300">
         Platform yang memerlukan bukti tayang: {taskPlatforms.map(platform => platforms[platform]).join(', ')}
       </p>}
-      {row.brief && <p className="whitespace-pre-wrap break-words text-sm">{row.brief}</p>}
-      {briefEntries.length > 0 && <details className="rounded-lg border border-slate-200 p-3">
-        <summary className="cursor-pointer text-sm font-semibold">Brief kreatif</summary>
-        <dl className="mt-2 grid gap-2 sm:grid-cols-2">{briefEntries.map(({ label, value }) => <div key={label}>
-          <dt className="text-sm font-semibold">{label}</dt><dd className="whitespace-pre-wrap break-words text-sm">{value}</dd>
+      {row.brief && (
+        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 text-sm leading-relaxed text-slate-800 dark:border-slate-700/80 dark:bg-slate-800/60 dark:text-slate-200">
+          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ringkasan Tugas</p>
+          <p className="whitespace-pre-wrap break-words">{row.brief}</p>
+        </div>
+      )}
+
+      {/* Lampiran Naskah Copywriting / Skrip (dapat dibuka ke Mode PDF & disalin langsung) */}
+      {(attachedTemplate || row.copy_template_id) && (
+        <div className="rounded-2xl border border-blue-200/80 bg-blue-50/60 p-4 space-y-3 dark:border-blue-800/70 dark:bg-blue-950/30">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-blue-600 text-white shadow-xs">
+                <FileText size={16} />
+              </span>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Lampiran Naskah &amp; Skrip</p>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {attachedTemplate?.title ?? 'Naskah Terlampir'}
+                </h3>
+              </div>
+            </div>
+            {attachedTemplate && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-bold text-blue-800 border border-blue-200 dark:bg-slate-800 dark:text-blue-200 dark:border-blue-700">
+                  {copyFormats[attachedTemplate.format] ?? attachedTemplate.format}
+                </span>
+                <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700">
+                  {outputTypes[attachedTemplate.output_type] ?? attachedTemplate.output_type}
+                </span>
+              </div>
+            )}
+          </div>
+          {attachedTemplate ? (
+            <>
+              {attachedTemplate.description && (
+                <p className="rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-xs text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100">
+                  <strong>Arahan Skrip:</strong> {attachedTemplate.description}
+                </p>
+              )}
+              <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200/90 bg-white p-3.5 text-sm dark:border-slate-700 dark:bg-slate-900">
+                <CopyRichTextContent content={attachedTemplate.body} className="text-xs sm:text-sm text-slate-800 dark:text-slate-200" />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingTemplate(attachedTemplate)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#1463ff] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#0b52db]"
+                >
+                  <Eye size={14} />
+                  <span>Buka Mode PDF / Baca Nyaman</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyText(stripCopyRichText(attachedTemplate.body), 'attached-script')}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  {copiedKey === 'attached-script' ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                  <span>{copiedKey === 'attached-script' ? 'Naskah Tersalin!' : 'Salin Naskah'}</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {templatesQuery.isPending ? 'Memuat lampiran naskah…' : 'Naskah terlampir belum ditemukan atau sudah diarsipkan.'}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Lampiran Referensi, Tautan & Media Hasil Produksi */}
+      {(referenceLinks.length > 0 || finalOutputUrl) && (
+        <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-4 space-y-2.5 dark:border-emerald-800/60 dark:bg-emerald-950/25">
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-600 text-white">
+              <Paperclip size={14} />
+            </span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+              Lampiran Tautan &amp; Media ({referenceLinks.length + (finalOutputUrl ? 1 : 0)})
+            </h3>
+          </div>
+          {finalOutputUrl && (
+            <div className="rounded-xl border border-emerald-200 bg-white p-3 space-y-2 dark:border-emerald-800 dark:bg-slate-900">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Aset / Hasil Final Internal</span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={finalOutputUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
+                  >
+                    <ExternalLink size={12} />
+                    <span>Buka Lampiran</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => copyText(finalOutputUrl, 'final-output')}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"
+                  >
+                    {copiedKey === 'final-output' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    <span>{copiedKey === 'final-output' ? 'Tersalin' : 'Salin'}</span>
+                  </button>
+                </div>
+              </div>
+              {isImageUrl(finalOutputUrl) && (
+                <a href={finalOutputUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                  <img src={finalOutputUrl} alt="Pratinjau lampiran hasil" className="max-h-56 w-full object-contain bg-slate-50 dark:bg-slate-950" />
+                </a>
+              )}
+              <p className="truncate text-[11px] font-mono text-slate-500">{finalOutputUrl}</p>
+            </div>
+          )}
+          {referenceLinks.length > 0 && (
+            <ul className="space-y-1.5">
+              {referenceLinks.map((url, idx) => {
+                let host = url;
+                try { host = new URL(url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+                return (
+                  <li key={url} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <Link2 size={14} className="shrink-0 text-blue-600 dark:text-blue-400" />
+                      <div className="min-w-0">
+                        <span className="block font-bold text-slate-800 dark:text-slate-100">{host}</span>
+                        <span className="block truncate font-mono text-[11px] text-slate-500">{url}</span>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500"
+                      >
+                        <ExternalLink size={11} />
+                        <span>Buka</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => copyText(url, `ref-${idx}`)}
+                        className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300"
+                      >
+                        {copiedKey === `ref-${idx}` ? 'Tersalin!' : 'Salin'}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {briefEntries.length > 0 && <details open className="rounded-2xl border border-slate-200/80 bg-white p-3.5 dark:border-slate-700 dark:bg-slate-900/70">
+        <summary className="cursor-pointer text-sm font-bold text-slate-900 dark:text-white">Brief kreatif</summary>
+        <dl className="mt-2.5 grid gap-2.5 sm:grid-cols-2">{briefEntries.map(({ label, value }) => <div key={label} className="rounded-xl bg-slate-50/80 p-2.5 dark:bg-slate-800/60">
+          <dt className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</dt>
+          <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-800 dark:text-slate-200">{value}</dd>
         </div>)}</dl>
       </details>}
       {([
         ['Hasil yang harus diserahkan', row.deliverable],
         ['Kriteria penerimaan', row.acceptance_criteria],
         ['Catatan bukti hasil', row.completion_note],
-      ] as const).map(([label, value]) => value && <div key={label}>
-        <h3 className="text-sm font-semibold">{label}</h3>
-        <p className="whitespace-pre-wrap break-words text-sm">{value}</p>
+      ] as const).map(([label, value]) => value && <div key={label} className="rounded-2xl border border-slate-200/80 bg-white p-3.5 dark:border-slate-700 dark:bg-slate-900/70">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</h3>
+        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800 dark:text-slate-200">{value}</p>
       </div>)}
-      {checklist.length > 0 && <fieldset className="space-y-2 rounded-lg border border-slate-200 p-3"
+      {checklist.length > 0 && <fieldset className="space-y-2 rounded-2xl border border-slate-200/80 bg-white p-3.5 dark:border-slate-700 dark:bg-slate-900/70"
         disabled={!canEdit || row.status === 'done' || row.status === 'cancelled' || checklistUpdate.isPending}>
-        <legend className="px-1 text-sm font-semibold">Checklist · {checklist.filter(item => item.done).length}/{checklist.length} selesai</legend>
+        <legend className="px-1 text-sm font-bold">Checklist · {checklist.filter(item => item.done).length}/{checklist.length} selesai</legend>
         {checklist.map((item, index) => <label key={`${index}-${item.label}`} className="flex items-start gap-2 text-sm">
           <input type="checkbox" checked={item.done} onChange={event => checklistUpdate.mutate({ index, done: event.target.checked })} />
           <span className="break-words">{item.label}</span>
         </label>)}
         {checklistUpdate.isError && <p role="alert" className="text-sm text-red-700">{errorText(checklistUpdate.error)}</p>}
       </fieldset>}
-      {row.review_note && <p className="whitespace-pre-wrap break-words rounded-lg bg-amber-50 p-2 text-sm text-amber-900">Catatan revisi: {row.review_note}</p>}
-      {row.reviewed_at && <p className="text-sm text-teal-800">Review disetujui pada {when(row.reviewed_at)}.</p>}
-      {row.approved_at && <p className="text-sm text-teal-800">Persetujuan akhir tercatat pada {when(row.approved_at)}.</p>}
-      {row.status === 'ready' && awaitingApproval && <p className="text-sm font-semibold text-amber-800">Menunggu persetujuan akhir sebelum tayang atau selesai.</p>}
-      {row.status === 'review' && row.reviewer_id && row.reviewer_id !== userId && <p className="text-sm text-slate-600">Menunggu keputusan reviewer yang ditugaskan.</p>}
-      {safeOutputUrl(row.output_url) && <a className="text-sm font-semibold text-teal-800 underline" href={safeOutputUrl(row.output_url)} target="_blank" rel="noopener noreferrer">Buka aset / video final internal</a>}
+      {row.review_note && <p className="whitespace-pre-wrap break-words rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">Catatan revisi: {row.review_note}</p>}
+      {row.reviewed_at && <p className="text-sm text-teal-800 dark:text-teal-300">Review disetujui pada {when(row.reviewed_at)}.</p>}
+      {row.approved_at && <p className="text-sm text-teal-800 dark:text-teal-300">Persetujuan akhir tercatat pada {when(row.approved_at)}.</p>}
+      {row.status === 'ready' && awaitingApproval && <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Menunggu persetujuan akhir sebelum tayang atau selesai.</p>}
+      {row.status === 'review' && row.reviewer_id && row.reviewer_id !== userId && <p className="text-sm text-slate-600 dark:text-slate-300">Menunggu keputusan reviewer yang ditugaskan.</p>}
       <div className="flex flex-wrap gap-2">
         {canEdit && row.status === 'ready' && awaitingApproval && row.approver_id === userId &&
           <button type="button" className={primary} disabled={approval.isPending} onClick={() => approval.mutate('approval')}>{approval.isPending ? 'Menyimpan…' : 'Setujui tugas'}</button>}
@@ -247,8 +432,14 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
       <h3 className="font-bold">Riwayat tindakan terbaru</h3>
       {history.isError && <p role="alert" className="text-sm text-red-700">{errorText(history.error)}</p>}
       {history.isSuccess && !history.data.length && <p className="text-sm text-slate-600">Belum ada tindakan tercatat.</p>}
-      <ul className="space-y-2 text-sm">{history.data?.slice(0,PAGE_SIZE).map(event => <li key={event.id}><span className="text-slate-600">{when(event.created_at)} · </span>{describeEvent(event.kind,event.detail)}</li>)}</ul>
+      <ul className="space-y-2 text-sm">{history.data?.slice(0,PAGE_SIZE).map(event => <li key={event.id}><span className="text-slate-600 dark:text-slate-400">{when(event.created_at)} · </span>{describeEvent(event.kind,event.detail)}</li>)}</ul>
     </div>
+    {viewingTemplate && (
+      <CopyScriptViewerModal
+        template={viewingTemplate}
+        onClose={() => setViewingTemplate(null)}
+      />
+    )}
   </section>;
 }
 
