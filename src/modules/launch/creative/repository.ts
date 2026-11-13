@@ -1078,6 +1078,17 @@ export async function saveTask(values: Draft<Task>, previous?: Task, sourceIdeaI
     payload = { ...values, ...(!previous && sourceIdeaId ? { source_idea_id: sourceIdeaId } : {}) };
   }
 
+  // Unconditionally ensure metadata stored inside creative_brief is never passed
+  // as top-level columns to avoid PostgREST schema cache missing column errors.
+  delete (payload as Record<string, unknown>).copy_template_id;
+  delete (payload as Record<string, unknown>).output_type;
+  delete (payload as Record<string, unknown>).routine_mode;
+  delete (payload as Record<string, unknown>).routine_category;
+  delete (payload as Record<string, unknown>).routine_trigger;
+  delete (payload as Record<string, unknown>).routine_target;
+  delete (payload as Record<string, unknown>).routine_runs;
+  delete (payload as Record<string, unknown>).routine_last_note;
+
   try {
     return await save('creative_tasks', payload, previous);
   } catch (error) {

@@ -67,17 +67,43 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'all' | NotificationCategory>('all');
+  const [dropdownSide, setDropdownSide] = useState<'left' | 'right'>('left');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    const updatePosition = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const spaceRight = viewportWidth - rect.left;
+      const spaceLeft = rect.right;
+      // Dropdown needs ~420px width.
+      // If placed on the left side of the screen (spaceLeft < 420),
+      // 'right-0' would extend -100px off-screen to the left, crashing into the sidebar.
+      // 'left' extends gracefully to the right into the main viewport content.
+      if (spaceLeft < 420 && spaceRight >= 360) {
+        setDropdownSide('left');
+      } else if (spaceRight < 420 && spaceLeft >= 360) {
+        setDropdownSide('right');
+      } else {
+        setDropdownSide(rect.left < 380 ? 'left' : 'right');
+      }
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [open]);
 
   const filteredItems = tab === 'all' ? items : items.filter(item => item.category === tab);
@@ -172,12 +198,22 @@ export function NotificationBell({
       </button>
 
       {open && (
-        <div
-          role="dialog"
-          aria-label="Daftar Notifikasi"
-          className="absolute right-0 top-full z-50 mt-2 w-[calc(100vw-1.5rem)] max-w-md rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl"
-        >
-          {/* Header */}
+        <>
+          {/* Mobile backdrop overlay to prevent accidental background taps and allow seamless tap-outside */}
+          <div
+            className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-[1px] sm:hidden"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+
+          <div
+            role="dialog"
+            aria-label="Daftar Notifikasi"
+            className={`z-50 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xl backdrop-blur-md transition-all sm:absolute sm:top-full sm:mt-2 sm:w-[420px] sm:max-w-md fixed inset-x-3 top-20 sm:inset-x-auto ${
+              dropdownSide === 'left' ? 'sm:left-0 sm:right-auto' : 'sm:right-0 sm:left-auto'
+            }`}
+          >
+            {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
@@ -309,7 +345,8 @@ export function NotificationBell({
             )}
           </div>
         </div>
-      )}
-    </div>
-  );
+      </>
+    )}
+  </div>
+);
 }

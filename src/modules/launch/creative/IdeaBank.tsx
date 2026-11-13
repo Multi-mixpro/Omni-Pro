@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, Copy, Eye, ExternalLink, FileText, Info, Lightbulb, Link2, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
+import { Bookmark, Copy, Eye, ExternalLink, FileText, Info, Lightbulb, Link2, Plus, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react';
 import { useWorkspaceUnits } from '../data/businessWorkspace';
 import { CopyRichTextContent, CopyScriptViewerModal, stripCopyRichText } from './CopyRichText';
 import { button, CopyTemplateForm, errorText, field, IdeaForm, Options, primary } from './CreativeForms';
@@ -489,42 +489,118 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
           )}
 
           {/* Filter Bar for Copywriting Table */}
-          <div className="grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-3">
-            <label className="text-xs font-semibold text-slate-700">
-              Cari judul / isi skrip
-              <div className="relative mt-1">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="search"
-                  className={`${field} !pl-8`}
-                  placeholder="Cari hook, skrip, caption…"
-                  value={scriptSearch}
-                  onChange={e => setScriptSearch(e.target.value)}
-                />
-              </div>
-            </label>
-            <label className="text-xs font-semibold text-slate-700">
-              Filter format naskah
-              <select className={`${field} mt-1`} value={scriptFormatFilter} onChange={e => setScriptFormatFilter(e.target.value)}>
-                <option value="">Semua format naskah</option>
-                <Options values={copyFormats} />
-              </select>
-            </label>
-            <label className="text-xs font-semibold text-slate-700">
-              Filter tipe output
-              <select className={`${field} mt-1`} value={scriptOutputFilter} onChange={e => setScriptOutputFilter(e.target.value)}>
-                <option value="">Semua tipe output</option>
-                <Options values={outputTypes} />
-              </select>
-            </label>
+          <div className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-end">
+            <div className="grid grid-cols-1 gap-3 flex-1 sm:grid-cols-3">
+              <label className="text-xs font-semibold text-slate-700">
+                Cari judul / isi skrip
+                <div className="relative mt-1">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="search"
+                    className={`${field} !pl-8`}
+                    placeholder="Cari hook, skrip, caption…"
+                    value={scriptSearch}
+                    onChange={e => setScriptSearch(e.target.value)}
+                  />
+                </div>
+              </label>
+              <label className="text-xs font-semibold text-slate-700">
+                Filter format naskah
+                <select className={`${field} mt-1`} value={scriptFormatFilter} onChange={e => setScriptFormatFilter(e.target.value)}>
+                  <option value="">Semua format naskah</option>
+                  <Options values={copyFormats} />
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-slate-700">
+                Filter tipe output
+                <select className={`${field} mt-1`} value={scriptOutputFilter} onChange={e => setScriptOutputFilter(e.target.value)}>
+                  <option value="">Semua tipe output</option>
+                  <Options values={outputTypes} />
+                </select>
+              </label>
+            </div>
+            <div className="flex items-center gap-2 self-end">
+              <button
+                type="button"
+                onClick={() => void templatesQuery.refetch()}
+                disabled={templatesQuery.isFetching}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors shadow-2xs"
+                title="Segarkan sinkronisasi naskah dari database"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${templatesQuery.isFetching ? 'animate-spin text-teal-600' : 'text-slate-500'}`} />
+                <span>{templatesQuery.isFetching ? 'Sinkronisasi…' : 'Segarkan'}</span>
+              </button>
+              {(scriptSearch || scriptFormatFilter || scriptOutputFilter) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScriptSearch('');
+                    setScriptFormatFilter('');
+                    setScriptOutputFilter('');
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Reset Filter
+                </button>
+              )}
+            </div>
           </div>
 
           {templatesQuery.isPending && <p role="status" className="text-sm text-slate-600">Memuat tabel naskah…</p>}
           {templatesQuery.isError && <p role="alert" className="text-sm text-red-700">{errorText(templatesQuery.error)}</p>}
 
           {filteredTemplates.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
-              Belum ada naskah copywriting atau skrip yang cocok dengan filter ini.
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
+              <p className="text-sm font-semibold text-slate-700">
+                {(scriptSearch || scriptFormatFilter || scriptOutputFilter)
+                  ? 'Tidak ada naskah yang cocok dengan pencarian atau filter.'
+                  : 'Belum ada naskah copywriting atau skrip di database.'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {(scriptSearch || scriptFormatFilter || scriptOutputFilter)
+                  ? 'Coba ganti kata kunci pencarian atau hapus filter format/output.'
+                  : 'Klik "+ Tambah Copy / Skrip" untuk membuat naskah baru, atau "Segarkan" jika baru saja diinput di perangkat lain.'}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                {(scriptSearch || scriptFormatFilter || scriptOutputFilter) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScriptSearch('');
+                      setScriptFormatFilter('');
+                      setScriptOutputFilter('');
+                    }}
+                    className={button + ' inline-flex items-center gap-1.5'}
+                  >
+                    Reset Filter
+                  </button>
+                ) : (
+                  <>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        className={primary + ' inline-flex items-center gap-1.5'}
+                        onClick={() => {
+                          setEditingTemplate('new');
+                          setNotice('');
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Tambah Copy / Skrip Baru</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void templatesQuery.refetch()}
+                      disabled={templatesQuery.isFetching}
+                      className={button + ' inline-flex items-center gap-1.5'}
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${templatesQuery.isFetching ? 'animate-spin text-teal-600' : ''}`} />
+                      <span>{templatesQuery.isFetching ? 'Menyinkronkan…' : 'Segarkan Data'}</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-slate-200">

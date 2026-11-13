@@ -436,13 +436,13 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         </nav>
       </aside>
       <div className="min-w-0 space-y-4">
-      <header className="creative-toolbar flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-teal-100 bg-white p-5 shadow-sm sm:p-6">
+      <header className="creative-toolbar flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-3xl border border-teal-100 bg-white p-5 shadow-sm sm:p-6">
         <div>
           <p className="creative-eyebrow mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"><span /> Creative Hub</p>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{activeSection}</h1>
           <p className="mt-1 text-sm text-slate-600">{sectionDescriptions[section]}</p>
         </div>
-        <div className="creative-toolbar-actions flex flex-wrap items-center gap-2">
+        <div className="creative-toolbar-actions flex flex-wrap items-center gap-2 md:justify-end">
           <NotificationBell
             items={notif.items}
             countsByCategory={notif.countsByCategory}
