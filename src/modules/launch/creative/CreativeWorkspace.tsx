@@ -35,7 +35,7 @@ const CreativeAssetLibrary = lazy(() => import('./CreativeAssetLibrary').then(mo
 const CreativeAccess = lazy(() => import('./CreativeAccess').then(module => ({ default: module.CreativeAccess })));
 const sectionLoading = <p role="status" className="p-4 text-sm text-slate-600">Memuat bagian ini…</p>;
 
-const panel = 'rounded-2xl border border-teal-100 bg-white p-4 shadow-sm';
+const panel = 'rounded-3xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.05)]';
 const defaultFilters: Filters = { platform: '', status: '', assignee: '', workstream: '', order: 'due_on' };
 const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZone: 'UTC' });
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
@@ -398,13 +398,13 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
 
   return <main className="creative-shell min-h-screen px-3 py-4 text-slate-900 sm:px-6 sm:py-6">
     <div className="creative-layout mx-auto grid max-w-[1536px] gap-4 xl:gap-5" data-compact={sidebarCompact}>
-      <aside className="creative-sidebar self-start space-y-3 rounded-3xl p-3 lg:sticky lg:top-4" data-mobile-expanded={menuOpen}>
+      <aside className="creative-sidebar self-start space-y-3 overflow-x-hidden rounded-3xl p-3.5 pb-5 lg:sticky lg:top-4" data-mobile-expanded={menuOpen}>
         <div className="creative-sidebar-head flex items-center justify-between gap-2 px-1 py-1">
-          <div className="flex min-w-0 items-center gap-2"><span className="creative-mark grid h-9 w-9 shrink-0 place-items-center rounded-[12px] text-white"><Command size={17} /></span>
-            <div className="creative-nav-label-text"><strong className="block text-sm text-slate-900">GG Workspace</strong><span className="creative-sidebar-caption block text-xs">Creative Hub</span></div></div>
-          <button type="button" className={button + ' creative-menu-toggle inline-flex items-center gap-1.5 lg:hidden'} aria-expanded={menuOpen} aria-controls="creative-navigation"
-            onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> {menuOpen ? 'Ciutkan menu' : 'Perluas menu'}</button>
-          <button type="button" className="creative-sidebar-toggle hidden lg:grid" aria-expanded={!sidebarCompact} aria-controls="creative-navigation"
+          <div className="flex min-w-0 items-center gap-2.5"><span className="creative-mark grid h-9 w-9 shrink-0 place-items-center rounded-[12px] text-white"><Command size={17} /></span>
+            <div className="creative-nav-label-text min-w-0"><strong className="block truncate text-sm font-bold text-slate-900">GG Workspace</strong><span className="creative-sidebar-caption block truncate text-[11px] font-medium">Creative Hub</span></div></div>
+          <button type="button" className={button + ' creative-menu-toggle inline-flex shrink-0 items-center gap-1.5 lg:hidden'} aria-expanded={menuOpen} aria-controls="creative-navigation"
+            onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} /> {menuOpen ? 'Ciutkan' : 'Menu'}</button>
+          <button type="button" className="creative-sidebar-toggle hidden shrink-0 lg:grid" aria-expanded={!sidebarCompact} aria-controls="creative-navigation"
             aria-label={sidebarCompact ? 'Perluas sidebar' : 'Ciutkan sidebar'} title={sidebarCompact ? 'Perluas sidebar' : 'Ciutkan sidebar'}
             onClick={() => {
               setSidebarCompact(!sidebarCompact);
@@ -413,17 +413,17 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         </div>
         <nav id="creative-navigation" aria-label="Bagian Creative Dashboard" className="creative-navigation">
           {visibleNavigation.map(group => <div key={group.label} className="creative-nav-group">
-            <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">{group.label}</p>
+            <p className="creative-nav-label px-2.5 text-[10px] font-bold uppercase tracking-widest">{group.label}</p>
             {group.items.map(({ id,label,icon:Icon }) => {
               const badge = sectionBadgeCount(id);
               return <button key={id} aria-current={section === id ? 'page' : undefined} aria-label={label} title={label}
-                className="creative-nav-item relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold"
+                className="creative-nav-item relative flex w-full min-w-0 items-center gap-2.5 rounded-2xl px-2.5 py-2 text-left text-[13px] font-semibold"
                 onClick={() => openSection(id)}>
-                <span className="creative-color-icon" data-color={sectionColors[id]}><Icon size={15} /></span>
-                <span className="creative-nav-label-text flex-1 truncate">{label}</span>
+                <span className="creative-color-icon shrink-0" data-color={sectionColors[id]}><Icon size={15} /></span>
+                <span className="creative-nav-label-text min-w-0 flex-1 truncate">{label}</span>
                 {badge.count > 0 && (
                   <span
-                    className={`inline-flex min-w-[20px] h-5 items-center justify-center rounded-full px-1.5 text-[10px] font-mono font-extrabold text-white shadow-2xs ${badge.color} ${
+                    className={`inline-flex shrink-0 min-w-[20px] h-5 items-center justify-center rounded-full px-1.5 text-[10px] font-mono font-extrabold text-white shadow-2xs ${badge.color} ${
                       sidebarCompact ? 'lg:absolute lg:top-0.5 lg:right-0.5 lg:min-w-[16px] lg:h-4 lg:px-1 lg:text-[9px]' : ''
                     }`}
                   >
@@ -436,7 +436,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         </nav>
       </aside>
       <div className="min-w-0 space-y-4">
-      <header className="creative-toolbar flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-3xl border border-teal-100 bg-white p-5 shadow-sm sm:p-6">
+      <header className="creative-toolbar flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.05)] sm:p-6">
         <div>
           <p className="creative-eyebrow mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"><span /> Creative Hub</p>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{activeSection}</h1>
@@ -504,29 +504,36 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         </div>
       </header>
 
-      {section !== 'access' && <div className={panel + ' creative-filter'} aria-label="Filter ruang kerja">
-        <div className="creative-filter-heading"><strong>Lingkup ruang kerja</strong><span>Pilih unit bisnis dan kampanye yang ingin dilihat.</span></div>
-        <div className="creative-filter-fields flex flex-wrap items-end gap-3">
-        <label className="min-w-0 flex-[1_1_12rem] space-y-1 text-sm font-semibold">Unit bisnis
-          <select className={field} value={unit} onChange={event => { setUnit(event.target.value); changeScope('all'); }}>
-            <option value="all">Semua unit bisnis</option>
-            <option value="unassigned">Unit belum ditetapkan</option>
-            {defaultUnit && !units.data?.some(row => row.id === defaultUnit) && <option value={defaultUnit}>Unit terpilih</option>}
-            {units.data?.map(row => <option key={row.id} value={row.id}>{row.name} · {unitSectors[row.sector]}{row.is_active ? '' : ' (arsip)'}</option>)}
-          </select>
-        </label>
-        {!['campaigns','accounts','ideas'].includes(section) && <>
-          <label className="min-w-0 flex-[1_1_14rem] space-y-1 text-sm font-semibold">Lingkup pekerjaan
-            <select className={field} value={scope} onChange={event => changeScope(event.target.value)}>
-              <option value="all">Semua pekerjaan</option>
-              {section !== 'ads' && <option value="standalone">Tanpa kampanye</option>}
-              {campaignList.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}{campaign.status === 'archived' ? ' (arsip)' : ''}</option>)}
-            </select>
-          </label>
-          {campaignQuery.hasNextPage && <button className={button} disabled={campaignQuery.isFetchingNextPage} onClick={() => void campaignQuery.fetchNextPage()}>Muat kampanye lain</button>}
-        </>}
-        {units.isError && <p role="alert" className="w-full text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
+      {section !== 'access' && <div className={panel + ' creative-filter !py-3.5'} aria-label="Filter ruang kerja">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="creative-filter-heading !mb-0 shrink-0">
+            <strong>Lingkup ruang kerja</strong>
+            <span>Pilih unit bisnis &amp; kampanye aktif</span>
+          </div>
+          <div className="creative-filter-fields flex flex-1 flex-wrap items-center justify-end gap-2.5">
+            <label className="min-w-0 flex-[1_1_13rem] max-w-md space-y-1 text-xs font-semibold">
+              <span className="sr-only">Unit bisnis</span>
+              <select className={field} aria-label="Unit bisnis" value={unit} onChange={event => { setUnit(event.target.value); changeScope('all'); }}>
+                <option value="all">Semua unit bisnis</option>
+                <option value="unassigned">Unit belum ditetapkan</option>
+                {defaultUnit && !units.data?.some(row => row.id === defaultUnit) && <option value={defaultUnit}>Unit terpilih</option>}
+                {units.data?.map(row => <option key={row.id} value={row.id}>{row.name} · {unitSectors[row.sector]}{row.is_active ? '' : ' (arsip)'}</option>)}
+              </select>
+            </label>
+            {!['campaigns','accounts','ideas'].includes(section) && <>
+              <label className="min-w-0 flex-[1_1_13rem] max-w-md space-y-1 text-xs font-semibold">
+                <span className="sr-only">Lingkup pekerjaan</span>
+                <select className={field} aria-label="Lingkup pekerjaan" value={scope} onChange={event => changeScope(event.target.value)}>
+                  <option value="all">Semua pekerjaan</option>
+                  {section !== 'ads' && <option value="standalone">Tanpa kampanye</option>}
+                  {campaignList.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}{campaign.status === 'archived' ? ' (arsip)' : ''}</option>)}
+                </select>
+              </label>
+              {campaignQuery.hasNextPage && <button className={button} disabled={campaignQuery.isFetchingNextPage} onClick={() => void campaignQuery.fetchNextPage()}>Muat kampanye lain</button>}
+            </>}
+          </div>
         </div>
+        {units.isError && <p role="alert" className="mt-2 w-full text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
       </div>}
 
       {!canEdit && section !== 'access' && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}

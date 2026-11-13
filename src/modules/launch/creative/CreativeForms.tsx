@@ -14,9 +14,9 @@ import {
   type Campaign, type CopyTemplate, type Idea, type RoutinePreset, type Task, type TeamMember,
 } from './repository';
 
-export const field = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm';
-export const button = 'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-50';
-export const primary = 'rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50';
+export const field = 'w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/15';
+export const button = 'rounded-full border border-slate-200/90 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50';
+export const primary = 'rounded-full bg-[#1463ff] px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_6px_16px_-3px_rgba(20,99,255,0.35)] transition-all hover:bg-[#0b52db] active:scale-[0.98] disabled:opacity-50';
 
 export function errorText(error: unknown) {
   if (error && typeof error === 'object' && 'code' in error && error.code === '42501') {

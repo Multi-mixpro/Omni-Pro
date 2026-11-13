@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { Bell, CheckCheck, ClipboardList, MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Bell, CheckCheck, ClipboardList, MessageSquare, RefreshCw, Sparkles, X } from 'lucide-react';
 import type { NotificationCategory, NotificationItem } from './useWorkspaceNotifications';
 
 function formatRelativeTime(isoDate: string): string {
@@ -67,44 +68,63 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'all' | NotificationCategory>('all');
-  const [dropdownSide, setDropdownSide] = useState<'left' | 'right'>('left');
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number; maxHeight: number }>({
+    top: 72,
+    left: 16,
+    width: 420,
+    maxHeight: 520,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const width = Math.min(430, vw - 24);
+    // Align to right edge of button by default on wide screens, or clamp safely inside viewport
+    let left = rect.right - width;
+    if (left < 12) {
+      // If right-aligning would push it left off-screen or into sidebar, align left edge of button
+      left = Math.max(12, Math.min(rect.left, vw - width - 12));
+    }
+    if (left + width > vw - 12) {
+      left = Math.max(12, vw - width - 12);
+    }
+    const top = Math.min(rect.bottom + 10, vh - 260);
+    const maxHeight = Math.max(280, vh - top - 16);
+    setCoords({ top, left, width, maxHeight });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
-    const updatePosition = () => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const spaceRight = viewportWidth - rect.left;
-      const spaceLeft = rect.right;
-      // Dropdown needs ~420px width.
-      // If placed on the left side of the screen (spaceLeft < 420),
-      // 'right-0' would extend -100px off-screen to the left, crashing into the sidebar.
-      // 'left' extends gracefully to the right into the main viewport content.
-      if (spaceLeft < 420 && spaceRight >= 360) {
-        setDropdownSide('left');
-      } else if (spaceRight < 420 && spaceLeft >= 360) {
-        setDropdownSide('right');
-      } else {
-        setDropdownSide(rect.left < 380 ? 'left' : 'right');
-      }
-    };
-
     updatePosition();
     window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        (!popoverRef.current || !popoverRef.current.contains(target))
+      ) {
         setOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open]);
+  }, [open, updatePosition]);
 
   const filteredItems = tab === 'all' ? items : items.filter(item => item.category === tab);
 
@@ -197,24 +217,23 @@ export function NotificationBell({
         )}
       </button>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <>
-          {/* Mobile backdrop overlay to prevent accidental background taps and allow seamless tap-outside */}
           <div
-            className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-[1px] sm:hidden"
+            className="fixed inset-0 z-[9998] bg-slate-950/20 backdrop-blur-[1px] sm:bg-transparent sm:backdrop-blur-none"
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
 
           <div
+            ref={popoverRef}
             role="dialog"
             aria-label="Daftar Notifikasi"
-            className={`z-50 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xl backdrop-blur-md transition-all sm:absolute sm:top-full sm:mt-2 sm:w-[420px] sm:max-w-md fixed inset-x-3 top-20 sm:inset-x-auto ${
-              dropdownSide === 'left' ? 'sm:left-0 sm:right-auto' : 'sm:right-0 sm:left-auto'
-            }`}
+            style={{ top: coords.top, left: coords.left, width: coords.width, maxHeight: coords.maxHeight }}
+            className="fixed z-[9999] flex flex-col rounded-3xl border border-slate-200/90 bg-white/98 p-4 shadow-[0_24px_60px_-12px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-900/98"
           >
             {/* Header */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
                 <span>Pusat Notifikasi</span>
@@ -243,17 +262,26 @@ export function NotificationBell({
                 <button
                   type="button"
                   onClick={onMarkAllAsRead}
-                  className="inline-flex items-center gap-1 rounded-lg bg-teal-50 px-2 py-1 text-[11px] font-bold text-teal-800 hover:bg-teal-100"
+                  className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100"
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
                   <span>Tandai dibaca</span>
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                title="Tutup"
+                aria-label="Tutup notifikasi"
+                className="rounded-full border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
 
           {/* Separated Category Tabs with Balloon Badges */}
-          <div className="mt-2.5 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1">
+          <div className="mt-2.5 shrink-0 grid grid-cols-4 gap-1 rounded-full bg-slate-100 p-1">
             {tabs.map(t => {
               const active = tab === t.id;
               const badgeVal = t.unread > 0 ? t.unread : t.total;
@@ -284,7 +312,7 @@ export function NotificationBell({
           </div>
 
           {/* Notification Items List */}
-          <div className="mt-2.5 max-h-80 space-y-1.5 overflow-y-auto pr-0.5">
+          <div className="mt-2.5 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
             {filteredItems.length === 0 ? (
               <div className="rounded-xl bg-slate-50 py-8 text-center text-xs text-slate-500">
                 Belum ada notifikasi pada kategori ini.
@@ -345,7 +373,8 @@ export function NotificationBell({
             )}
           </div>
         </div>
-      </>
+      </>,
+      document.body
     )}
   </div>
 );
