@@ -14,7 +14,7 @@ import { CreativeCopyVersions } from './CreativeCopyVersions';
 function extractUrlsFromText(text?: string | null): string[] {
   if (!text) return [];
   const matches = text.match(/https?:\/\/[^\s<>"')]+/gi) ?? [];
-  return matches.map(u => safeOutputUrl(u)).filter(Boolean);
+  return matches.map(u => safeOutputUrl(u)).filter((u): u is string => Boolean(u));
 }
 
 function isImageUrl(url: string): boolean {
@@ -55,11 +55,11 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
     ? templatesQuery.data?.find(t => t.id === row.copy_template_id)
     : undefined;
   const referenceLinks = Array.from(new Set([
-    ...(row?.source_idea?.reference_urls ?? []).map(u => safeOutputUrl(u)).filter(Boolean),
-    ...extractUrlsFromText(typeof row?.creative_brief?.reference === 'string' ? row.creative_brief.reference : ''),
+    ...(row?.source_idea?.reference_urls ?? []).map(u => safeOutputUrl(u)).filter((u): u is string => Boolean(u)),
+    ...extractUrlsFromText(typeof row?.creative_brief?.references === 'string' ? row.creative_brief.references : ''),
     ...extractUrlsFromText(row?.brief),
   ]));
-  const finalOutputUrl = safeOutputUrl(row?.output_url);
+  const finalOutputUrl = safeOutputUrl(row?.output_url ?? '');
   const copyText = (text: string, key: string) => {
     void navigator.clipboard?.writeText(text).then(() => {
       setCopiedKey(key);

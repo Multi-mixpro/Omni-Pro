@@ -807,7 +807,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
               task.copy_template_id ||
               output ||
               (task.source_idea?.reference_urls && task.source_idea.reference_urls.length > 0) ||
-              (typeof task.creative_brief?.reference === 'string' && /https?:\/\//i.test(task.creative_brief.reference))
+              (typeof task.creative_brief?.references === 'string' && /https?:\/\//i.test(task.creative_brief.references))
             );
             return <li key={task.id} data-status={task.status} className={'creative-task-card flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] ' + (taskView === 'list' ? 'sm:flex-row sm:p-4' : '')}>
               <div className="min-w-0 flex-1 space-y-1">
