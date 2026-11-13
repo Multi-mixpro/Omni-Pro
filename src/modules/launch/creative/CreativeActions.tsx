@@ -4,7 +4,7 @@ import { button, Editor, errorText, field, Label, primary } from './CreativeForm
 import { CreativePager, PublicationList } from './CreativeAccounts';
 import { accounts, nudgeTask, publications, recordPublication, taskEvents } from './commandRepository';
 import { channelPlatforms } from './channelRepository';
-import { advanceTask, approveTask, briefFields, getTask, PAGE_SIZE, pendingTaskDecisions, platforms, requestRevision, safeOutputUrl, setTaskChecklistItem, taskStatuses } from './repository';
+import { advanceTask, approveTask, briefFields, getTask, PAGE_SIZE, pendingTaskDecisions, platforms, recordRoutineExecution, requestRevision, safeOutputUrl, setTaskChecklistItem, taskRoutineCategories, taskRoutineModes, taskStatuses } from './repository';
 import type { Focus } from './schedule';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
 import { CreativeCopyVersions } from './CreativeCopyVersions';
@@ -28,6 +28,7 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
   const [accountPage, setAccountPage] = useState(0);
   const [notice, setNotice] = useState('');
   const [nudgeBusy, setNudgeBusy] = useState(false);
+  const [routineNote, setRoutineNote] = useState('');
   const task = useQuery({ queryKey: [...prefix,'task-detail',taskId], queryFn: ({ signal }) => getTask(taskId,signal) });
   const post = useQuery({ queryKey: [...prefix,'publications','task',taskId], queryFn: ({ signal }) => publications('task_id',taskId,0,signal) });
   const history = useQuery({ queryKey: [...prefix,'task-events','task',taskId], queryFn: ({ signal }) => taskEvents('task',taskId,signal) });
@@ -59,6 +60,22 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
       await client.invalidateQueries({ queryKey: [...prefix, 'tasks'] });
     },
   });
+  const routineCycle = useMutation({
+    mutationFn: ({ reset }: { reset: boolean }) => {
+      if (!row) throw new Error('Tugas belum dimuat.');
+      return recordRoutineExecution(row, routineNote, reset);
+    },
+    onSuccess: async (_, { reset }) => {
+      setRoutineNote('');
+      await task.refetch();
+      onChanged();
+      setNotice(
+        reset
+          ? 'Eksekusi rutinitas berhasil dicatat & checklist di-reset untuk order/siklus berikutnya.'
+          : 'Eksekusi rutinitas berhasil ditambahkan ke catatan bukti.',
+      );
+    },
+  });
   const unit = row?.business_unit_id ?? 'unassigned';
   const taskPlatforms = row ? [row.platform, ...(row.additional_platforms ?? [])] : [];
   const accountQuery = useQuery({ queryKey: [...prefix,'accounts','active',unit,accountPage,taskPlatforms], enabled: action === 'publish' && Boolean(row),
@@ -76,6 +93,71 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
     {notice && <p role="status" className="text-sm text-teal-800">{notice}</p>}
     {approval.isError && <p role="alert" className="text-sm text-red-700">{errorText(approval.error)}</p>}
     {row && <>
+      {row.routine_mode && row.routine_mode !== 'once' && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3.5 space-y-2.5 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full bg-indigo-700 px-2.5 py-0.5 text-xs font-bold text-white">
+                🔁 {taskRoutineModes[row.routine_mode]}
+              </span>
+              {row.routine_category && (
+                <span className="rounded-full border border-indigo-300 bg-white px-2.5 py-0.5 text-xs font-bold text-indigo-900">
+                  {taskRoutineCategories[row.routine_category]}
+                </span>
+              )}
+            </div>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-900">
+              Sudah dieksekusi: {row.routine_runs ?? 0} kali
+            </span>
+          </div>
+          <div className="grid gap-1 text-xs text-slate-700 sm:grid-cols-2">
+            {row.routine_trigger && (
+              <p><strong>Pemicu Rutinitas:</strong> {row.routine_trigger}</p>
+            )}
+            {row.routine_target && (
+              <p><strong>Target Output:</strong> {row.routine_target}</p>
+            )}
+          </div>
+          {row.routine_last_note && (
+            <p className="rounded-lg bg-white/90 border border-indigo-100 px-2.5 py-1.5 text-xs text-slate-700">
+              <strong>Eksekusi Terakhir:</strong> {row.routine_last_note}
+            </p>
+          )}
+          {canEdit && (
+            <div className="pt-1 space-y-2 border-t border-indigo-200/70">
+              <label className="block space-y-1 text-xs font-semibold text-slate-800">
+                <span>Catat Eksekusi Baru (Contoh: Order #12 - Kaos 50 pcs / Testimoni Customer Baru)</span>
+                <input
+                  type="text"
+                  value={routineNote}
+                  onChange={e => setRoutineNote(e.target.value)}
+                  placeholder="Tulis keterangan order customer / testimoni / episode yang baru selesai dibuat..."
+                  className={field}
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={routineCycle.isPending}
+                  onClick={() => routineCycle.mutate({ reset: true })}
+                  className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-800 disabled:opacity-50"
+                >
+                  {routineCycle.isPending ? 'Menyimpan…' : '🔄 Catat Selesai & Siapkan untuk Order Berikutnya'}
+                </button>
+                <button
+                  type="button"
+                  disabled={routineCycle.isPending}
+                  onClick={() => routineCycle.mutate({ reset: false })}
+                  className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-bold text-indigo-900 hover:bg-indigo-50 disabled:opacity-50"
+                >
+                  + Catat Eksekusi Saja (Tanpa Reset Checklist)
+                </button>
+              </div>
+              {routineCycle.isError && <p role="alert" className="text-xs text-red-700">{errorText(routineCycle.error)}</p>}
+            </div>
+          )}
+        </div>
+      )}
       {taskPlatforms && <p className="text-sm text-slate-600">
         Platform yang memerlukan bukti tayang: {taskPlatforms.map(platform => platforms[platform]).join(', ')}
       </p>}

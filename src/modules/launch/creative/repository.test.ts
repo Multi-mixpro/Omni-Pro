@@ -154,4 +154,30 @@ describe('creative repository', () => {
     expect(briefBlock).toContain('Gunakan talent wanita.');
     expect(briefBlock).toContain('[HOOK]\nTampil rapi setiap hari!');
   });
+
+  it('packs copy_template_id, output_type, and routine fields into creative_brief JSONB to avoid missing column errors', async () => {
+    chain.maybeSingle.mockResolvedValue({ data: { id: 'routine-task-1' }, error: null });
+    await saveTask({
+      ...draft,
+      title: 'VIDEO INTRODUCTION / ORDER DOC',
+      output_type: 'video',
+      copy_template_id: 'template-script-1',
+      routine_mode: 'event_triggered',
+      routine_category: 'customer_order',
+      routine_trigger: 'Setiap ada customer order masuk',
+      routine_target: '1 Video per Customer Order',
+    });
+    const insertedArg = chain.insert.mock.calls[0][0] as Record<string, unknown>;
+    expect(insertedArg).not.toHaveProperty('copy_template_id');
+    expect(insertedArg).not.toHaveProperty('output_type');
+    expect(insertedArg).not.toHaveProperty('routine_mode');
+    expect(insertedArg.creative_brief).toEqual({
+      _copy_template_id: 'template-script-1',
+      _output_type: 'video',
+      _routine_mode: 'event_triggered',
+      _routine_category: 'customer_order',
+      _routine_trigger: 'Setiap ada customer order masuk',
+      _routine_target: '1 Video per Customer Order',
+    });
+  });
 });

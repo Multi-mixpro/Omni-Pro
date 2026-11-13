@@ -15,6 +15,127 @@ export const ideaQueues = { candidate: 'Perlu ditinjau', ready: 'Siap dikerjakan
 export const workstreams = { creative: 'Produksi Konten', marketing: 'Marketing & Promo', operations: 'Operasional' };
 export const outputTypes = { post: 'Postingan teks', image: 'Gambar statis', carousel: 'Carousel', video: 'Video', story: 'Story', live: 'Live', other: 'Lainnya' };
 export const copyFormats = { caption: 'Caption', hook: 'Hook video', script: 'Skrip video', listing: 'Listing produk', ad: 'Iklan', other: 'Lainnya' };
+export const taskRoutineModes = {
+  once: 'Sekali Buat (1x Video / Konten)',
+  event_triggered: 'Rutin Setiap Kejadian (Order Customer / Testimoni)',
+  scheduled_recurring: 'Rutin Terjadwal (Harian / Mingguan / Bulanan)',
+};
+export const taskRoutineCategories = {
+  customer_order: 'Dokumentasi Video Customer Order',
+  testimonial: 'Testimoni & Review Pelanggan',
+  packing_shipping: 'Dokumentasi Packing & Pengiriman Order',
+  production_qc: 'Proses Produksi / Jahit / Sablon / QC Order',
+  customer_qna: 'Video Jawab Pertanyaan / Request Customer',
+  daily_weekly: 'Konten Rutin Harian / Mingguan Produk',
+  other_routine: 'Rutinitas Konten Lainnya',
+};
+export type RoutinePreset = {
+  id: string;
+  label: string;
+  badge: string;
+  mode: keyof typeof taskRoutineModes;
+  category: keyof typeof taskRoutineCategories;
+  output_type: keyof typeof outputTypes;
+  trigger: string;
+  target: string;
+  format: string;
+  deliverable: string;
+  acceptance_criteria: string;
+  checklist: string[];
+};
+export const ROUTINE_PRESETS: RoutinePreset[] = [
+  {
+    id: 'preset-customer-order',
+    label: 'Setiap Customer Order (Video Dokumentasi)',
+    badge: 'Order Customer',
+    mode: 'event_triggered',
+    category: 'customer_order',
+    output_type: 'video',
+    trigger: 'Setiap ada customer order / PO masuk (sebelum barang dikirim)',
+    target: '1 Video Dokumentasi per Customer Order',
+    format: 'Video Dokumentasi Order 15-45 detik (Reels / TikTok / WA)',
+    deliverable: '1 video dokumentasi produk pesanan customer siap upload + foto/footage bukti order',
+    acceptance_criteria: 'Menampilkan detail produk pesanan customer dengan jelas, rapi, dan selalu menyertakan identitas/icon perusahaan',
+    checklist: [
+      'Cek detail artikel, warna, dan jumlah pesanan customer order',
+      'Rekam footage close-up detail produk / hasil bordir / sablon / jahitan',
+      'Rekam proses pelipatan & persiapan packing pesanan customer',
+      'Edit singkat + tambahkan watermark/icon perusahaan & teks order',
+    ],
+  },
+  {
+    id: 'preset-testimonial',
+    label: 'Konten Testimoni & Review Pelanggan',
+    badge: 'Testimoni',
+    mode: 'event_triggered',
+    category: 'testimonial',
+    output_type: 'video',
+    trigger: 'Setiap ada testimoni, foto pemakaian, atau review dari customer',
+    target: '1 Konten Bukti Sosial per Testimoni Masuk',
+    format: 'Video / Story / Post Kompilasi Testimoni Customer',
+    deliverable: 'Konten video atau visual testimoni pelanggan siap tayang di sosial media',
+    acceptance_criteria: 'Review pelanggan terbaca jelas, disandingkan dengan footage produk asli, dan menggunakan icon perusahaan',
+    checklist: [
+      'Simpan tangkapan layar review / video unboxing dari pelanggan',
+      'Gabungkan dengan footage produk asli yang dipesan pelanggan',
+      'Tambahkan highlight kepuasan pelanggan & ajakan order (CTA)',
+    ],
+  },
+  {
+    id: 'preset-packing-shipping',
+    label: 'Dokumentasi Packing & Pengiriman Order',
+    badge: 'Pengiriman',
+    mode: 'event_triggered',
+    category: 'packing_shipping',
+    output_type: 'video',
+    trigger: 'Setiap kloter pengiriman / pick-up ekspedisi order customer',
+    target: '1 Video / Story Bukti Pengiriman per Kloter',
+    format: 'Video Aktivitas Packing & Pengiriman (15-30 detik)',
+    deliverable: 'Video dokumentasi paket pesanan yang siap dikirim ke ekspedisi',
+    acceptance_criteria: 'Menunjukkan aktivitas pengiriman riil untuk meningkatkan kepercayaan calon pembeli',
+    checklist: [
+      'Rekam proses pengemasan paket dan tempel resi pengiriman',
+      'Rekam tumpukan paket siap kirim atau serah terima kurir',
+      'Tambahkan caption update pengiriman hari ini & icon perusahaan',
+    ],
+  },
+  {
+    id: 'preset-production-qc',
+    label: 'Behind The Scene Produksi & QC Order',
+    badge: 'Produksi / QC',
+    mode: 'event_triggered',
+    category: 'production_qc',
+    output_type: 'video',
+    trigger: 'Setiap batch produksi atau pengecekan QC pesanan berjalan',
+    target: '1 Video Proses Produksi / QC per Batch',
+    format: 'Video Behind The Scenes Produksi & QC (15-30 detik)',
+    deliverable: 'Video proses pengerjaan produksi dan pengecekan kualitas (QC)',
+    acceptance_criteria: 'Menonjolkan kerapian pengerjaan, kualitas bahan, dan standar QC perusahaan',
+    checklist: [
+      'Rekam tahapan pengerjaan produksi (cutting / jahit / finishing)',
+      'Rekam pengecekan kualitas (QC) ukuran dan kerapian benang',
+      'Tambahkan narasi singkat standar kualitas & icon perusahaan',
+    ],
+  },
+  {
+    id: 'preset-scheduled-routine',
+    label: 'Konten Rutin Terjadwal (Harian / Mingguan)',
+    badge: 'Rutin Berkala',
+    mode: 'scheduled_recurring',
+    category: 'daily_weekly',
+    output_type: 'video',
+    trigger: 'Jadwal rutin berkala (Harian / 3x Seminggu / Mingguan)',
+    target: 'Sesuai target jadwal mingguan',
+    format: 'Video Reels / TikTok / Story Rutin',
+    deliverable: 'Konten rutin sesuai jadwal publikasi mingguan',
+    acceptance_criteria: 'Sesuai jadwal publikasi, konsisten dengan tone visual dan icon perusahaan',
+    checklist: [
+      'Siapkan produk atau topik bahasan sesuai jadwal rutin',
+      'Take video dan edit sesuai template brand',
+      'Publikasikan pada jam tayang utama',
+    ],
+  },
+];
 type Row = { id: string; updated_at: string };
 export type ChecklistItem = { label: string; done: boolean };
 export const briefFields = {
@@ -22,7 +143,16 @@ export const briefFields = {
   offer: 'Penawaran', cta: 'Ajakan bertindak', mandatory: 'Elemen wajib', restrictions: 'Batasan atau klaim yang dihindari',
   voice: 'Panduan gaya bahasa dan visual', references: 'Referensi',
 };
-type CreativeBrief = Partial<Record<keyof typeof briefFields, string>>;
+type CreativeBrief = Partial<Record<keyof typeof briefFields, string>> & {
+  _copy_template_id?: string;
+  _output_type?: keyof typeof outputTypes;
+  _routine_mode?: keyof typeof taskRoutineModes;
+  _routine_category?: keyof typeof taskRoutineCategories;
+  _routine_trigger?: string;
+  _routine_target?: string;
+  _routine_runs?: string;
+  _routine_last_note?: string;
+};
 export type Campaign = Row & {
   business_unit_id?: string | null;
   name: string; objective: string; owner_id: string | null; status: keyof typeof campaignStatuses;
@@ -44,6 +174,12 @@ export type Task = Row & {
   business_unit_id?: string | null;
   copy_template_id?: string | null;
   output_type?: keyof typeof outputTypes;
+  routine_mode?: keyof typeof taskRoutineModes;
+  routine_category?: keyof typeof taskRoutineCategories;
+  routine_trigger?: string;
+  routine_target?: string;
+  routine_runs?: number;
+  routine_last_note?: string;
   workstream?: keyof typeof workstreams;
   campaign_id: string | null; title: string; brief: string; assignee_id: string | null;
   platform: keyof typeof platforms; format: string; status: keyof typeof taskStatuses;
@@ -68,7 +204,27 @@ export type Draft<T> = Omit<T, keyof Row>;
 export const PAGE_SIZE = 30;
 
 const campaignColumns = 'id,business_unit_id,name,objective,owner_id,status,starts_on,ends_on,budget_idr,spent_idr,updated_at';
-const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,creative_brief,deliverable,acceptance_criteria,completion_note,checklist,assignee_id,reviewer_id,reviewed_by,reviewed_at,approver_id,approved_at,platform,additional_platforms,additional_assignee_ids,copy_template_id,output_type,format,status,priority,due_on,publish_on,output_url,blocker,review_note,source_activation_id,updated_at';
+const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,creative_brief,deliverable,acceptance_criteria,completion_note,checklist,assignee_id,reviewer_id,reviewed_by,reviewed_at,approver_id,approved_at,platform,additional_platforms,additional_assignee_ids,format,status,priority,due_on,publish_on,output_url,blocker,review_note,source_activation_id,updated_at';
+
+function hydrateTask<T extends Task>(row: T): T {
+  const cb = row.creative_brief ?? {};
+  const mode = cb._routine_mode && cb._routine_mode in taskRoutineModes ? cb._routine_mode : row.routine_mode;
+  const cat = cb._routine_category && cb._routine_category in taskRoutineCategories ? cb._routine_category : row.routine_category;
+  const outType = cb._output_type && cb._output_type in outputTypes ? cb._output_type : row.output_type;
+  const tplId = cb._copy_template_id || row.copy_template_id || null;
+  const runs = cb._routine_runs !== undefined ? Number(cb._routine_runs) || 0 : row.routine_runs ?? 0;
+  return {
+    ...row,
+    copy_template_id: tplId,
+    output_type: outType,
+    routine_mode: mode,
+    routine_category: cat,
+    routine_trigger: cb._routine_trigger ?? row.routine_trigger ?? '',
+    routine_target: cb._routine_target ?? row.routine_target ?? '',
+    routine_runs: runs,
+    routine_last_note: cb._routine_last_note ?? row.routine_last_note ?? '',
+  };
+}
 
 export type CopyTemplate = {
   id: string;
@@ -369,7 +525,7 @@ export async function tasks(campaignId: string | null | 'all', filters: Filters,
   const { data, error } = await query.order(filters.order, { nullsFirst: false }).order('id')
     .range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
-  const rows = (data ?? []) as unknown as ListedTask[];
+  const rows = ((data ?? []) as unknown as ListedTask[]).map(hydrateTask);
   return isDemoPurged() ? rows.filter(row => !isDemoText(row.title)) : rows;
 }
 
@@ -425,14 +581,94 @@ async function save(table: string, values: Record<string, string | number | bool
 
 export const saveCampaign = (values: Draft<Campaign>, previous?: Campaign) => save('creative_campaigns', values, previous);
 export async function saveTask(values: Draft<Task>, previous?: Task, sourceIdeaId?: string) {
+  const hasExtendedMetadata =
+    'copy_template_id' in values ||
+    'output_type' in values ||
+    'routine_mode' in values ||
+    'routine_category' in values ||
+    'routine_trigger' in values ||
+    'routine_target' in values ||
+    'routine_runs' in values ||
+    'routine_last_note' in values;
+
+  let payload: Record<string, string | number | boolean | string[] | ChecklistItem[] | CreativeBrief | null | undefined>;
+  if (hasExtendedMetadata) {
+    const {
+      copy_template_id,
+      output_type,
+      routine_mode,
+      routine_category,
+      routine_trigger,
+      routine_target,
+      routine_runs,
+      routine_last_note,
+      creative_brief,
+      ...dbColumns
+    } = values;
+    const mergedBrief: CreativeBrief = { ...(previous?.creative_brief ?? {}), ...(creative_brief ?? {}) };
+    if (copy_template_id) mergedBrief._copy_template_id = copy_template_id;
+    else delete mergedBrief._copy_template_id;
+    if (output_type) mergedBrief._output_type = output_type;
+    else delete mergedBrief._output_type;
+    if (routine_mode && routine_mode !== 'once') {
+      mergedBrief._routine_mode = routine_mode;
+      if (routine_category) mergedBrief._routine_category = routine_category;
+      if (routine_trigger) mergedBrief._routine_trigger = routine_trigger;
+      else delete mergedBrief._routine_trigger;
+      if (routine_target) mergedBrief._routine_target = routine_target;
+      else delete mergedBrief._routine_target;
+      if (routine_runs !== undefined && routine_runs > 0) mergedBrief._routine_runs = String(routine_runs);
+      if (routine_last_note) mergedBrief._routine_last_note = routine_last_note;
+    } else {
+      delete mergedBrief._routine_mode;
+      delete mergedBrief._routine_category;
+      delete mergedBrief._routine_trigger;
+      delete mergedBrief._routine_target;
+    }
+    payload = {
+      ...dbColumns,
+      creative_brief: mergedBrief,
+      ...(!previous && sourceIdeaId ? { source_idea_id: sourceIdeaId } : {}),
+    };
+  } else {
+    payload = { ...values, ...(!previous && sourceIdeaId ? { source_idea_id: sourceIdeaId } : {}) };
+  }
+
   try {
-    return await save('creative_tasks', { ...values, ...(!previous && sourceIdeaId ? { source_idea_id: sourceIdeaId } : {}) }, previous);
+    return await save('creative_tasks', payload, previous);
   } catch (error) {
     if (sourceIdeaId && error && typeof error === 'object' && 'code' in error && error.code === '23505') {
       throw new Error('Ide ini sudah dijadikan tugas. Segarkan daftar untuk melihat statusnya.');
     }
     throw error;
   }
+}
+
+export async function recordRoutineExecution(task: Task, note: string, resetForNextOrder = true) {
+  const hydrated = hydrateTask(task);
+  const nextRuns = (hydrated.routine_runs ?? 0) + 1;
+  const timestamp = new Intl.DateTimeFormat('id-ID', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(new Date());
+  const entry = `[Eksekusi #${nextRuns} · ${timestamp}] ${note.trim() || 'Selesai dieksekusi'}`;
+  const updatedCompletionNote = [entry, hydrated.completion_note?.trim() ?? ''].filter(Boolean).join('\n').slice(0, 2000);
+  const mergedBrief: CreativeBrief = {
+    ...(hydrated.creative_brief ?? {}),
+    _routine_mode: hydrated.routine_mode && hydrated.routine_mode !== 'once' ? hydrated.routine_mode : 'event_triggered',
+    _routine_runs: String(nextRuns),
+    _routine_last_note: entry,
+  };
+  const resetChecklist = resetForNextOrder && hydrated.checklist?.length
+    ? hydrated.checklist.map(item => ({ ...item, done: false }))
+    : hydrated.checklist;
+  const nextStatus: Task['status'] = resetForNextOrder
+    ? (hydrated.assignee_id && hydrated.due_on && hydrated.deliverable && hydrated.acceptance_criteria ? 'doing' : 'todo')
+    : hydrated.status;
+  return save('creative_tasks', {
+    creative_brief: mergedBrief,
+    completion_note: updatedCompletionNote,
+    ...(resetChecklist ? { checklist: resetChecklist } : {}),
+    status: nextStatus,
+    blocker: '',
+  }, task);
 }
 export async function removeTask(task: Pick<Task, 'id' | 'updated_at'>) {
   const { error } = await supabase.rpc('remove_creative_task', {
@@ -482,7 +718,7 @@ export async function getTask(id: string, signal: AbortSignal) {
     .select(taskColumns + ',campaign:creative_campaigns(name),source_idea:creative_ideas(title,reference_urls)')
     .eq('id', id).abortSignal(signal).single();
   if (error) throw error;
-  return data as unknown as ListedTask;
+  return hydrateTask(data as unknown as ListedTask);
 }
 
 export const BOARD_PAGE_SIZE = 6;
@@ -512,7 +748,10 @@ export async function boardTasks(scope: string, unit: string, filters: Filters, 
     p_filters: filters, p_focus: focus, p_today: today, p_page: page,
   }).abortSignal(signal);
   if (error) throw error;
-  const lanes = (data ?? []) as { stage: Task['status']; total: number; items: ListedTask[] }[];
+  const lanes = ((data ?? []) as { stage: Task['status']; total: number; items: ListedTask[] }[]).map(lane => ({
+    ...lane,
+    items: (lane.items ?? []).map(hydrateTask),
+  }));
   if (!isDemoPurged()) return lanes;
   return lanes.map(lane => {
     const filtered = (lane.items ?? []).filter(item => !isDemoText(item.title));

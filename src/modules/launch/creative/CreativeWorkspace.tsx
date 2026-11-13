@@ -16,7 +16,7 @@ import { channelSummary, type CalendarEvent } from './channelRepository';
 import { publicationTaskId } from './commandRepository';
 import { focusLabels, jakartaToday, mondayWeek, type Focus } from './schedule';
 import {
-  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, isDemoText, outputTypes, PAGE_SIZE, platforms, priorities, purgeCreativeDemoData, removeTask, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
+  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, isDemoText, outputTypes, PAGE_SIZE, platforms, priorities, purgeCreativeDemoData, removeTask, safeOutputUrl, summary, taskRoutineCategories, taskRoutineModes, tasks, taskStatuses, team, workload, workstreams,
   type Campaign, type Filters, type Idea, type Task,
 } from './repository';
 import './creativeWorkspace.css';
@@ -155,6 +155,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
     assignee: new URLSearchParams(location.search).get('mine') === '1' ? userId : '',
   }));
   const [focus, setFocus] = useState<Focus>('all');
+  const [routineFilter, setRoutineFilter] = useState<'all' | 'routine' | 'once'>('all');
   const [page, setPage] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [taskToRemove, setTaskToRemove] = useState<Task | null>(null);
@@ -301,12 +302,19 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       void client.invalidateQueries({ queryKey: ['business-execution', userId] });
     },
   });
-  const tasksOnPage = taskQuery.data?.slice(0, PAGE_SIZE) ?? [];
+  const matchRoutineFilter = (row: Task) => {
+    const isRoutine = Boolean(row.routine_mode && row.routine_mode !== 'once');
+    if (routineFilter === 'routine') return isRoutine;
+    if (routineFilter === 'once') return !isRoutine;
+    return true;
+  };
+  const tasksOnPage = (taskQuery.data?.slice(0, PAGE_SIZE) ?? []).filter(matchRoutineFilter);
   const boardStatuses: Task['status'][] = ['todo', 'doing', 'review', 'ready', 'blocked', 'done', 'cancelled'];
   const taskGroups = taskView === 'board'
     ? boardStatuses.map(status => {
       const lane = boardQuery.data?.find(row => row.stage === status);
-      return { status, rows: lane?.items ?? [], total: Number(lane?.total ?? 0) };
+      const filteredRows = (lane?.items ?? []).filter(matchRoutineFilter);
+      return { status, rows: filteredRows, total: routineFilter === 'all' ? Number(lane?.total ?? 0) : filteredRows.length };
     })
     : [{ status: null, rows: tasksOnPage, total: tasksOnPage.length }];
   const hasDemoItems = taskGroups.some(group => group.rows.some(row => isDemoText(row.title))) || campaignList.some(c => isDemoText(c.name));
@@ -547,9 +555,35 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
             <button className={button} aria-expanded={showFilters} aria-controls="creative-task-filters" onClick={() => setShowFilters(!showFilters)}>{showFilters ? 'Tutup filter' : 'Filter lanjutan'}{filters.platform || filters.workstream || filters.status || (filters.assignee && filters.assignee !== userId) ? ' · aktif' : ''}</button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2" aria-label="Fokus pekerjaan">
-          {(Object.keys(focusLabels) as Focus[]).map(option => <button key={option} aria-pressed={focus === option}
-            className={focus === option ? primary : button} onClick={() => chooseFocus(option)}>{focusLabels[option]}</button>)}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2" aria-label="Fokus pekerjaan">
+            {(Object.keys(focusLabels) as Focus[]).map(option => <button key={option} aria-pressed={focus === option}
+              className={focus === option ? primary : button} onClick={() => chooseFocus(option)}>{focusLabels[option]}</button>)}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs">
+            <span className="px-2 font-bold text-slate-600">Pola:</span>
+            <button
+              type="button"
+              onClick={() => setRoutineFilter('all')}
+              className={`rounded-lg px-2.5 py-1 font-bold transition-colors ${routineFilter === 'all' ? 'bg-teal-800 text-white' : 'text-slate-700 hover:bg-white'}`}
+            >
+              Semua
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoutineFilter('routine')}
+              className={`rounded-lg px-2.5 py-1 font-bold transition-colors ${routineFilter === 'routine' ? 'bg-indigo-700 text-white' : 'text-slate-700 hover:bg-white'}`}
+            >
+              🔁 Rutinitas (Order / Testimoni)
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoutineFilter('once')}
+              className={`rounded-lg px-2.5 py-1 font-bold transition-colors ${routineFilter === 'once' ? 'bg-teal-800 text-white' : 'text-slate-700 hover:bg-white'}`}
+            >
+              🎯 Sekali Buat (1x)
+            </button>
+          </div>
         </div>
         <SavedTaskViews key={userId} userId={userId} view={{ filters, focus, mode: taskView }} onApply={view => {
           setFilters(view.filters); setFocus(view.focus); setTaskView(view.mode); setPage(0);
@@ -596,9 +630,29 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
                       {outputTypes[task.output_type] ?? task.output_type}
                     </span>
                   )}
+                  {task.routine_mode && task.routine_mode !== 'once' ? (
+                    <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-800">
+                      🔁 {task.routine_category ? taskRoutineCategories[task.routine_category] : taskRoutineModes[task.routine_mode]}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                      1x Sekali Buat
+                    </span>
+                  )}
+                  {Boolean(task.routine_runs && task.routine_runs > 0) && (
+                    <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                      ✓ {task.routine_runs}x dieksekusi
+                    </span>
+                  )}
                   {task.priority !== 'normal' && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-800">{priorities[task.priority]}</span>}
                 </div>
                 <h3 className="break-words font-semibold">{task.title}</h3>
+                {task.routine_mode && task.routine_mode !== 'once' && (task.routine_trigger || task.routine_target) && (
+                  <p className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-2.5 py-1 text-xs font-medium text-indigo-950">
+                    <strong>Rutinitas:</strong> {task.routine_trigger || taskRoutineModes[task.routine_mode]}
+                    {task.routine_target ? ` · Target: ${task.routine_target}` : ''}
+                  </p>
+                )}
                 <p className="break-words text-sm text-slate-600">{workstreams[task.workstream ?? 'creative']} · {platformNames}{task.format ? ' · ' + task.format : ''} · {assigneeIds.length ? assigneeIds.map(person).join(', ') : person(null)}</p>
                 {scope === 'all' && <p className="break-words text-sm text-slate-600">{unitName(task.business_unit_id)} · {task.campaign?.name ?? (task.campaign_id ? 'Kampanye terkait' : 'Tanpa kampanye')}</p>}
                 <p className="text-sm"><span className={overdue ? 'font-semibold text-red-700' : ''}>Deadline {date(task.due_on)}{overdue ? ' (terlambat)' : ''}</span> · Tayang {date(task.publish_on)}</p>

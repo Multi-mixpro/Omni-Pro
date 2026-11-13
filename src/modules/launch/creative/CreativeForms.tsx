@@ -10,8 +10,8 @@ import {
   stripCopyRichText,
 } from './CopyRichText';
 import {
-  briefFields, campaignStatuses, copyFormats, copyTemplates, getIdeaAttachedScript, ideaQueues, outputTypes, platforms, priorities, safeOutputUrl, saveCampaign, saveCopyTemplate, saveIdea, saveTask, setIdeaAttachedScript, taskStatuses, workstreams,
-  type Campaign, type CopyTemplate, type Idea, type Task, type TeamMember,
+  briefFields, campaignStatuses, copyFormats, copyTemplates, getIdeaAttachedScript, ideaQueues, outputTypes, platforms, priorities, ROUTINE_PRESETS, safeOutputUrl, saveCampaign, saveCopyTemplate, saveIdea, saveTask, setIdeaAttachedScript, taskRoutineCategories, taskRoutineModes, taskStatuses, workstreams,
+  type Campaign, type CopyTemplate, type Idea, type RoutinePreset, type Task, type TeamMember,
 } from './repository';
 
 export const field = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm';
@@ -123,13 +123,36 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
   const [status, setStatus] = useState(task?.status ?? 'todo');
   const [selectedCampaign, setSelectedCampaign] = useState(task ? task.campaign_id ?? '' : campaignId ?? '');
   const [platform, setPlatform] = useState<Task['platform']>(task?.platform ?? sourceIdea?.platform ?? 'internal');
-  const [outputType, setOutputType] = useState<Task['output_type']>(task?.output_type ?? 'post');
+  const [outputType, setOutputType] = useState<Task['output_type']>(task?.output_type ?? 'video');
+  const [routineMode, setRoutineMode] = useState<NonNullable<Task['routine_mode']>>(task?.routine_mode ?? 'once');
+  const [routineCategory, setRoutineCategory] = useState<NonNullable<Task['routine_category']>>(task?.routine_category ?? 'customer_order');
+  const [routineTrigger, setRoutineTrigger] = useState(task?.routine_trigger ?? '');
+  const [routineTarget, setRoutineTarget] = useState(task?.routine_target ?? '');
+  const [titleText, setTitleText] = useState(task?.title ?? sourceIdea?.title ?? '');
+  const [formatText, setFormatText] = useState(task?.format ?? '');
+  const [deliverableText, setDeliverableText] = useState(task?.deliverable ?? '');
+  const [criteriaText, setCriteriaText] = useState(task?.acceptance_criteria ?? '');
+  const [checklistText, setChecklistText] = useState(task?.checklist?.map(item => item.label).join('\n') ?? '');
   const [selectedTemplateId, setSelectedTemplateId] = useState(task?.copy_template_id ?? getIdeaAttachedScript(sourceIdea?.id) ?? '');
   const [briefText, setBriefText] = useState(task?.brief ?? sourceIdea?.brief ?? '');
   const [customScriptNote, setCustomScriptNote] = useState('');
   const [viewingScript, setViewingScript] = useState<CopyTemplate | null>(null);
   const templates = useQuery({ queryKey: ['creative-copy-library', defaultUnit ?? 'all'], queryFn: ({ signal }) => copyTemplates(signal, defaultUnit ?? 'all') });
   const selectedTemplate = templates.data?.find(t => t.id === selectedTemplateId);
+
+  const applyRoutinePreset = (preset: RoutinePreset, forceOverwrite = false) => {
+    setRoutineMode(preset.mode);
+    setRoutineCategory(preset.category);
+    setOutputType(preset.output_type);
+    setRoutineTrigger(preset.trigger);
+    setRoutineTarget(preset.target);
+    if (forceOverwrite || !titleText.trim()) setTitleText(preset.label);
+    if (forceOverwrite || !formatText.trim()) setFormatText(preset.format);
+    if (forceOverwrite || !deliverableText.trim()) setDeliverableText(preset.deliverable);
+    if (forceOverwrite || !criteriaText.trim()) setCriteriaText(preset.acceptance_criteria);
+    if (forceOverwrite || !checklistText.trim()) setChecklistText(preset.checklist.join('\n'));
+  };
+
   return <>
     {viewingScript && (
       <CopyScriptViewerModal
@@ -145,7 +168,7 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
       const people = [...new Set(data.getAll('additionalPerson').map(String))];
       const primaryPerson = value(data, 'person') || people[0] || null;
       const extraPlatforms = data.getAll('additionalPlatform').map(String) as Task['platform'][];
-      const steps = [...new Set(value(data, 'checklist').split(/\r?\n/).map(line => line.trim()).filter(Boolean))];
+      const steps = [...new Set(checklistText.split(/\r?\n/).map(line => line.trim()).filter(Boolean))];
       if (steps.length > 20 || steps.some(step => step.length > 160)) {
         throw new Error('Checklist maksimal 20 langkah, masing-masing 160 karakter.');
       }
@@ -153,10 +176,15 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
       if (sourceIdea && (!value(data, 'person') || !value(data, 'due'))) throw new Error('Tentukan PIC dan deadline sebelum memasukkan ide ke antrean produksi.');
       if (link && !output) throw new Error('Tautan hasil harus berupa URL HTTP atau HTTPS yang valid.');
       if (status === 'blocked' && !blocker) throw new Error('Isi alasan tugas terhambat.');
+      const resolvedDeliverable = deliverableText.trim() || (status !== 'todo' ? `${outputTypes[outputType ?? 'video'] ?? 'Konten'} - ${titleText.trim()}` : '');
+      const resolvedCriteria = criteriaText.trim() || (status !== 'todo' ? 'Sesuai brief dan standar kualitas visual brand' : '');
+      if (['doing', 'review', 'ready', 'done'].includes(status) && (!primaryPerson || !value(data, 'due'))) {
+        throw new Error('Untuk status Dikerjakan / Review / Siap Tayang / Selesai, pilih PIC utama dan Deadline pengerjaan terlebih dahulu (atau gunakan status "Belum mulai").');
+      }
       return saveTask({
-        campaign_id: value(data, 'campaign') || null, title: value(data, 'title'), brief: value(data, 'brief'),
+        campaign_id: value(data, 'campaign') || null, title: titleText.trim() || value(data, 'title'), brief: briefText,
         creative_brief: Object.fromEntries(Object.keys(briefFields).map(key => [key, value(data, `brief.${key}`)]).filter(([, text]) => text)),
-        deliverable: value(data, 'deliverable'), acceptance_criteria: value(data, 'criteria'),
+        deliverable: resolvedDeliverable, acceptance_criteria: resolvedCriteria,
         completion_note: value(data, 'evidence'),
         checklist: steps.map(label => ({ label, done: checked.has(label) })),
         assignee_id: primaryPerson, platform,
@@ -166,14 +194,30 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
         additional_platforms: platform === 'internal' ? [] : extraPlatforms.filter(choice => choice !== platform),
         copy_template_id: value(data, 'copyTemplate') || null,
         output_type: outputType,
-        format: value(data, 'format'), status, priority: value(data, 'priority') as Task['priority'],
+        routine_mode: routineMode,
+        routine_category: routineMode !== 'once' ? routineCategory : undefined,
+        routine_trigger: routineMode !== 'once' ? routineTrigger.trim() : undefined,
+        routine_target: routineMode !== 'once' ? routineTarget.trim() : undefined,
+        routine_runs: task?.routine_runs,
+        routine_last_note: task?.routine_last_note,
+        format: formatText.trim(), status, priority: value(data, 'priority') as Task['priority'],
         due_on: value(data, 'due') || null, publish_on: value(data, 'publish') || null,
         output_url: output, blocker: status === 'blocked' ? blocker : '',
         business_unit_id: selectedCampaign ? task?.business_unit_id ?? null : value(data, 'businessUnit') || null,
         workstream: value(data, 'workstream') as Task['workstream'],
       }, task, sourceIdea?.id);
     }}>
-    <Label title="Judul / hasil yang dibutuhkan"><input name="title" className={field} required maxLength={160} defaultValue={task?.title ?? sourceIdea?.title} /></Label>
+    <Label title="Judul / hasil yang dibutuhkan">
+      <input
+        name="title"
+        className={field}
+        required
+        maxLength={160}
+        value={titleText}
+        onChange={e => setTitleText(e.target.value)}
+        placeholder="Contoh: VIDEO INTRODUCTION / Dokumentasi Video Customer Order"
+      />
+    </Label>
     {(task?.reviewed_at || task?.approved_at) && ['ready','done'].includes(task.status) && <p className="sm:col-span-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
       Brief dan hasil ini sudah disetujui. Pilih status Dikerjakan saat mengubahnya agar review dan persetujuan dapat dicatat ulang.
     </p>}
@@ -206,6 +250,125 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
         <Options values={outputTypes} />
       </select>
     </Label>
+
+    {/* POLA PRODUKSI TUGAS: SEKALI BUAT vs KONTEN RUTINITAS (BERULANG / CUSTOMER ORDER / TESTIMONI) */}
+    <div className="sm:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3.5 space-y-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <strong className="block font-bold text-slate-900">Pola Produksi Tugas: Sekali Buat vs Konten Rutinitas (Berulang)</strong>
+          <span className="text-xs text-slate-600">
+            Pilih apakah tugas ini hanya dibuat sekali (1x video/konten) atau rutinitas berulang seperti setiap ada customer order, testimoni, dan pengiriman.
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {(Object.entries(taskRoutineModes) as [NonNullable<Task['routine_mode']>, string][]).map(([modeKey, modeLabel]) => {
+          const active = routineMode === modeKey;
+          return (
+            <button
+              key={modeKey}
+              type="button"
+              onClick={() => {
+                setRoutineMode(modeKey);
+                if (modeKey === 'event_triggered' && !routineTrigger.trim()) {
+                  const defaultPreset = ROUTINE_PRESETS[0];
+                  setRoutineCategory(defaultPreset.category);
+                  setRoutineTrigger(defaultPreset.trigger);
+                  setRoutineTarget(defaultPreset.target);
+                } else if (modeKey === 'scheduled_recurring' && !routineTrigger.trim()) {
+                  setRoutineCategory('daily_weekly');
+                  setRoutineTrigger('Jadwal rutin berkala (Harian / 3x Seminggu / Mingguan)');
+                  setRoutineTarget('Sesuai jadwal rutin mingguan');
+                }
+              }}
+              className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition-all ${
+                active
+                  ? 'border-teal-700 bg-teal-800 text-white shadow-2xs'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50/50'
+              }`}
+            >
+              <span className="block">{modeKey === 'once' ? '🎯 ' : modeKey === 'event_triggered' ? '🔁 ' : '📅 '}{modeLabel}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {routineMode !== 'once' && (
+        <div className="rounded-xl border border-indigo-200 bg-white p-3 space-y-3">
+          <div>
+            <span className="block text-xs font-bold text-slate-700 mb-1.5">
+              Preset Cepat Konten Rutinitas (Klik untuk mengisi template standar):
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {ROUTINE_PRESETS.map(preset => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => applyRoutinePreset(preset, false)}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    routineCategory === preset.category && routineMode === preset.mode
+                      ? 'border-teal-700 bg-teal-100 text-teal-950 font-bold'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-teal-50 hover:border-teal-200'
+                  }`}
+                >
+                  + {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <label className="block space-y-1 text-xs font-semibold text-slate-700">
+              <span>Kategori Konten Rutinitas</span>
+              <select
+                value={routineCategory}
+                onChange={e => setRoutineCategory(e.target.value as NonNullable<Task['routine_category']>)}
+                className={field}
+              >
+                <Options values={taskRoutineCategories} />
+              </select>
+            </label>
+            <label className="block space-y-1 text-xs font-semibold text-slate-700">
+              <span>Target Output per Kejadian / Siklus</span>
+              <input
+                type="text"
+                value={routineTarget}
+                onChange={e => setRoutineTarget(e.target.value)}
+                placeholder="Contoh: 1 Video Dokumentasi per Customer Order"
+                className={field}
+              />
+            </label>
+            <label className="block space-y-1 text-xs font-semibold text-slate-700 sm:col-span-2">
+              <span>Pemicu / Aturan Kapan Konten Ini Dibuat</span>
+              <input
+                type="text"
+                value={routineTrigger}
+                onChange={e => setRoutineTrigger(e.target.value)}
+                placeholder="Contoh: Setiap ada customer order baru / Setiap ada testimoni pelanggan masuk"
+                className={field}
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+            <span className="text-xs text-slate-600">
+              Ingin mengisi otomatis Format, Hasil yang diserahkan, Kriteria penerimaan &amp; Checklist sesuai kategori ini?
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const match = ROUTINE_PRESETS.find(p => p.category === routineCategory) ?? ROUTINE_PRESETS[0];
+                applyRoutinePreset(match, true);
+              }}
+              className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-900 hover:bg-indigo-100"
+            >
+              Isi Standar Format &amp; Checklist Rutinitas
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
     <div className="space-y-2.5 sm:col-span-2 rounded-xl border border-teal-200 bg-teal-50/70 p-3.5 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <label htmlFor="task-copy-template" className="font-bold text-slate-800">
@@ -315,7 +478,7 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
       )}
     </div>
     <Label title="Pos kerja"><select name="workstream" className={field} defaultValue={task?.workstream ?? 'creative'}><Options values={workstreams} /></select></Label>
-    <Label title="Format"><input name="format" className={field} maxLength={80} placeholder="Contoh: Reels 30 detik / Carousel 5 slide" defaultValue={task?.format} /></Label>
+    <Label title="Format"><input name="format" className={field} maxLength={80} placeholder="Contoh: Reels 30 detik / Video Dokumentasi Order" value={formatText} onChange={e => setFormatText(e.target.value)} /></Label>
     <div className="space-y-2">
       <Label title={sourceIdea ? 'PIC utama (wajib)' : 'PIC utama'}><People members={members} current={task?.assignee_id} required={!!sourceIdea} /></Label>
       <details className="rounded-lg border border-slate-200 p-2 text-sm">
@@ -353,10 +516,10 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
         </Label>)}
       </div>
     </details>
-    <Label title="Hasil yang harus diserahkan"><textarea name="deliverable" className={field} maxLength={1000} defaultValue={task?.deliverable} placeholder="Contoh: tiga versi logo dalam SVG" /></Label>
-    <Label title="Kriteria penerimaan"><textarea name="criteria" className={field} maxLength={2000} defaultValue={task?.acceptance_criteria} placeholder="Contoh: logo tetap terbaca pada ukuran kecil" /></Label>
+    <Label title="Hasil yang harus diserahkan"><textarea name="deliverable" className={field} maxLength={1000} value={deliverableText} onChange={e => setDeliverableText(e.target.value)} placeholder="Contoh: 1 video siap upload / tiga versi logo dalam SVG" /></Label>
+    <Label title="Kriteria penerimaan"><textarea name="criteria" className={field} maxLength={2000} value={criteriaText} onChange={e => setCriteriaText(e.target.value)} placeholder="Contoh: Selalu menggunakan icon perusahaan & produk terlihat jelas" /></Label>
     <Label title="Checklist pekerjaan"><textarea name="checklist" className={field} rows={3} maxLength={3220}
-      defaultValue={task?.checklist?.map(item => item.label).join('\n')} placeholder="Tulis satu langkah per baris" /></Label>
+      value={checklistText} onChange={e => setChecklistText(e.target.value)} placeholder="Tulis satu langkah per baris" /></Label>
     <Label title="Catatan bukti hasil"><textarea name="evidence" className={field} maxLength={2000} defaultValue={task?.completion_note} placeholder="Isi catatan atau lampirkan tautan hasil sebelum review" /></Label>
     <Label title="Tautan hasil / aset"><input name="url" className={field} type="url" maxLength={1024} defaultValue={task?.output_url} /></Label>
   </Editor>
