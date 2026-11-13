@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CopyRichTextContent, CopyScriptViewerModal, OpenScriptReaderButton } from './CopyRichText';
 import { CreativePager } from './CreativeAccounts';
 import { button, Editor, errorText, field, Label, Options } from './CreativeForms';
+import type { CopyTemplate } from './repository';
 
 const formats = { caption: 'Caption', hook: 'Hook video', script: 'Skrip video', listing: 'Listing produk', ad: 'Iklan', other: 'Lainnya' };
 const stages = { review: 'Review', approval: 'Persetujuan akhir' };
@@ -19,6 +21,7 @@ export function CreativeCopyVersions({ taskId, userId, canEdit, reviewerId, appr
   const [page, setPage] = useState(0);
   const [draft, setDraft] = useState<CopyVersion | 'new' | null>(null);
   const [decision, setDecision] = useState<{ id: string; stage: Stage } | null>(null);
+  const [viewingVersion, setViewingVersion] = useState<CopyTemplate | null>(null);
   const key = ['creative', userId, 'copy-versions', taskId];
   const versions = useQuery({ queryKey: [...key, page], queryFn: async ({ signal }) => {
     const start = page * pageSize;
@@ -31,6 +34,12 @@ export function CreativeCopyVersions({ taskId, userId, canEdit, reviewerId, appr
   const template = draft && draft !== 'new' ? draft : null;
 
   return <section className="space-y-3 border-t border-slate-200 pt-3" aria-label="Versi copy">
+    {viewingVersion && (
+      <CopyScriptViewerModal
+        template={viewingVersion}
+        onClose={() => setViewingVersion(null)}
+      />
+    )}
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="font-bold">Versi copy</h3>
       {canEdit && !draft && <button type="button" className={button} onClick={() => setDraft('new')}>Tulis versi baru</button>}
@@ -67,7 +76,9 @@ export function CreativeCopyVersions({ taskId, userId, canEdit, reviewerId, appr
       return <details key={item.id} className="rounded-lg border border-slate-200 p-2">
         <summary className="cursor-pointer text-sm font-semibold">Versi {item.version} · {formats[item.format]} · {status}</summary>
         <p className="mt-2 text-xs text-slate-600">Disimpan {timestamp.format(new Date(item.created_at))} WIB</p>
-        <p className="mt-2 whitespace-pre-wrap break-words text-sm">{item.body}</p>
+        <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-sm">
+          <CopyRichTextContent content={item.body} />
+        </div>
         {item.change_note && <p className="mt-2 break-words text-sm text-slate-600">{item.change_note}</p>}
         {[review, approval].map(record => record && <div key={record.stage} className="mt-2 rounded bg-slate-50 p-2 text-sm">
           <p className="font-semibold">{stages[record.stage]} · {record.outcome === 'accepted' ? 'Disetujui' : 'Perlu revisi'}</p>
@@ -75,6 +86,21 @@ export function CreativeCopyVersions({ taskId, userId, canEdit, reviewerId, appr
           {record.note && <p className="whitespace-pre-wrap break-words">{record.note}</p>}
         </div>)}
         <div className="mt-2 flex flex-wrap gap-2">
+          <OpenScriptReaderButton
+            label="📄 Mode PDF / Baca"
+            onClick={() => setViewingVersion({
+              id: item.id,
+              title: `Versi ${item.version} · ${formats[item.format]}`,
+              description: item.change_note || `Versi ke-${item.version} (${status})`,
+              format: item.format,
+              output_type: 'video',
+              platform: null,
+              body: item.body,
+              business_unit_id: null,
+              is_archived: false,
+              updated_at: item.created_at,
+            })}
+          />
           {mayReview && !decision && <button type="button" className={button} onClick={() => setDecision({ id: item.id, stage: 'review' })}>Catat review</button>}
           {mayApprove && !decision && <button type="button" className={button} onClick={() => setDecision({ id: item.id, stage: 'approval' })}>Catat persetujuan akhir</button>}
           {canEdit && !draft && <button type="button" className={button} onClick={() => setDraft(item)}>Gunakan sebagai dasar revisi</button>}

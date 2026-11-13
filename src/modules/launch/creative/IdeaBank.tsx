@@ -590,10 +590,10 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                             type="button"
                             className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
                             onClick={() => setViewingTemplate(tpl)}
-                            title="Buka Mode Lihat & Baca Naskah (Nyaman / Teleprompter)"
+                            title="Buka Pratinjau Mode Dokumen PDF (A4) & Teleprompter"
                           >
                             <Eye size={13} />
-                            <span>Mode Lihat</span>
+                            <span>Mode PDF / Lihat</span>
                           </button>
                           <button
                             type="button"

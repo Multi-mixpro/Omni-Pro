@@ -240,10 +240,10 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
                           type="button"
                           className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
                           onClick={() => setViewingTemplate(tpl)}
-                          title="Buka Mode Lihat & Baca Naskah (Nyaman / Teleprompter)"
+                          title="Buka Pratinjau Mode Dokumen PDF (A4) & Teleprompter"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>Mode Lihat</span>
+                          <span>Mode PDF / Lihat</span>
                         </button>
                         <button
                           type="button"
