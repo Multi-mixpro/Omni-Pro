@@ -362,6 +362,30 @@ function unpackCopyTemplateFromIdeaRow(row: {
   };
 }
 
+function safeUnitId(id?: string | null): string | null {
+  if (!id || typeof id !== 'string') return null;
+  const trimmed = id.trim();
+  return /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(trimmed) ? trimmed : null;
+}
+
+function safePlatform(p?: string | null): CopyTemplate['platform'] {
+  if (!p || typeof p !== 'string') return null;
+  const trimmed = p.trim().toLowerCase();
+  return trimmed && Object.prototype.hasOwnProperty.call(platforms, trimmed)
+    ? (trimmed as keyof typeof platforms)
+    : null;
+}
+
+function safeFormat(f?: string | null): CopyTemplate['format'] {
+  if (!f || typeof f !== 'string') return 'script';
+  return Object.prototype.hasOwnProperty.call(copyFormats, f) ? (f as CopyTemplate['format']) : 'script';
+}
+
+function safeOutputType(o?: string | null): CopyTemplate['output_type'] {
+  if (!o || typeof o !== 'string') return 'video';
+  return Object.prototype.hasOwnProperty.call(outputTypes, o) ? (o as CopyTemplate['output_type']) : 'video';
+}
+
 export async function copyTemplates(signal?: AbortSignal, unit = 'all'): Promise<CopyTemplate[]> {
   const local = getLocalCopyLibrary();
   let merged = local;
@@ -382,11 +406,11 @@ export async function copyTemplates(signal?: AbortSignal, unit = 'all'): Promise
           id: String(row.id),
           title: String(row.title || '').trim(),
           description: String(row.description || '').trim(),
-          format: row.format in copyFormats ? (row.format as CopyTemplate['format']) : 'script',
-          output_type: row.output_type in outputTypes ? (row.output_type as CopyTemplate['output_type']) : 'video',
-          platform: row.platform && row.platform in platforms ? (row.platform as CopyTemplate['platform']) : null,
+          format: safeFormat(row.format),
+          output_type: safeOutputType(row.output_type),
+          platform: safePlatform(row.platform),
           body: String(row.body || ''),
-          business_unit_id: row.business_unit_id ?? null,
+          business_unit_id: safeUnitId(row.business_unit_id),
           is_archived: Boolean(row.is_archived),
           updated_at: String(row.updated_at || new Date().toISOString()),
         }));
@@ -394,27 +418,41 @@ export async function copyTemplates(signal?: AbortSignal, unit = 'all'): Promise
       const dbMap = new Map(dbTemplates.map(item => [item.id, item]));
 
       // Migrate any local-only items (e.g. created offline or before DB migration) to Supabase
-      const unsyncedLocal = local.filter(item => !dbMap.has(item.id) && !item.is_archived);
+      const unsyncedLocal = local.filter(item => !dbMap.has(item.id) && !item.is_archived && !LEGACY_DUMMY_COPY_IDS.has(item.id) && !isDemoText(item.title));
       for (const localItem of unsyncedLocal) {
         try {
           const insertPayload = {
-            title: localItem.title.trim(),
-            description: localItem.description?.trim() ?? '',
-            format: localItem.format,
-            output_type: localItem.output_type,
-            platform: localItem.platform,
-            body: localItem.body,
-            business_unit_id: localItem.business_unit_id,
+            title: (localItem.title || 'Naskah').trim().slice(0, 200),
+            description: (localItem.description || '').trim(),
+            format: safeFormat(localItem.format),
+            output_type: safeOutputType(localItem.output_type),
+            platform: safePlatform(localItem.platform),
+            body: localItem.body || '',
+            business_unit_id: safeUnitId(localItem.business_unit_id),
             is_archived: false,
           };
-          const { data: inserted } = await supabase.from('creative_copy_library').insert(insertPayload).select('id, updated_at').maybeSingle();
-          if (inserted?.id) {
-            const migrated: CopyTemplate = { ...localItem, id: String(inserted.id), updated_at: String(inserted.updated_at || localItem.updated_at) };
+          const { data: inserted, error: insertErr } = await supabase
+            .from('creative_copy_library')
+            .insert(insertPayload)
+            .select('id, updated_at')
+            .maybeSingle();
+          if (!insertErr && inserted?.id) {
+            const migrated: CopyTemplate = {
+              ...localItem,
+              id: String(inserted.id),
+              updated_at: String(inserted.updated_at || localItem.updated_at),
+              format: safeFormat(localItem.format),
+              output_type: safeOutputType(localItem.output_type),
+              platform: safePlatform(localItem.platform),
+              business_unit_id: safeUnitId(localItem.business_unit_id),
+            };
             dbMap.set(migrated.id, migrated);
           } else {
+            console.warn('[copyTemplates sync warning]', insertErr);
             dbMap.set(localItem.id, localItem);
           }
-        } catch {
+        } catch (e) {
+          console.warn('[copyTemplates sync exception]', e);
           dbMap.set(localItem.id, localItem);
         }
       }
@@ -428,7 +466,9 @@ export async function copyTemplates(signal?: AbortSignal, unit = 'all'): Promise
       if (unit === 'unassigned') return active.filter(item => item.business_unit_id === null);
       return active.filter(item => item.business_unit_id === null || item.business_unit_id === unit);
     }
-  } catch { /* fallback to bridge below */ }
+  } catch (err) {
+    console.warn('[copyTemplates table fetch error, falling back]', err);
+  }
 
   // 2. Fallback bridge via creative_ideas if creative_copy_library table is not yet created
   try {
@@ -444,7 +484,7 @@ export async function copyTemplates(signal?: AbortSignal, unit = 'all'): Promise
         .map(row => unpackCopyTemplateFromIdeaRow(row as never))
         .filter((item): item is CopyTemplate => item !== null && !LEGACY_DUMMY_COPY_IDS.has(item.id));
       const remoteById = new Map(remoteTemplates.map(item => [item.id, item]));
-      const unsyncedLocal = local.filter(item => !remoteById.has(item.id) && !item.is_archived);
+      const unsyncedLocal = local.filter(item => !remoteById.has(item.id) && !item.is_archived && !LEGACY_DUMMY_COPY_IDS.has(item.id) && !isDemoText(item.title));
       for (const localItem of unsyncedLocal) {
         try {
           const packed = packCopyTemplateForIdeaRow(localItem);
@@ -475,19 +515,29 @@ export async function copyTemplates(signal?: AbortSignal, unit = 'all'): Promise
 export async function saveCopyTemplate(template: Omit<CopyTemplate, 'id' | 'updated_at' | 'is_archived'>, id?: string): Promise<string> {
   const now = new Date().toISOString();
   const list = getLocalCopyLibrary();
-  const fullDraft: Omit<CopyTemplate, 'id' | 'updated_at'> = { ...template, is_archived: false };
+  const safeDraft: Omit<CopyTemplate, 'id' | 'updated_at'> = {
+    ...template,
+    title: (template.title || 'Naskah').trim().slice(0, 200),
+    description: (template.description || '').trim(),
+    format: safeFormat(template.format),
+    output_type: safeOutputType(template.output_type),
+    platform: safePlatform(template.platform),
+    body: template.body || '',
+    business_unit_id: safeUnitId(template.business_unit_id),
+    is_archived: false,
+  };
   const isUuid = Boolean(id && /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id));
 
   // 1. Try public.creative_copy_library table
   try {
     const payload = {
-      title: template.title.trim(),
-      description: template.description?.trim() ?? '',
-      format: template.format,
-      output_type: template.output_type,
-      platform: template.platform,
-      body: template.body,
-      business_unit_id: template.business_unit_id,
+      title: safeDraft.title,
+      description: safeDraft.description,
+      format: safeDraft.format,
+      output_type: safeDraft.output_type,
+      platform: safeDraft.platform,
+      body: safeDraft.body,
+      business_unit_id: safeDraft.business_unit_id,
       is_archived: false,
     };
     if (id && isUuid) {
@@ -498,7 +548,7 @@ export async function saveCopyTemplate(template: Omit<CopyTemplate, 'id' | 'upda
         .select('id, updated_at')
         .maybeSingle();
       if (!error && data?.id) {
-        const updatedItem: CopyTemplate = { ...fullDraft, id: String(data.id), updated_at: String(data.updated_at || now) };
+        const updatedItem: CopyTemplate = { ...safeDraft, id: String(data.id), updated_at: String(data.updated_at || now) };
         const nextList = list.some(item => item.id === id)
           ? list.map(item => item.id === id ? updatedItem : item)
           : [updatedItem, ...list];
@@ -513,16 +563,18 @@ export async function saveCopyTemplate(template: Omit<CopyTemplate, 'id' | 'upda
         .maybeSingle();
       if (!error && data?.id) {
         const newId = String(data.id);
-        const created: CopyTemplate = { ...fullDraft, id: newId, updated_at: String(data.updated_at || now) };
+        const created: CopyTemplate = { ...safeDraft, id: newId, updated_at: String(data.updated_at || now) };
         const filtered = id ? list.filter(item => item.id !== id) : list;
         saveLocalCopyLibrary([created, ...filtered]);
         return newId;
       }
     }
-  } catch { /* fallback to bridge below */ }
+  } catch (err) {
+    console.warn('[saveCopyTemplate table error, trying fallback]', err);
+  }
 
   // 2. Fallback bridge via creative_ideas if creative_copy_library table does not exist
-  const packed = packCopyTemplateForIdeaRow(fullDraft);
+  const packed = packCopyTemplateForIdeaRow(safeDraft);
   if (id && isUuid) {
     try {
       const { data, error } = await supabase
@@ -532,7 +584,7 @@ export async function saveCopyTemplate(template: Omit<CopyTemplate, 'id' | 'upda
         .select('id,updated_at')
         .maybeSingle();
       if (!error && data?.id) {
-        const updatedItem: CopyTemplate = { ...fullDraft, id: String(data.id), updated_at: String(data.updated_at || now) };
+        const updatedItem: CopyTemplate = { ...safeDraft, id: String(data.id), updated_at: String(data.updated_at || now) };
         const nextList = list.some(item => item.id === id)
           ? list.map(item => item.id === id ? updatedItem : item)
           : [updatedItem, ...list];
@@ -550,7 +602,7 @@ export async function saveCopyTemplate(template: Omit<CopyTemplate, 'id' | 'upda
       .maybeSingle();
     if (!error && data?.id) {
       const newId = String(data.id);
-      const created: CopyTemplate = { ...fullDraft, id: newId, updated_at: String(data.updated_at || now) };
+      const created: CopyTemplate = { ...safeDraft, id: newId, updated_at: String(data.updated_at || now) };
       const filtered = id ? list.filter(item => item.id !== id) : list;
       saveLocalCopyLibrary([created, ...filtered]);
       return newId;
@@ -558,12 +610,12 @@ export async function saveCopyTemplate(template: Omit<CopyTemplate, 'id' | 'upda
   } catch { /* fallback to local below */ }
 
   if (id) {
-    const updated = list.map(item => item.id === id ? { ...item, ...template, updated_at: now } : item);
+    const updated = list.map(item => item.id === id ? { ...item, ...safeDraft, updated_at: now } : item);
     saveLocalCopyLibrary(updated);
     return id;
   }
   const fallbackId = `copy-tpl-${Date.now()}`;
-  const created: CopyTemplate = { ...template, id: fallbackId, is_archived: false, updated_at: now };
+  const created: CopyTemplate = { ...safeDraft, id: fallbackId, is_archived: false, updated_at: now };
   saveLocalCopyLibrary([created, ...list]);
   return fallbackId;
 }

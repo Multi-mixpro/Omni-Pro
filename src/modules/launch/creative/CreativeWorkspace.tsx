@@ -256,6 +256,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const openEditor = (next: Editor) => { setEditor(next); setNotice(''); };
   const refresh = () => {
     void client.invalidateQueries({ queryKey: prefix });
+    void client.invalidateQueries({ queryKey: ['creative-copy-library'] });
     void notif.refetch();
   };
   const sectionBadgeCount = (id: Section): { count: number; color: string } => {

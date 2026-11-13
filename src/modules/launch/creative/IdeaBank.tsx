@@ -69,6 +69,9 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
   const templatesQuery = useQuery({
     queryKey: ['creative-copy-library', unit],
     queryFn: ({ signal }) => copyTemplates(signal, unit),
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const removeIdeaMutation = useMutation({
