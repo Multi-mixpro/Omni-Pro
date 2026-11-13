@@ -52,7 +52,12 @@ export function CreativeTaskDetail({ taskId, userId, canEdit, onClose, onChanged
   });
   const row = task.data;
   const attachedTemplate = row?.copy_template_id
-    ? templatesQuery.data?.find(t => t.id === row.copy_template_id)
+    ? (templatesQuery.data?.find(t => t.id === row.copy_template_id) ??
+       templatesQuery.data?.find(t =>
+         row.title &&
+         (t.title.toLowerCase().includes(row.title.toLowerCase()) ||
+          row.title.toLowerCase().includes(t.title.toLowerCase()))
+       ))
     : undefined;
   const referenceLinks = Array.from(new Set([
     ...(row?.source_idea?.reference_urls ?? []).map(u => safeOutputUrl(u)).filter((u): u is string => Boolean(u)),
