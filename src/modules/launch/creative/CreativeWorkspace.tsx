@@ -5,6 +5,8 @@ import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
 import { isProjectId } from '../discussion/repository';
+import { NotificationBell } from '../notifications/NotificationBell';
+import { useWorkspaceNotifications } from '../notifications/useWorkspaceNotifications';
 import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
 import { button, CampaignForm, errorText, field, Options, primary, TaskForm } from './CreativeForms';
 import { IdeaBank, ReferenceLinks } from './IdeaBank';
@@ -162,6 +164,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const [discussionCampaign, setDiscussionCampaign] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const prefix = ['creative', userId];
+  const notif = useWorkspaceNotifications(userId);
   const units = useWorkspaceUnits();
   const unitName = (id?: string | null) => id ? units.data?.find(row => row.id === id)?.name ?? 'Unit bisnis' : 'Belum ditetapkan';
   const defaultUnit = unit !== 'all' && unit !== 'unassigned' ? unit : undefined;
@@ -250,7 +253,36 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
     catch (reason) { setNavigationError(errorText(reason)); }
   };
   const openEditor = (next: Editor) => { setEditor(next); setNotice(''); };
-  const refresh = () => void client.invalidateQueries({ queryKey: prefix });
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: prefix });
+    void notif.refetch();
+  };
+  const sectionBadgeCount = (id: Section): { count: number; color: string } => {
+    const b = notif.creativeBadges;
+    if (!b) return { count: 0, color: 'bg-teal-700' };
+    switch (id) {
+      case 'overview':
+        return { count: (counts ? counts.overdue + counts.blocked : b.overview), color: 'bg-rose-600' };
+      case 'inbox':
+        return { count: b.inbox, color: 'bg-rose-600' };
+      case 'ideas':
+        return { count: b.ideas, color: 'bg-amber-600' };
+      case 'campaigns':
+        return { count: b.campaigns, color: 'bg-indigo-600' };
+      case 'work':
+        return { count: b.work, color: 'bg-teal-700' };
+      case 'studio':
+        return { count: b.studio, color: 'bg-pink-600' };
+      case 'decisions':
+        return { count: counts?.review ?? b.decisions, color: 'bg-amber-600' };
+      case 'calendar':
+        return { count: b.calendar, color: 'bg-sky-600' };
+      case 'ads':
+        return { count: pendingEvaluations || b.ads, color: overdueEvaluations > 0 ? 'bg-rose-600' : 'bg-indigo-600' };
+      default:
+        return { count: 0, color: 'bg-teal-700' };
+    }
+  };
   const taskChanged = () => {
     for (const key of ['tasks','task-detail','task-events','publications','summary','calendar','ideas','workload']) {
       void client.invalidateQueries({ queryKey: [...prefix,key] });
@@ -343,9 +375,24 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         <nav id="creative-navigation" aria-label="Bagian Creative Dashboard" className="creative-navigation">
           {visibleNavigation.map(group => <div key={group.label} className="creative-nav-group">
             <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">{group.label}</p>
-            {group.items.map(({ id,label,icon:Icon }) => <button key={id} aria-current={section === id ? 'page' : undefined} aria-label={label} title={label}
-              className="creative-nav-item flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold"
-              onClick={() => openSection(id)}><span className="creative-color-icon" data-color={sectionColors[id]}><Icon size={15} /></span><span className="creative-nav-label-text">{label}</span></button>)}
+            {group.items.map(({ id,label,icon:Icon }) => {
+              const badge = sectionBadgeCount(id);
+              return <button key={id} aria-current={section === id ? 'page' : undefined} aria-label={label} title={label}
+                className="creative-nav-item relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold"
+                onClick={() => openSection(id)}>
+                <span className="creative-color-icon" data-color={sectionColors[id]}><Icon size={15} /></span>
+                <span className="creative-nav-label-text flex-1 truncate">{label}</span>
+                {badge.count > 0 && (
+                  <span
+                    className={`inline-flex min-w-[20px] h-5 items-center justify-center rounded-full px-1.5 text-[10px] font-mono font-extrabold text-white shadow-2xs ${badge.color} ${
+                      sidebarCompact ? 'lg:absolute lg:top-0.5 lg:right-0.5 lg:min-w-[16px] lg:h-4 lg:px-1 lg:text-[9px]' : ''
+                    }`}
+                  >
+                    {badge.count > 99 ? '99+' : badge.count}
+                  </span>
+                )}
+              </button>;
+            })}
           </div>)}
         </nav>
       </aside>
@@ -356,7 +403,45 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{activeSection}</h1>
           <p className="mt-1 text-sm text-slate-600">{sectionDescriptions[section]}</p>
         </div>
-        <div className="creative-toolbar-actions flex flex-wrap gap-2">
+        <div className="creative-toolbar-actions flex flex-wrap items-center gap-2">
+          <NotificationBell
+            items={notif.items}
+            countsByCategory={notif.countsByCategory}
+            isUnread={notif.isUnread}
+            onMarkAsRead={notif.markAsRead}
+            onMarkAllAsRead={notif.markAllAsRead}
+            onRefresh={() => void notif.refetch()}
+            buttonClassName={button + ' relative inline-flex items-center gap-2'}
+            onSelectNotification={item => {
+              if (item.workspace === 'launch') {
+                if (item.articleId && item.targetSection === 'discussion') {
+                  navigate(`/launch/app/projects/${encodeURIComponent(item.articleId)}?view=discussion`);
+                } else if (item.targetSection) {
+                  navigate(`/launch/app/${item.targetSection}`);
+                } else {
+                  navigate('/launch/app/today');
+                }
+                return;
+              }
+              if (item.taskId) {
+                setDetailId(item.taskId);
+                return;
+              }
+              if (item.campaignId) {
+                openSection('campaigns');
+                setDiscussionCampaign(item.campaignId);
+                return;
+              }
+              if (item.targetSection === 'ads' && item.targetId) {
+                openSection('ads');
+                setAdsActivation(item.targetId);
+                return;
+              }
+              if (item.targetSection) {
+                openSection(item.targetSection as Section);
+              }
+            }}
+          />
           {canSwitchWorkspace && <Link to="/launch/app" className={button + ' inline-flex items-center gap-2'}><ArrowLeft size={16} /> Pilih ruang kerja</Link>}
           <AccountSignOut name={userName} className={button + ' inline-flex items-center gap-2'} />
           <button className={button + ' inline-flex items-center gap-2'} disabled={loading} onClick={refresh}><RefreshCw size={15} /> Segarkan</button>
@@ -460,8 +545,15 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
             <div className="flex flex-wrap gap-2">
               <button className={button + ' inline-flex items-center gap-2'} onClick={() => { changeScope(campaign.id); openFocus('all'); }}>Lihat tugas <ArrowRight size={14} /></button>
               <button className={button} onClick={() => { openSection('ads'); changeScope(campaign.id); }}>Iklan &amp; evaluasi</button>
-              <button className={button} aria-expanded={discussionCampaign === campaign.id}
-                onClick={() => setDiscussionCampaign(discussionCampaign === campaign.id ? null : campaign.id)}>Diskusi</button>
+              <button className={button + ' inline-flex items-center gap-1.5'} aria-expanded={discussionCampaign === campaign.id}
+                onClick={() => setDiscussionCampaign(discussionCampaign === campaign.id ? null : campaign.id)}>
+                <span>Diskusi</span>
+                {Boolean(notif.creativeBadges?.campaignDiscussions[campaign.id]) && (
+                  <span className="inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[10px] font-mono font-bold text-white">
+                    {notif.creativeBadges?.campaignDiscussions[campaign.id]}
+                  </span>
+                )}
+              </button>
               {canEdit && <button className={button} onClick={() => openEditor({ kind: 'campaign', row: campaign })}>Edit</button>}
             </div>
             {discussionCampaign === campaign.id && <ProjectDiscussion scope="campaign" projectId={campaign.id} userId={userId} canPost={canEdit} />}
@@ -645,6 +737,15 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
                     </span>
                   )}
                   {task.priority !== 'normal' && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-800">{priorities[task.priority]}</span>}
+                  {Boolean(notif.creativeBadges?.taskDiscussions[task.id]) && (
+                    <button
+                      type="button"
+                      onClick={() => setDetailId(task.id)}
+                      className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100"
+                    >
+                      💬 {notif.creativeBadges?.taskDiscussions[task.id]} diskusi
+                    </button>
+                  )}
                 </div>
                 <h3 className="break-words font-semibold">{task.title}</h3>
                 {task.routine_mode && task.routine_mode !== 'once' && (task.routine_trigger || task.routine_target) && (

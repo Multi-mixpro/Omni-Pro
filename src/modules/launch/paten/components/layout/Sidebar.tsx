@@ -27,6 +27,14 @@ interface SidebarProps {
   blockedTasksCount: number;
   canSwitchWorkspace: boolean;
   canManageAccess: boolean;
+  menuBadges?: {
+    dashboard?: number;
+    pipeline?: number;
+    implementation?: number;
+    tasks?: number;
+    approvals?: number;
+    calendar?: number;
+  };
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -38,14 +46,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
   blockedTasksCount,
   canSwitchWorkspace,
   canManageAccess,
+  menuBadges,
 }) => {
+  const dashboardBadge = menuBadges?.dashboard ?? 0;
+  const pipelineBadge = menuBadges?.pipeline ?? 0;
+  const implementationBadge = menuBadges?.implementation ?? 0;
+  const tasksBadge = menuBadges?.tasks ?? blockedTasksCount;
+  const approvalsBadge = menuBadges?.approvals ?? pendingApprovalsCount;
+  const calendarBadge = menuBadges?.calendar ?? 0;
+
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tint: 'text-sky-600', activeBg: 'bg-sky-50', activeBorder: 'border-sky-200' },
-    { id: 'pipeline', label: 'Article Pipeline', icon: Kanban, tint: 'text-violet-600', activeBg: 'bg-violet-50', activeBorder: 'border-violet-200' },
-    { id: 'implementation', label: 'Implementasi Artikel', icon: Rocket, tint: 'text-orange-600', activeBg: 'bg-orange-50', activeBorder: 'border-orange-200' },
-    { id: 'tasks', label: 'Tasks & Updates', icon: CheckSquare, tint: 'text-rose-600', activeBg: 'bg-rose-50', activeBorder: 'border-rose-200', badge: blockedTasksCount > 0 ? `${blockedTasksCount}` : undefined, badgeColor: 'bg-[#C83B3B]' },
-    { id: 'approvals', label: 'Approvals Gate', icon: FileCheck2, tint: 'text-amber-600', activeBg: 'bg-amber-50', activeBorder: 'border-amber-200', badge: pendingApprovalsCount > 0 ? `${pendingApprovalsCount}` : undefined, badgeColor: 'bg-[#B86A05]' },
-    { id: 'calendar', label: 'Calendar', icon: Calendar, tint: 'text-indigo-600', activeBg: 'bg-indigo-50', activeBorder: 'border-indigo-200' },
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      tint: 'text-sky-600',
+      activeBg: 'bg-sky-50',
+      activeBorder: 'border-sky-200',
+      badge: dashboardBadge > 0 ? `${dashboardBadge}` : undefined,
+      badgeColor: 'bg-sky-600',
+    },
+    {
+      id: 'pipeline',
+      label: 'Article Pipeline',
+      icon: Kanban,
+      tint: 'text-violet-600',
+      activeBg: 'bg-violet-50',
+      activeBorder: 'border-violet-200',
+      badge: pipelineBadge > 0 ? `${pipelineBadge}` : undefined,
+      badgeColor: 'bg-indigo-600',
+    },
+    {
+      id: 'implementation',
+      label: 'Implementasi Artikel',
+      icon: Rocket,
+      tint: 'text-orange-600',
+      activeBg: 'bg-orange-50',
+      activeBorder: 'border-orange-200',
+      badge: implementationBadge > 0 ? `${implementationBadge}` : undefined,
+      badgeColor: 'bg-orange-600',
+    },
+    {
+      id: 'tasks',
+      label: 'Tasks & Updates',
+      icon: CheckSquare,
+      tint: 'text-rose-600',
+      activeBg: 'bg-rose-50',
+      activeBorder: 'border-rose-200',
+      badge: tasksBadge > 0 ? `${tasksBadge}` : undefined,
+      badgeColor: 'bg-[#C83B3B]',
+    },
+    {
+      id: 'approvals',
+      label: 'Approvals Gate',
+      icon: FileCheck2,
+      tint: 'text-amber-600',
+      activeBg: 'bg-amber-50',
+      activeBorder: 'border-amber-200',
+      badge: approvalsBadge > 0 ? `${approvalsBadge}` : undefined,
+      badgeColor: 'bg-[#B86A05]',
+    },
+    {
+      id: 'calendar',
+      label: 'Calendar',
+      icon: Calendar,
+      tint: 'text-indigo-600',
+      activeBg: 'bg-indigo-50',
+      activeBorder: 'border-indigo-200',
+      badge: calendarBadge > 0 ? `${calendarBadge}` : undefined,
+      badgeColor: 'bg-indigo-600',
+    },
     { id: 'master', label: 'Master Data', icon: Database, tint: 'text-teal-600', activeBg: 'bg-teal-50', activeBorder: 'border-teal-200' },
     { id: 'reports', label: 'Reports & KPI', icon: BarChart3, tint: 'text-emerald-600', activeBg: 'bg-emerald-50', activeBorder: 'border-emerald-200' },
   ];

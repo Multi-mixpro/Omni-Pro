@@ -21,6 +21,7 @@ interface ArticleStickyHeaderProps {
   onSelectTab: (tab: 'brief' | 'detail' | 'workspace' | 'discussion') => void;
   onBack: () => void;
   onRequestApproval: () => void;
+  discussionCount?: number;
 }
 
 export const ArticleStickyHeader: React.FC<ArticleStickyHeaderProps> = ({
@@ -29,6 +30,7 @@ export const ArticleStickyHeader: React.FC<ArticleStickyHeaderProps> = ({
   onSelectTab,
   onBack,
   onRequestApproval,
+  discussionCount = 0,
 }) => {
   return (
     <div className="paten-sticky-header sticky z-20 bg-white border-b border-slate-200 shadow-2xs">
@@ -107,10 +109,24 @@ export const ArticleStickyHeader: React.FC<ArticleStickyHeaderProps> = ({
             <Layers className="w-3.5 h-3.5" />
             <span>Workspace</span>
           </button>
-          <button onClick={() => onSelectTab('discussion')} aria-current={activeTab === 'discussion' ? 'page' : undefined}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 ${activeTab === 'discussion' ? 'bg-[#087E79] text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+          <button
+            onClick={() => onSelectTab('discussion')}
+            aria-current={activeTab === 'discussion' ? 'page' : undefined}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 ${
+              activeTab === 'discussion' ? 'bg-[#087E79] text-white' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Diskusi</span>
+            {discussionCount > 0 && (
+              <span
+                className={`inline-flex min-w-[16px] h-4 items-center justify-center rounded-full px-1 text-[9px] font-mono font-bold ${
+                  activeTab === 'discussion' ? 'bg-white text-[#087E79]' : 'bg-indigo-600 text-white'
+                }`}
+              >
+                {discussionCount}
+              </span>
+            )}
           </button>
         </div>
 

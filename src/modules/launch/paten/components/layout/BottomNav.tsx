@@ -36,6 +36,14 @@ interface BottomNavProps {
   canCreate?: boolean;
   canSwitchWorkspace: boolean;
   canManageAccess: boolean;
+  menuBadges?: {
+    dashboard?: number;
+    pipeline?: number;
+    implementation?: number;
+    tasks?: number;
+    approvals?: number;
+    calendar?: number;
+  };
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
@@ -49,6 +57,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   canCreate = false,
   canSwitchWorkspace,
   canManageAccess,
+  menuBadges,
 }) => {
   const [showMoreSheet, setShowMoreSheet] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -87,13 +96,21 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     UNASSIGNED_BUSINESS_UNIT,
   ];
 
+  const homeBadge = menuBadges?.dashboard ?? 0;
+  const pipelineBadge = menuBadges?.pipeline ?? 0;
+  const tasksBadge = menuBadges?.tasks ?? 0;
+  const implementationBadge = menuBadges?.implementation ?? 0;
+  const calendarBadge = menuBadges?.calendar ?? 0;
+  const approvalsBadge = menuBadges?.approvals ?? pendingApprovalsCount;
+  const moreBadge = implementationBadge + calendarBadge + approvalsBadge;
+
   return (
     <>
       <nav className="paten-bottom-nav md:hidden fixed z-40 px-2 py-1 flex items-center justify-around pb-[env(safe-area-inset-bottom,8px)]">
         {/* Home / Dashboard */}
         <button
           onClick={() => onSelectTab('dashboard')}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-lg transition-colors ${
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-lg transition-colors ${
             activeTab === 'dashboard'
               ? 'text-[#087E79] font-bold'
               : 'text-slate-400'
@@ -101,12 +118,17 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         >
           <Home className="w-4 h-4 stroke-[2]" />
           <span className="text-[10px] font-mono mt-0.5">Home</span>
+          {homeBadge > 0 && (
+            <span className="absolute top-0 right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-sky-600 text-white text-[9px] font-mono font-bold flex items-center justify-center">
+              {homeBadge > 99 ? '99+' : homeBadge}
+            </span>
+          )}
         </button>
 
         {/* Pipeline */}
         <button
           onClick={() => onSelectTab('pipeline')}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-lg transition-colors ${
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-lg transition-colors ${
             activeTab === 'pipeline'
               ? 'text-[#087E79] font-bold'
               : 'text-slate-400'
@@ -114,6 +136,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         >
           <Kanban className="w-4 h-4 stroke-[2]" />
           <span className="text-[10px] font-mono mt-0.5">Pipeline</span>
+          {pipelineBadge > 0 && (
+            <span className="absolute top-0 right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-indigo-600 text-white text-[9px] font-mono font-bold flex items-center justify-center">
+              {pipelineBadge > 99 ? '99+' : pipelineBadge}
+            </span>
+          )}
         </button>
 
         {/* Center Prominent Elevated Add Button */}
@@ -132,7 +159,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {/* Tasks */}
         <button
           onClick={() => onSelectTab('tasks')}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-lg transition-colors ${
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-lg transition-colors ${
             activeTab === 'tasks'
               ? 'text-[#087E79] font-bold'
               : 'text-slate-400'
@@ -140,6 +167,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         >
           <CheckSquare className="w-4 h-4 stroke-[2]" />
           <span className="text-[10px] font-mono mt-0.5">Tasks</span>
+          {tasksBadge > 0 && (
+            <span className="absolute top-0 right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-rose-600 text-white text-[9px] font-mono font-bold flex items-center justify-center">
+              {tasksBadge > 99 ? '99+' : tasksBadge}
+            </span>
+          )}
         </button>
 
         {/* More Sheet Trigger */}
@@ -153,8 +185,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         >
           <MoreHorizontal className="w-4 h-4 stroke-[2]" />
           <span className="text-[10px] font-mono mt-0.5">Lainnya</span>
-          {pendingApprovalsCount > 0 && (
-            <span className="absolute top-0 right-2 w-2 h-2 rounded-full bg-amber-500" />
+          {moreBadge > 0 && (
+            <span className="absolute top-0 right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-600 text-white text-[9px] font-mono font-bold flex items-center justify-center">
+              {moreBadge > 99 ? '99+' : moreBadge}
+            </span>
           )}
         </button>
       </nav>
@@ -215,7 +249,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 className="flex items-center gap-2.5 p-2.5 rounded-xl bg-teal-100 border border-[#087E79]/30 text-left text-xs font-bold text-[#087E79]"
               >
                 <Rocket className="w-4 h-4 text-[#087E79]" />
-                <span>Implementasi Artikel</span>
+                <div className="flex-1 flex items-center justify-between gap-1">
+                  <span>Implementasi Artikel</span>
+                  {implementationBadge > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full font-mono bg-orange-600 text-white text-[9px]">
+                      {implementationBadge}
+                    </span>
+                  )}
+                </div>
               </button>
 
               <button
@@ -226,7 +267,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 className="flex items-center gap-2.5 p-2.5 rounded-xl bg-teal-50 border border-teal-200 text-left text-xs font-bold text-[#087E79]"
               >
                 <Calendar className="w-4 h-4 text-[#087E79]" />
-                <span>Calendar & Jadwal</span>
+                <div className="flex-1 flex items-center justify-between gap-1">
+                  <span>Calendar & Jadwal</span>
+                  {calendarBadge > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full font-mono bg-indigo-600 text-white text-[9px]">
+                      {calendarBadge}
+                    </span>
+                  )}
+                </div>
               </button>
 
               <button
@@ -237,11 +285,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-left text-xs font-bold text-slate-900"
               >
                 <FileCheck2 className="w-4 h-4 text-amber-500" />
-                <div className="flex-1">
+                <div className="flex-1 flex items-center justify-between gap-1">
                   <span>Approvals Gate</span>
-                  {pendingApprovalsCount > 0 && (
-                    <span className="ml-1.5 px-1.5 py-0.2 rounded font-mono bg-amber-800 text-white text-[9px]">
-                      {pendingApprovalsCount}
+                  {approvalsBadge > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full font-mono bg-amber-800 text-white text-[9px]">
+                      {approvalsBadge}
                     </span>
                   )}
                 </div>

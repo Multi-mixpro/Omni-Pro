@@ -5,7 +5,6 @@
 import React, { useState } from 'react';
 import {
   Search,
-  Bell,
   Plus,
   Layers,
   CheckCircle2,
@@ -19,6 +18,8 @@ import { BusinessUnit, ApprovalGate } from '../../types';
 import { useWorkspaceUnits } from '../../../data/businessWorkspace';
 import { UNASSIGNED_BUSINESS_UNIT } from '../../services/businessUnits';
 import { useTeamActivity, TeamMemberActivity } from '../../hooks/useTeamActivity';
+import { NotificationBell } from '../../../notifications/NotificationBell';
+import type { NotificationItem } from '../../../notifications/useWorkspaceNotifications';
 
 interface NavbarProps {
   activeBusinessUnit: BusinessUnit;
@@ -39,6 +40,18 @@ interface NavbarProps {
   syncHealthy?: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
+  notificationItems?: NotificationItem[];
+  notificationCounts?: {
+    all: number;
+    discussion: number;
+    task: number;
+    update: number;
+  };
+  isNotificationUnread?: (item: NotificationItem) => boolean;
+  onMarkNotificationRead?: (id: string) => void;
+  onMarkAllNotificationsRead?: () => void;
+  onSelectNotification?: (item: NotificationItem) => void;
+  onRefreshNotifications?: () => void;
 }
 
 function formatLastSeen(dateStr: string | null): string {
@@ -99,9 +112,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   syncHealthy = true,
   isRefreshing,
   onRefresh,
+  notificationItems = [],
+  notificationCounts,
+  isNotificationUnread = () => false,
+  onMarkNotificationRead = () => {},
+  onMarkAllNotificationsRead = () => {},
+  onSelectNotification = () => {},
+  onRefreshNotifications,
 }) => {
   const [showBuDropdown, setShowBuDropdown] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
 
@@ -114,6 +133,13 @@ export const Navbar: React.FC<NavbarProps> = ({
     ...Array.from(new Set(buList.map((u) => u.name))),
     UNASSIGNED_BUSINESS_UNIT,
   ];
+
+  const fallbackCounts = notificationCounts ?? {
+    all: pendingApprovals.length,
+    discussion: 0,
+    task: 0,
+    update: pendingApprovals.length,
+  };
 
   return (
     <header className="paten-navbar fixed z-30 px-3.5 flex items-center justify-between transition-colors">
@@ -142,7 +168,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => {
               setShowBuDropdown(!showBuDropdown);
               setShowTeamDropdown(false);
-              setShowNotifications(false);
               setShowProfileMenu(false);
             }}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 transition-colors border border-slate-200"
@@ -221,7 +246,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               const willOpen = !showTeamDropdown;
               setShowTeamDropdown(willOpen);
               if (willOpen) onOpenTeam();
-              setShowNotifications(false);
               setShowProfileMenu(false);
             }}
             className="relative flex items-center gap-1.5 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
@@ -259,74 +283,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Notifications Popup */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowNotifications(!showNotifications);
-              setShowTeamDropdown(false);
-              setShowProfileMenu(false);
-            }}
-            className="relative p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
-            title="Notifikasi"
-          >
-            <Bell className="w-4 h-4" />
-            {pendingApprovals.length > 0 && (
-              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-600 text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center">
-                {pendingApprovals.length}
-              </span>
-            )}
-          </button>
-
-          {showNotifications && (
-            <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-3">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-                <h3 className="font-bold text-xs text-slate-900 font-mono">
-                  APPROVAL PENDING ({pendingApprovals.length})
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowNotifications(false);
-                    onSelectTab('approvals');
-                  }}
-                  className="text-[11px] font-bold text-[#087E79] hover:underline"
-                >
-                  Lihat Semua
-                </button>
-              </div>
-
-              {pendingApprovals.length === 0 ? (
-                <p className="text-xs text-slate-500 py-3 text-center font-sans">Tidak ada approval pending hari ini.</p>
-              ) : (
-                <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {pendingApprovals.map((app) => (
-                    <div
-                      key={app.id}
-                      onClick={() => {
-                        setShowNotifications(false);
-                        onSelectTab('approvals');
-                      }}
-                      className="p-2 rounded-lg bg-slate-50 border border-slate-200 hover:border-[#087E79] cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center justify-between text-[11px] font-mono font-bold text-slate-900">
-                        <span className="text-[#087E79]">{app.articleCode}</span>
-                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200">
-                          {app.gateType}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 line-clamp-1 mt-0.5">
-                        {app.summaryNote}
-                      </p>
-                      <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
-                        By {app.requestedBy}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Separated Notifications Bell (Diskusi, Tugas, Update) */}
+        <NotificationBell
+          items={notificationItems}
+          countsByCategory={fallbackCounts}
+          isUnread={isNotificationUnread}
+          onMarkAsRead={onMarkNotificationRead}
+          onMarkAllAsRead={onMarkAllNotificationsRead}
+          onSelectNotification={onSelectNotification}
+          onRefresh={onRefreshNotifications}
+          compact={false}
+          buttonClassName="relative inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition-colors"
+        />
 
         {/* Primary Action Button: + Tambah Artikel */}
         {canCreate && (
@@ -346,7 +314,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => {
               setShowProfileMenu(value => !value);
               setShowTeamDropdown(false);
-              setShowNotifications(false);
             }}
             className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-slate-100 transition-colors"
             title="Menu profil"

@@ -1,38 +1,97 @@
 import { ArrowRight, Megaphone, Rocket } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from './simpleRouter';
+import { Link, useNavigate } from './simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { businessOverview, unitSectors, useWorkspaceUnits } from '@/modules/launch/data/businessWorkspace';
 import { jakartaToday } from '@/modules/launch/creative/schedule';
+import { NotificationBell } from '@/modules/launch/notifications/NotificationBell';
+import { useWorkspaceNotifications } from '@/modules/launch/notifications/useWorkspaceNotifications';
 import { UNASSIGNED_BUSINESS_UNIT } from '@/modules/launch/paten/services/businessUnits';
 
 const workspaces = [
-  { to: '/launch/app/today', title: 'Launching Artikel', description: 'Kelola pipeline artikel, sampel, produksi, dan kesiapan peluncuran.', icon: Rocket, color: 'bg-sky-100 text-sky-800' },
-  { to: '/launch/app/creative', title: 'Creative Dashboard', description: 'Simpan ide dan referensi, susun tugas konten, dan pantau kampanye promo.', icon: Megaphone, color: 'bg-teal-100 text-teal-800' },
+  { id: 'launch' as const, to: '/launch/app/today', title: 'Launching Artikel', description: 'Kelola pipeline artikel, sampel, produksi, dan kesiapan peluncuran.', icon: Rocket, color: 'bg-sky-100 text-sky-800' },
+  { id: 'creative' as const, to: '/launch/app/creative', title: 'Creative Dashboard', description: 'Simpan ide dan referensi, susun tugas konten, dan pantau kampanye promo.', icon: Megaphone, color: 'bg-teal-100 text-teal-800' },
 ];
 
 export function WorkspacePicker({ name, userId, jobTitle, permissions }: {
   name: string; userId: string; jobTitle?: string | null; permissions: string[];
 }) {
+  const navigate = useNavigate();
   const isAdmin = permissions.includes('launch.admin');
   const role = jobTitle || (isAdmin ? 'Admin / Owner' : permissions.includes('launch.approve') ? 'Reviewer' : 'Anggota tim');
+  const notif = useWorkspaceNotifications(userId);
+
+  const countWorkspaceUnread = (ws: 'launch' | 'creative', cat?: 'discussion' | 'task' | 'update') =>
+    notif.unreadItems.filter(i => i.workspace === ws && (!cat || i.category === cat)).length;
+
   return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
     <div className="mx-auto max-w-4xl">
-      <div className="mb-12 flex items-center justify-between gap-3">
+      <div className="mb-12 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm font-bold text-teal-800">Omni Pro</span>
-        <AccountSignOut name={name} className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold" />
+        <div className="flex flex-wrap items-center gap-2">
+          <NotificationBell
+            items={notif.items}
+            countsByCategory={notif.countsByCategory}
+            isUnread={notif.isUnread}
+            onMarkAsRead={notif.markAsRead}
+            onMarkAllAsRead={notif.markAllAsRead}
+            onRefresh={() => void notif.refetch()}
+            onSelectNotification={item => {
+              if (item.workspace === 'creative') {
+                navigate(`/launch/app/creative?section=${item.targetSection ?? 'overview'}`);
+              } else if (item.articleId && item.targetSection === 'discussion') {
+                navigate(`/launch/app/projects/${encodeURIComponent(item.articleId)}?view=discussion`);
+              } else {
+                navigate(`/launch/app/${item.targetSection ?? 'today'}`);
+              }
+            }}
+          />
+          <AccountSignOut name={name} className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold" />
+        </div>
       </div>
       <p className="mb-2 text-sm font-medium text-slate-600">Halo, {name} · {role}</p>
       <h1 className="text-3xl font-bold sm:text-4xl">Pilih ruang kerja</h1>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        {workspaces.map(({ to, title, description, icon: Icon, color }) =>
-          <Link key={to} to={to} className="group flex flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-teal-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-700">
-            <span className={'rounded-xl p-3 ' + color}><Icon size={24} /></span>
-            <h2 className="text-xl font-bold">{title}</h2>
-            <p className="flex-1 text-sm leading-relaxed text-slate-600">{description}</p>
-            <span className="inline-flex items-center gap-2 text-sm font-semibold text-teal-800">Buka ruang kerja <ArrowRight size={16} /></span>
-          </Link>
-        )}
+        {workspaces.map(({ id, to, title, description, icon: Icon, color }) => {
+          const totalUnread = countWorkspaceUnread(id);
+          const discUnread = countWorkspaceUnread(id, 'discussion');
+          const taskUnread = countWorkspaceUnread(id, 'task');
+          const updUnread = countWorkspaceUnread(id, 'update');
+          return (
+            <Link key={to} to={to} className="group relative flex flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-teal-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-700">
+              <div className="flex w-full items-center justify-between gap-2">
+                <span className={'rounded-xl p-3 ' + color}><Icon size={24} /></span>
+                {totalUnread > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-2.5 py-1 text-xs font-mono font-bold text-white shadow-2xs">
+                    {totalUnread} notifikasi
+                  </span>
+                )}
+              </div>
+              <h2 className="text-xl font-bold">{title}</h2>
+              <p className="flex-1 text-sm leading-relaxed text-slate-600">{description}</p>
+              {(discUnread > 0 || taskUnread > 0 || updUnread > 0) && (
+                <div className="flex flex-wrap gap-1.5 text-xs font-bold">
+                  {discUnread > 0 && (
+                    <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-indigo-800">
+                      💬 {discUnread} Diskusi
+                    </span>
+                  )}
+                  {taskUnread > 0 && (
+                    <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-rose-800">
+                      📋 {taskUnread} Tugas
+                    </span>
+                  )}
+                  {updUnread > 0 && (
+                    <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-amber-900">
+                      🔔 {updUnread} Update
+                    </span>
+                  )}
+                </div>
+              )}
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-teal-800">Buka ruang kerja <ArrowRight size={16} /></span>
+            </Link>
+          );
+        })}
       </div>
       {isAdmin ? <BusinessOverview userId={userId} /> : (
         <div className="mt-6 rounded-xl border border-teal-200 bg-teal-50 p-4">

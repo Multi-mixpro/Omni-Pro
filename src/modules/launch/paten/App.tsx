@@ -9,6 +9,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
 import { ArticleStickyHeader } from './components/article/ArticleStickyHeader';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
+import { useWorkspaceNotifications } from '../notifications/useWorkspaceNotifications';
 
 const DashboardView = React.lazy(() => import('./components/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 const ArticlePipelineView = React.lazy(() => import('./components/pipeline/ArticlePipelineView').then(m => ({ default: m.ArticlePipelineView })));
@@ -120,6 +121,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   };
   // Navigation & Filter States
   const [activeTab, setActiveTab] = useState<PatenTab>(initialRoute.tab);
+  const notif = useWorkspaceNotifications(currentUser?.id);
 
   const [selectedUnit, setSelectedUnit] = useState<BusinessUnit>(() => new URLSearchParams(location.search).get('unit') || 'Semua Unit Bisnis');
   const [selectedArticleId, setSelectedArticleId] = useState<string>(initialRoute.articleId || '');
@@ -549,6 +551,16 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
   const pendingApprovals = scopedApprovals.filter((a) => a.status === 'Pending');
   const pendingApprovalsCount = pendingApprovals.length;
   const blockedTasksCount = scopedBlockers.length;
+  const activeTasksCount = scopedTasks.filter((t) => t.status !== 'Completed').length;
+  const pendingDecisionsCount = scopedDecisions.filter((d) => d.status === 'Pending').length;
+  const menuBadges = {
+    dashboard: scopedBlockers.length + pendingApprovals.length + pendingDecisionsCount + (notif.countsByCategory.discussion || 0),
+    pipeline: notif.launchBadges?.pipeline || filteredArticles.filter((a) => a.scheduleHealth === 'At Risk').length,
+    implementation: notif.launchBadges?.implementation || updates.length,
+    tasks: activeTasksCount + scopedBlockers.length + pendingDecisionsCount,
+    approvals: pendingApprovals.length,
+    calendar: scopedTasks.filter((t) => t.status !== 'Completed' && Boolean(t.dueDate)).length,
+  };
 
   if (isLoading) {
     return (
@@ -595,6 +607,26 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
           if (isRefreshing) return;
           setIsRefreshing(true);
           setRefreshVersion(version => version + 1);
+          void notif.refetch();
+        }}
+        notificationItems={notif.items}
+        notificationCounts={notif.countsByCategory}
+        isNotificationUnread={notif.isUnread}
+        onMarkNotificationRead={notif.markAsRead}
+        onMarkAllNotificationsRead={notif.markAllAsRead}
+        onRefreshNotifications={() => void notif.refetch()}
+        onSelectNotification={(item) => {
+          if (item.workspace === 'creative') {
+            navigate('/launch/app/creative?section=' + (item.targetSection || 'overview'));
+            return;
+          }
+          if (item.articleId && item.targetSection === 'discussion') {
+            selectTab('discussion', item.articleId);
+            return;
+          }
+          if (item.targetSection) {
+            selectTab(item.targetSection as PatenTab, item.articleId);
+          }
         }}
       />
 
@@ -608,6 +640,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         pendingApprovalsCount={pendingApprovalsCount}
         blockedTasksCount={blockedTasksCount}
+        menuBadges={menuBadges}
       />
 
       <div className={`paten-main ${isSidebarCollapsed ? 'md:pl-[76px]' : 'md:pl-[232px]'} transition-all duration-200 min-h-screen flex flex-col`}>
@@ -620,6 +653,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
               onSelectTab={(tab) => selectTab(tab)}
               onBack={() => selectTab('pipeline')}
               onRequestApproval={() => selectTab('approvals')}
+              discussionCount={notif.launchBadges?.articleDiscussions?.[activeArticle.id] ?? 0}
             />
           )}
 
@@ -786,6 +820,7 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
           onSelectBusinessUnit={setSelectedUnit}
         onSignOut={() => void handleSignOut()}
           canCreate={canCreate}
+          menuBadges={menuBadges}
         />
       </div>
 

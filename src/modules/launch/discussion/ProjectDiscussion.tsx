@@ -34,6 +34,7 @@ function DiscussionPanel({ scope, projectId, userId, canPost }: Props) {
       await postDiscussion(scope, projectId, userId, draft);
       setDraft('');
       await client.invalidateQueries({ queryKey: key, refetchType: 'none' });
+      void client.invalidateQueries({ queryKey: ['workspace-notifications'] });
       if (page === 0) void client.refetchQueries({ queryKey: [...key, 0], exact: true, type: 'active' });
       else setPage(0);
     } catch {
@@ -46,7 +47,14 @@ function DiscussionPanel({ scope, projectId, userId, canPost }: Props) {
   return <section className="mx-auto max-w-4xl space-y-4 rounded-xl border border-slate-200 bg-white p-4" aria-label={title}>
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div>
-        <h2 className="text-lg font-bold">{title}</h2>
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <span>{title}</span>
+          {Boolean(query.data?.length) && (
+            <span className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-mono font-bold text-white">
+              {query.data!.length > DISCUSSION_PAGE_SIZE ? `${DISCUSSION_PAGE_SIZE}+` : query.data!.length}
+            </span>
+          )}
+        </h2>
         <p className="text-sm text-slate-600">Catat masukan, keputusan tim, atau tindak lanjut. Gunakan Segarkan untuk memuat komentar terbaru.</p>
       </div>
       <button type="button" className={button} disabled={query.isFetching || sending} onClick={() => {
