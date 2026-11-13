@@ -49,8 +49,14 @@ async function authorizedFetch(path: string, body: unknown) {
     if (!error && refreshed.session?.access_token) response = await send(refreshed.session.access_token);
   }
 
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error ?? 'Permintaan gagal diproses.');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = (typeof payload?.error === 'string' && payload.error)
+      || (typeof payload?.message === 'string' && payload.message)
+      || (typeof payload === 'string' && payload)
+      || `Permintaan gagal diproses (status ${response.status}).`;
+    throw new Error(message);
+  }
   return payload;
 }
 

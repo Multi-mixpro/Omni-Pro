@@ -16,7 +16,7 @@ import { channelSummary, type CalendarEvent } from './channelRepository';
 import { publicationTaskId } from './commandRepository';
 import { focusLabels, jakartaToday, mondayWeek, type Focus } from './schedule';
 import {
-  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, PAGE_SIZE, platforms, priorities, removeTask, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
+  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, outputTypes, PAGE_SIZE, platforms, priorities, removeTask, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
   type Campaign, type Filters, type Idea, type Task,
 } from './repository';
 import './creativeWorkspace.css';
@@ -561,6 +561,11 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="mb-1 flex flex-wrap items-center gap-1.5">
                   <span className={'rounded-full px-2 py-0.5 text-xs font-semibold ' + statusColor[task.status]}>{taskStatuses[task.status]}</span>
+                  {task.output_type && task.output_type !== 'other' && (
+                    <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">
+                      {outputTypes[task.output_type] ?? task.output_type}
+                    </span>
+                  )}
                   {task.priority !== 'normal' && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-800">{priorities[task.priority]}</span>}
                 </div>
                 <h3 className="break-words font-semibold">{task.title}</h3>

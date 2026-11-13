@@ -101,6 +101,8 @@ body:has(.workspace-theme-control) { padding-bottom: 3rem; }
 [data-theme='dark'] [class~='hover:text-[#066561]']:hover,
 [data-theme='dark'] .group:hover [class~='group-hover:text-[#087E79]'] { color: rgb(var(--theme-mint-text)); }
 [data-theme='dark'] .paten-bottom-nav > button[class*='text-[#087E79]'] { color: #fff; }
+[data-theme='dark'] [class~='bg-[#087E79]'] { background-color: #16837d; color: #fff; }
+[data-theme='dark'] [class~='hover:bg-[#066864]']:hover { background-color: #1d9992; }
 
 [data-theme='dark'] :is(.hd-input, input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']), textarea, select:not(.workspace-theme-control select)) {
   background-color: #172233;

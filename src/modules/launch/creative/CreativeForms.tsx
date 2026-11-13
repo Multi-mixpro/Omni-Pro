@@ -1,8 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
 import {
-  briefFields, campaignStatuses, ideaQueues, platforms, priorities, safeOutputUrl, saveCampaign, saveIdea, saveTask, taskStatuses, workstreams,
-  type Campaign, type Idea, type Task, type TeamMember,
+  briefFields, campaignStatuses, copyFormats, copyTemplates, ideaQueues, outputTypes, platforms, priorities, safeOutputUrl, saveCampaign, saveCopyTemplate, saveIdea, saveTask, taskStatuses, workstreams,
+  type Campaign, type CopyTemplate, type Idea, type Task, type TeamMember,
 } from './repository';
 
 export const field = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm';
@@ -114,6 +115,11 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
   const [status, setStatus] = useState(task?.status ?? 'todo');
   const [selectedCampaign, setSelectedCampaign] = useState(task ? task.campaign_id ?? '' : campaignId ?? '');
   const [platform, setPlatform] = useState<Task['platform']>(task?.platform ?? sourceIdea?.platform ?? 'internal');
+  const [outputType, setOutputType] = useState<Task['output_type']>(task?.output_type ?? 'post');
+  const [selectedTemplateId, setSelectedTemplateId] = useState(task?.copy_template_id ?? '');
+  const [briefText, setBriefText] = useState(task?.brief ?? sourceIdea?.brief ?? '');
+  const templates = useQuery({ queryKey: ['creative-copy-library', defaultUnit ?? 'all'], queryFn: ({ signal }) => copyTemplates(signal, defaultUnit ?? 'all') });
+  const selectedTemplate = templates.data?.find(t => t.id === selectedTemplateId);
   return <Editor title={task ? 'Edit tugas' : sourceIdea ? 'Jadikan ide sebagai tugas' : 'Tugas kreatif baru'} onCancel={onCancel} onSaved={onSaved}
     onSave={data => {
       const link = value(data, 'url');
@@ -141,6 +147,8 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
         approver_id: value(data, 'approver') || null,
         additional_assignee_ids: people.filter(id => id !== primaryPerson),
         additional_platforms: platform === 'internal' ? [] : extraPlatforms.filter(choice => choice !== platform),
+        copy_template_id: value(data, 'copyTemplate') || null,
+        output_type: outputType,
         format: value(data, 'format'), status, priority: value(data, 'priority') as Task['priority'],
         due_on: value(data, 'due') || null, publish_on: value(data, 'publish') || null,
         output_url: output, blocker: status === 'blocked' ? blocker : '',
@@ -176,8 +184,70 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
         </div>
       </details>
     </div>
+    <Label title="Tipe output konten">
+      <select name="outputType" className={field} value={outputType} onChange={event => setOutputType(event.target.value as Task['output_type'])}>
+        <Options values={outputTypes} />
+      </select>
+    </Label>
+    <div className="space-y-2 sm:col-span-2 rounded-xl border border-teal-100 bg-teal-50 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label htmlFor="task-copy-template" className="font-bold text-slate-800">
+          Lampirkan dari Bank Copy &amp; Skrip (opsional)
+        </label>
+        {templates.data && templates.data.length > 0 && (
+          <span className="text-xs text-teal-800 font-semibold">{templates.data.length} template siap pakai</span>
+        )}
+      </div>
+      <select
+        id="task-copy-template"
+        name="copyTemplate"
+        className={field}
+        value={selectedTemplateId}
+        onChange={event => {
+          const nextId = event.target.value;
+          setSelectedTemplateId(nextId);
+          const selected = templates.data?.find(t => t.id === nextId);
+          if (selected) {
+            setOutputType(selected.output_type);
+            if (selected.platform) setPlatform(selected.platform);
+          }
+        }}
+      >
+        <option value="">-- Buat naskah mandiri / Tanpa template bank copy --</option>
+        {templates.data?.map(tpl => (
+          <option key={tpl.id} value={tpl.id}>
+            [{outputTypes[tpl.output_type] ?? tpl.output_type}] {tpl.title}
+          </option>
+        ))}
+      </select>
+      {selectedTemplate ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-700">
+              Pratinjau: {copyFormats[selectedTemplate.format] ?? selectedTemplate.format}
+            </span>
+            <button
+              type="button"
+              className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-bold text-teal-800 hover:bg-teal-200 transition-colors"
+              onClick={() => {
+                setBriefText(prev => prev.trim() ? `${prev.trim()}\n\n${selectedTemplate.body}` : selectedTemplate.body);
+              }}
+            >
+              + Gunakan ke Brief
+            </button>
+          </div>
+          <p className="max-h-24 overflow-y-auto whitespace-pre-wrap font-mono text-xs text-slate-700">
+            {selectedTemplate.body}
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-600">
+          Memilih template akan menyelaraskan tipe output dan memberikan rujukan naskah bagi PIC saat mengerjakan tugas.
+        </p>
+      )}
+    </div>
     <Label title="Pos kerja"><select name="workstream" className={field} defaultValue={task?.workstream ?? 'creative'}><Options values={workstreams} /></select></Label>
-    <Label title="Format"><input name="format" className={field} maxLength={80} placeholder="Contoh: Reels 30 detik" defaultValue={task?.format} /></Label>
+    <Label title="Format"><input name="format" className={field} maxLength={80} placeholder="Contoh: Reels 30 detik / Carousel 5 slide" defaultValue={task?.format} /></Label>
     <div className="space-y-2">
       <Label title={sourceIdea ? 'PIC utama (wajib)' : 'PIC utama'}><People members={members} current={task?.assignee_id} required={!!sourceIdea} /></Label>
       <details className="rounded-lg border border-slate-200 p-2 text-sm">
@@ -206,7 +276,7 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
     <Label title="Jadwal tayang"><input name="publish" className={field} type="date" defaultValue={task?.publish_on ?? ''} /></Label>
     <Label title="Status"><select name="status" className={field} value={status} onChange={event => setStatus(event.target.value as Task['status'])}><Options values={taskStatuses} /></select></Label>
     {status === 'blocked' && <Label title="Alasan terhambat"><input name="blocker" className={field} required maxLength={500} defaultValue={task?.blocker} /></Label>}
-    <Label title="Brief"><textarea name="brief" className={field} maxLength={2000} defaultValue={task?.brief ?? sourceIdea?.brief} /></Label>
+    <Label title="Brief"><textarea name="brief" className={field} maxLength={2000} value={briefText} onChange={event => setBriefText(event.target.value)} /></Label>
     <details className="rounded-lg border border-slate-200 p-3 sm:col-span-2">
       <summary className="cursor-pointer text-sm font-semibold">Brief kreatif terstruktur</summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -274,4 +344,72 @@ export function IdeaForm({ idea, defaultUnit, onCancel, onSaved }: Omit<Common, 
       <input name="prioritized" type="checkbox" defaultChecked={idea?.prioritized} /> Prioritas untuk dikerjakan
     </label>
   </Editor>;
+}
+
+export function CopyTemplateForm({
+  template,
+  defaultUnit,
+  onCancel,
+  onSaved,
+}: {
+  template?: CopyTemplate;
+  defaultUnit?: string;
+  onCancel: () => void;
+  onSaved: (id: string) => void;
+}) {
+  return (
+    <Editor
+      title={template ? 'Edit skrip / naskah bank' : 'Tambah naskah baru ke Bank Copy'}
+      onCancel={onCancel}
+      onSaved={onSaved}
+      onSave={data => {
+        const title = value(data, 'title');
+        const body = value(data, 'body');
+        if (!title) throw new Error('Judul template naskah wajib diisi.');
+        if (!body) throw new Error('Isi naskah / skrip tidak boleh kosong.');
+        return saveCopyTemplate({
+          title,
+          body,
+          format: (value(data, 'format') as CopyTemplate['format']) || 'caption',
+          output_type: (value(data, 'output_type') as CopyTemplate['output_type']) || 'post',
+          platform: (value(data, 'platform') as CopyTemplate['platform']) || null,
+          business_unit_id: value(data, 'businessUnit') || null,
+        }, template?.id);
+      }}
+    >
+      <Label title="Judul naskah / skrip">
+        <input name="title" className={field} maxLength={160} required defaultValue={template?.title} placeholder="Contoh: Hook video unboxing varsity" />
+      </Label>
+      <UnitField current={template ? template.business_unit_id : defaultUnit} required={false} />
+      <Label title="Format naskah">
+        <select name="format" className={field} defaultValue={template?.format ?? 'hook'}>
+          <Options values={copyFormats} />
+        </select>
+      </Label>
+      <Label title="Target tipe output">
+        <select name="output_type" className={field} defaultValue={template?.output_type ?? 'video'}>
+          <Options values={outputTypes} />
+        </select>
+      </Label>
+      <Label title="Platform utama (opsional)">
+        <select name="platform" className={field} defaultValue={template?.platform ?? ''}>
+          <option value="">Semua platform</option>
+          <Options values={platforms} />
+        </select>
+      </Label>
+      <div className="sm:col-span-2">
+        <Label title="Isi naskah / skrip / copywriting">
+          <textarea
+            name="body"
+            className={field}
+            rows={7}
+            required
+            maxLength={12000}
+            defaultValue={template?.body}
+            placeholder="Tuliskan hook, naskah dialog video, alur adegan, atau caption di sini..."
+          />
+        </Label>
+      </div>
+    </Editor>
+  );
 }

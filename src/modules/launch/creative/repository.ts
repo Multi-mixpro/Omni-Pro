@@ -13,6 +13,8 @@ export const campaignStatuses = { planned: 'Direncanakan', active: 'Aktif', comp
 export const priorities = { normal: 'Normal', high: 'Tinggi', urgent: 'Mendesak' };
 export const ideaQueues = { candidate: 'Perlu ditinjau', ready: 'Siap dikerjakan', parked: 'Ditunda' };
 export const workstreams = { creative: 'Produksi Konten', marketing: 'Marketing & Promo', operations: 'Operasional' };
+export const outputTypes = { post: 'Postingan teks', image: 'Gambar statis', carousel: 'Carousel', video: 'Video', story: 'Story', live: 'Live', other: 'Lainnya' };
+export const copyFormats = { caption: 'Caption', hook: 'Hook video', script: 'Skrip video', listing: 'Listing produk', ad: 'Iklan', other: 'Lainnya' };
 type Row = { id: string; updated_at: string };
 export type ChecklistItem = { label: string; done: boolean };
 export const briefFields = {
@@ -40,6 +42,8 @@ export type Task = Row & {
   review_note?: string;
   source_activation_id?: string | null;
   business_unit_id?: string | null;
+  copy_template_id?: string | null;
+  output_type?: keyof typeof outputTypes;
   workstream?: keyof typeof workstreams;
   campaign_id: string | null; title: string; brief: string; assignee_id: string | null;
   platform: keyof typeof platforms; format: string; status: keyof typeof taskStatuses;
@@ -64,7 +68,104 @@ export type Draft<T> = Omit<T, keyof Row>;
 export const PAGE_SIZE = 30;
 
 const campaignColumns = 'id,business_unit_id,name,objective,owner_id,status,starts_on,ends_on,budget_idr,spent_idr,updated_at';
-const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,creative_brief,deliverable,acceptance_criteria,completion_note,checklist,assignee_id,reviewer_id,reviewed_by,reviewed_at,approver_id,approved_at,platform,additional_platforms,additional_assignee_ids,format,status,priority,due_on,publish_on,output_url,blocker,review_note,source_activation_id,updated_at';
+const taskColumns = 'id,business_unit_id,workstream,campaign_id,title,brief,creative_brief,deliverable,acceptance_criteria,completion_note,checklist,assignee_id,reviewer_id,reviewed_by,reviewed_at,approver_id,approved_at,platform,additional_platforms,additional_assignee_ids,copy_template_id,output_type,format,status,priority,due_on,publish_on,output_url,blocker,review_note,source_activation_id,updated_at';
+
+export type CopyTemplate = { id: string; title: string; format: keyof typeof copyFormats; output_type: keyof typeof outputTypes; platform: keyof typeof platforms | null; body: string; business_unit_id: string | null; is_archived: boolean; updated_at: string };
+
+const LOCAL_COPY_LIBRARY_KEY = 'mix_pro_creative_copy_library_v1';
+
+function getLocalCopyLibrary(): CopyTemplate[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_COPY_LIBRARY_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [
+    {
+      id: 'template-hook-1',
+      title: 'Hook Before-After Masalah Pakaian / Lookbook',
+      format: 'hook',
+      output_type: 'video',
+      platform: 'tiktok',
+      body: 'Pernah nggak ngerasa outfit kamu kaku banget pas dipakai seharian? Ini 3 rahasia styling simpel yang bikin look kamu 10x lebih rapi.',
+      business_unit_id: null,
+      is_archived: false,
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 'template-caption-1',
+      title: 'Caption Peluncuran Drop Baru (Storytelling)',
+      format: 'caption',
+      output_type: 'post',
+      platform: 'instagram',
+      body: 'Setiap jahitan punya cerita. Koleksi terbaru kami hadir dengan material premium breathable yang siap nemenin mobilitas harian kamu. Link pembelian di bio!',
+      business_unit_id: null,
+      is_archived: false,
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 'template-script-1',
+      title: 'Skrip Review Produk & Uji Detail 30 Detik',
+      format: 'script',
+      output_type: 'video',
+      platform: 'instagram',
+      body: '[0-5s] Buka video dengan zoom detail jahitan & bahan.\n[6-15s] Jelaskan 3 fitur unggulan (anti kusut, furing adem, fitting pas).\n[16-25s] Tunjukkan pemakaian di badan saat bergerak.\n[26-30s] Call to action: cek varian warna sekarang sebelum kehabisan.',
+      business_unit_id: null,
+      is_archived: false,
+      updated_at: new Date().toISOString(),
+    },
+  ];
+}
+
+function saveLocalCopyLibrary(items: CopyTemplate[]) {
+  try {
+    localStorage.setItem(LOCAL_COPY_LIBRARY_KEY, JSON.stringify(items));
+  } catch { /* ignore */ }
+}
+
+export async function copyTemplates(signal?: AbortSignal, unit = 'all'): Promise<CopyTemplate[]> {
+  try {
+    let query = supabase.from('creative_copy_library').select('id,title,format,output_type,platform,body,business_unit_id,is_archived,updated_at').eq('is_archived', false);
+    if (unit !== 'all') query = unit === 'unassigned' ? query.is('business_unit_id', null) : query.or(`business_unit_id.eq.${unit},business_unit_id.is.null`);
+    if (signal) query = query.abortSignal(signal);
+    const { data, error } = await query.order('updated_at', { ascending: false }).order('id');
+    if (!error && data && data.length > 0) return data as CopyTemplate[];
+  } catch { /* fallback to local library */ }
+  const local = getLocalCopyLibrary().filter(item => !item.is_archived);
+  if (unit === 'all') return local;
+  if (unit === 'unassigned') return local.filter(item => item.business_unit_id === null);
+  return local.filter(item => item.business_unit_id === null || item.business_unit_id === unit);
+}
+
+export async function saveCopyTemplate(template: Omit<CopyTemplate, 'id' | 'updated_at' | 'is_archived'>, id?: string): Promise<string> {
+  const now = new Date().toISOString();
+  try {
+    if (id) {
+      const { error } = await supabase.from('creative_copy_library').update({ ...template, updated_at: now }).eq('id', id);
+      if (!error) return id;
+    } else {
+      const { data, error } = await supabase.from('creative_copy_library').insert({ ...template, is_archived: false }).select('id').single();
+      if (!error && data) return data.id as string;
+    }
+  } catch { /* fallback to local */ }
+  const list = getLocalCopyLibrary();
+  if (id) {
+    const updated = list.map(item => item.id === id ? { ...item, ...template, updated_at: now } : item);
+    saveLocalCopyLibrary(updated);
+    return id;
+  }
+  const newId = `copy-tpl-${Date.now()}`;
+  const created: CopyTemplate = { ...template, id: newId, is_archived: false, updated_at: now };
+  saveLocalCopyLibrary([created, ...list]);
+  return newId;
+}
+
+export async function deleteCopyTemplate(id: string): Promise<void> {
+  try {
+    await supabase.from('creative_copy_library').update({ is_archived: true }).eq('id', id);
+  } catch { /* fallback */ }
+  const list = getLocalCopyLibrary().map(item => item.id === id ? { ...item, is_archived: true } : item);
+  saveLocalCopyLibrary(list);
+}
 
 export async function campaigns(page: number, signal: AbortSignal, unit = 'all') {
   const start = page * PAGE_SIZE;

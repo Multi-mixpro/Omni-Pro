@@ -274,7 +274,15 @@ export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'cre
     setCreateError(null);
     setCreateNotice(null);
     try { await createUser.mutateAsync(draft); }
-    catch (reason) { setCreateError(reason instanceof Error ? reason.message : 'Pengguna gagal dibuat.'); }
+    catch (reason: unknown) {
+      const err = reason as Record<string, unknown> | null;
+      const message = reason instanceof Error ? reason.message
+        : typeof err?.error === 'string' ? err.error
+        : typeof err?.message === 'string' ? err.message
+        : typeof reason === 'string' && reason ? reason
+        : 'Pengguna gagal dibuat. Periksa koneksi atau izin admin.';
+      setCreateError(message);
+    }
   }
 
   async function submitEdit(event: FormEvent) {

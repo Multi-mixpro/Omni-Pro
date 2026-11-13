@@ -142,6 +142,14 @@ button.creative-metric-card:hover { border-color: #9cc5f0; background: #f8fbff; 
 .creative-task-card[data-status='done'] { --task-accent: #35a67c; }
 .creative-task-card[data-status='blocked'] { --task-accent: #ed8274; }
 .creative-task-card:hover { box-shadow: 0 5px 16px #163a6815; background-color: #fbfdff; }
+.creative-template-card {
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.creative-template-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px #163a6814;
+  border-color: #9cc5f0;
+}
 .creative-shell button[aria-pressed='true']:not(.creative-calendar-day)[class~='border-slate-300'] {
   border-color: #90baf0;
   background-color: #e1efff;
@@ -203,6 +211,7 @@ button.creative-metric-card:hover { border-color: #9cc5f0; background: #f8fbff; 
 [data-theme='dark'] .creative-focus-card [class~='bg-white/65'] { background: #10172480; }
 [data-theme='dark'] .creative-task-card { border-inline-start-color: var(--task-accent); }
 [data-theme='dark'] .creative-task-card:hover { background-color: #22334a; }
+[data-theme='dark'] .creative-template-card:hover { border-color: #55759a; box-shadow: 0 10px 26px #050a1355; }
 [data-theme='dark'] .creative-access-chip { color: #b5c5d9; background: #263347; }
 [data-theme='dark'] .creative-access-chip[data-allowed='true'] { color: #a2e3ce; background: #204239; }
 [data-theme='dark'] .creative-table thead { background: #233a56; color: #b5d7ff; }
