@@ -32,6 +32,15 @@ export interface DeleteTeamUserResult {
   deleted_self?: boolean;
 }
 
+function sanitizeErrorString(val: unknown): string {
+  if (typeof val !== 'string') return '';
+  const trimmed = val.trim();
+  if (!trimmed || trimmed === '{}' || trimmed === '[]' || trimmed === 'null' || trimmed === '[object Object]') {
+    return '';
+  }
+  return trimmed;
+}
+
 async function authorizedFetch(path: string, body: unknown) {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -51,11 +60,16 @@ async function authorizedFetch(path: string, body: unknown) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = (typeof payload?.error === 'string' && payload.error)
-      || (typeof payload?.message === 'string' && payload.message)
-      || (typeof payload === 'string' && payload)
-      || `Permintaan gagal diproses (status ${response.status}).`;
-    throw new Error(message);
+    const rawError = sanitizeErrorString(payload?.error)
+      || sanitizeErrorString(payload?.message)
+      || sanitizeErrorString(payload);
+    const message = rawError
+      || 'Gagal membuat pengguna di Supabase Auth (kemungkinan izin trigger handle_new_auth_user di database perlu diperbarui).';
+    const err = new Error(message) as Error & { sql_fix?: string };
+    if (typeof payload?.sql_fix === 'string') {
+      err.sql_fix = payload.sql_fix;
+    }
+    throw err;
   }
   return payload;
 }

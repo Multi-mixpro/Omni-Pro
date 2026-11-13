@@ -86,6 +86,8 @@ export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'cre
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createSqlFix, setCreateSqlFix] = useState<string | null>(null);
+  const [copiedSqlFix, setCopiedSqlFix] = useState(false);
   const [createNotice, setCreateNotice] = useState<string | null>(null);
   const [memberFeedback, setMemberFeedback] = useState<string | null>(null);
   const [memberFeedbackTone, setMemberFeedbackTone] = useState<'success' | 'error'>('success');
@@ -275,16 +277,29 @@ export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'cre
   async function submitUser(event: FormEvent) {
     event.preventDefault();
     setCreateError(null);
+    setCreateSqlFix(null);
+    setCopiedSqlFix(false);
     setCreateNotice(null);
     try { await createUser.mutateAsync(draft); }
     catch (reason: unknown) {
       const err = reason as Record<string, unknown> | null;
-      const message = reason instanceof Error ? reason.message
+      const rawMessage = reason instanceof Error ? reason.message
         : typeof err?.error === 'string' ? err.error
         : typeof err?.message === 'string' ? err.message
-        : typeof reason === 'string' && reason ? reason
-        : 'Pengguna gagal dibuat. Periksa koneksi atau izin admin.';
+        : typeof reason === 'string' ? reason
+        : '';
+      const trimmed = rawMessage.trim();
+      const isEmptyObject = !trimmed || trimmed === '{}' || trimmed === '[]' || trimmed === 'null' || trimmed === '[object Object]';
+      const message = isEmptyObject
+        ? 'Database Supabase menolak pembuatan user baru karena izin fungsi trigger (handle_new_auth_user) tercabut. Jalankan SQL perbaikan trigger di bawah ini pada Supabase SQL Editor.'
+        : trimmed;
+      const sqlFix = typeof err?.sql_fix === 'string' && err.sql_fix
+        ? err.sql_fix
+        : (isEmptyObject || message.includes('handle_new_auth_user'))
+        ? 'GRANT EXECUTE ON FUNCTION public.handle_new_auth_user() TO supabase_auth_admin, postgres, service_role;\nGRANT EXECUTE ON FUNCTION public.provision_auth_user(uuid) TO supabase_auth_admin, postgres, service_role;'
+        : null;
       setCreateError(message);
+      setCreateSqlFix(sqlFix);
     }
   }
 
@@ -852,9 +867,35 @@ export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'cre
                 </div>
 
                 {createError && (
-                  <p className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold">
-                    <AlertCircle className="w-4 h-4 shrink-0" /> {createError}
-                  </p>
+                  <div className="space-y-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-rose-700">
+                    <p className="flex items-start gap-1.5 font-bold">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{createError}</span>
+                    </p>
+                    {createSqlFix && (
+                      <div className="rounded-lg border border-rose-200 bg-white p-2.5 space-y-1.5 text-slate-800">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-extrabold text-slate-700">
+                            SQL Perbaikan Trigger (Jalankan 1x di Supabase SQL Editor):
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void navigator.clipboard?.writeText(createSqlFix);
+                              setCopiedSqlFix(true);
+                              setTimeout(() => setCopiedSqlFix(false), 2000);
+                            }}
+                            className="px-2.5 py-1 rounded-full bg-teal-700 hover:bg-teal-800 text-white text-[10px] font-bold transition-colors"
+                          >
+                            {copiedSqlFix ? 'Tersalin!' : 'Salin SQL'}
+                          </button>
+                        </div>
+                        <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[10px] text-slate-700 bg-slate-50 p-2 rounded border border-slate-200">
+                          {createSqlFix}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 <div className="flex flex-wrap gap-2">

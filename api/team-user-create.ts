@@ -6,10 +6,20 @@ const INTERNAL_DOMAIN = 'team.ggindoapparel.internal';
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,40}$/;
 const PIN_PATTERN = /^\d{6,12}$/;
 
+function cleanAuthErrorMessage(err: unknown): string {
+  if (!err || typeof err !== 'object') return '';
+  const record = err as Record<string, unknown>;
+  const raw = typeof record.message === 'string' ? record.message.trim() : '';
+  if (!raw || raw === '{}' || raw === '[]' || raw === 'null' || raw === '[object Object]') {
+    return '';
+  }
+  return raw;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authorized = await authorizeTeamAdmin(req, res);
   if (!authorized) return;
-  const { admin } = authorized;
+  const { admin, user: callerUser } = authorized;
 
   const username = String(req.body?.username ?? '').trim().toLowerCase();
   const pin = String(req.body?.pin ?? '').trim();
@@ -41,14 +51,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     user_metadata: { full_name: fullName, username, job_title: jobTitle || null },
   });
 
-  if (createError || !created.user) {
+  let userId = created?.user?.id ?? '';
+
+  if (createError || !userId) {
+    // Recovery path: check if an orphaned or previously deactivated/deleted Auth user can be reused
+    if (
+      typeof admin.auth.admin.listUsers === 'function' &&
+      typeof admin.auth.admin.updateUserById === 'function'
+    ) {
+      try {
+        const [{ data: usersList }, { data: allProfiles }] = await Promise.all([
+          admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+          admin.from('profiles').select('id, is_active'),
+        ]);
+        const activeProfileIds = new Set(
+          ((allProfiles ?? []) as Array<{ id: string; is_active?: boolean }>)
+            .filter(p => p.is_active !== false)
+            .map(p => p.id),
+        );
+        const authUsers = (usersList?.users ?? []) as Array<{ id: string; email?: string }>;
+        const exactOrphan = authUsers.find(
+          u => u.email?.toLowerCase() === email.toLowerCase() && !activeProfileIds.has(u.id) && u.id !== callerUser.id,
+        );
+        const recycledOrphan = authUsers.find(
+          u => !activeProfileIds.has(u.id) && u.id !== callerUser.id && (
+            u.email?.toLowerCase().endsWith('@deleted.ggindoapparel.internal') ||
+            u.email?.toLowerCase().endsWith(`@${INTERNAL_DOMAIN}`)
+          ),
+        );
+        const targetAuthUser = exactOrphan ?? recycledOrphan;
+        if (targetAuthUser) {
+          const { data: updatedAuth, error: updateErr } = await admin.auth.admin.updateUserById(targetAuthUser.id, {
+            email,
+            password: pin,
+            email_confirm: true,
+            app_metadata: { app_role: roleRow.code },
+            user_metadata: { full_name: fullName, username, job_title: jobTitle || null },
+          });
+          if (!updateErr && updatedAuth?.user?.id) {
+            userId = updatedAuth.user.id;
+          }
+        }
+      } catch {
+        // Ignore recovery errors and fall through to standard error reporting
+      }
+    }
+  }
+
+  if (!userId) {
     if (createError?.code === 'email_exists' || createError?.code === 'user_already_exists') {
       return res.status(409).json({ error: 'Username sudah terdaftar di autentikasi. Gunakan username lain.' });
     }
-    return res.status(400).json({ error: createError?.message ?? 'Pengguna gagal dibuat di Supabase Auth.' });
+    const cleanMsg = cleanAuthErrorMessage(createError);
+    const isTrigger500 = !cleanMsg || (createError as { status?: number } | null)?.status === 500 || cleanMsg.toLowerCase().includes('database error');
+    const friendlyError = isTrigger500
+      ? 'Database Supabase menolak pembuatan user baru karena izin fungsi trigger (handle_new_auth_user / provision_auth_user) tercabut saat hardening. Jalankan SQL perbaikan trigger di Supabase SQL Editor.'
+      : cleanMsg;
+    return res.status(400).json({
+      error: friendlyError,
+      sql_fix: isTrigger500
+        ? 'GRANT EXECUTE ON FUNCTION public.handle_new_auth_user() TO supabase_auth_admin, postgres, service_role;\nGRANT EXECUTE ON FUNCTION public.provision_auth_user(uuid) TO supabase_auth_admin, postgres, service_role;'
+        : undefined,
+    });
   }
-
-  const userId = created.user.id;
 
   const { error: profileError } = await admin.from('profiles').upsert({
     id: userId,

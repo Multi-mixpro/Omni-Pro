@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, Copy, ExternalLink, FileText, Lightbulb, Link2, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
+import { Bookmark, Copy, Eye, ExternalLink, FileText, Info, Lightbulb, Link2, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { useWorkspaceUnits } from '../data/businessWorkspace';
+import { CopyRichTextContent, CopyScriptViewerModal, stripCopyRichText } from './CopyRichText';
 import { button, CopyTemplateForm, errorText, field, IdeaForm, Options, primary } from './CreativeForms';
 import {
   copyFormats,
@@ -52,6 +53,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
   const [editor, setEditor] = useState<Idea | 'new' | null>(null);
   const [initialScriptForIdea, setInitialScriptForIdea] = useState<CopyTemplate | undefined>(undefined);
   const [editingTemplate, setEditingTemplate] = useState<CopyTemplate | 'new' | null>(null);
+  const [viewingTemplate, setViewingTemplate] = useState<CopyTemplate | null>(null);
   const [scriptSearch, setScriptSearch] = useState('');
   const [scriptFormatFilter, setScriptFormatFilter] = useState('');
   const [scriptOutputFilter, setScriptOutputFilter] = useState('');
@@ -124,7 +126,9 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
     if (scriptOutputFilter && tpl.output_type !== scriptOutputFilter) return false;
     if (scriptSearch.trim()) {
       const q = scriptSearch.trim().toLowerCase();
-      if (!tpl.title.toLowerCase().includes(q) && !tpl.body.toLowerCase().includes(q)) return false;
+      const plainBody = stripCopyRichText(tpl.body).toLowerCase();
+      const desc = (tpl.description ?? '').toLowerCase();
+      if (!tpl.title.toLowerCase().includes(q) && !plainBody.includes(q) && !desc.includes(q)) return false;
     }
     return true;
   });
@@ -347,10 +351,16 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                         {idea.task ? 'Tugas: ' + taskStatuses[idea.task.status] : ideaQueues[idea.queue_state]}
                       </span>
                       {attachedScript && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800">
+                        <button
+                          type="button"
+                          onClick={() => setViewingTemplate(attachedScript)}
+                          title="Buka Mode Lihat Nyaman untuk naskah ini"
+                          className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
+                        >
                           <FileText size={12} />
                           <span>Naskah: {attachedScript.title}</span>
-                        </span>
+                          <Eye size={11} className="ml-0.5 opacity-80" />
+                        </button>
                       )}
                     </div>
                     {unit === 'all' && (
@@ -363,11 +373,41 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                     </p>
                     {idea.brief && <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{idea.brief}</p>}
                     {attachedScript && (
-                      <details className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs">
+                      <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
                         <summary className="cursor-pointer font-bold text-teal-800">
                           Lihat Lampiran Skrip ({copyFormats[attachedScript.format] ?? attachedScript.format} · {outputTypes[attachedScript.output_type] ?? attachedScript.output_type})
                         </summary>
-                        <p className="mt-2 whitespace-pre-wrap font-mono text-slate-700">{attachedScript.body}</p>
+                        <div className="mt-2.5 space-y-2">
+                          {attachedScript.description && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-950">
+                              <strong className="inline-flex items-center gap-1 font-bold text-amber-900">
+                                <Info className="w-3.5 h-3.5" /> Penjelasan Skrip:
+                              </strong>
+                              <p className="mt-0.5 whitespace-pre-wrap">{attachedScript.description}</p>
+                            </div>
+                          )}
+                          <div className="rounded-lg border border-slate-200 bg-white p-2.5">
+                            <CopyRichTextContent content={attachedScript.body} className="text-xs text-slate-800" />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setViewingTemplate(attachedScript)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100"
+                            >
+                              <Eye size={12} />
+                              <span>Buka Mode Lihat Nyaman / Teleprompter</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(stripCopyRichText(attachedScript.body), `idea-tpl-${idea.id}`)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            >
+                              <Copy size={12} />
+                              <span>{copiedId === `idea-tpl-${idea.id}` ? 'Tersalin!' : 'Salin Naskah'}</span>
+                            </button>
+                          </div>
+                        </div>
                       </details>
                     )}
                     <ReferenceLinks urls={idea.reference_urls} />
@@ -488,18 +528,33 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
               <table className="creative-table w-full text-sm">
                 <thead>
                   <tr>
-                    <th scope="col" className="w-60">Judul Naskah</th>
-                    <th scope="col" className="w-40">Format &amp; Output</th>
-                    <th scope="col" className="w-36">Platform &amp; Unit</th>
-                    <th scope="col">Isi Copywriting / Skrip Naskah</th>
-                    <th scope="col" className="w-56 text-right">Aksi</th>
+                    <th scope="col" className="w-56">Judul &amp; Penjelasan Skrip</th>
+                    <th scope="col" className="w-36">Format &amp; Output</th>
+                    <th scope="col" className="w-32">Platform &amp; Unit</th>
+                    <th scope="col">Pratinjau Naskah Copywriting</th>
+                    <th scope="col" className="w-60 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTemplates.map(tpl => (
                     <tr key={tpl.id} className="align-top">
-                      <td className="font-bold text-slate-900">
-                        {tpl.title}
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => setViewingTemplate(tpl)}
+                          className="text-left font-bold text-slate-900 hover:text-teal-800 hover:underline"
+                          title="Klik untuk membuka Mode Lihat & Baca Naskah"
+                        >
+                          {tpl.title}
+                        </button>
+                        {tpl.description ? (
+                          <div className="mt-1.5 rounded-lg border border-amber-200/80 bg-amber-50/70 px-2 py-1.5 text-xs text-amber-950">
+                            <span className="font-bold text-amber-900 block">Penjelasan / Arahan Brief:</span>
+                            <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap leading-snug">{tpl.description}</p>
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-xs italic text-slate-400">Belum ada catatan penjelasan skrip</p>
+                        )}
                       </td>
                       <td>
                         <div className="flex flex-col items-start gap-1">
@@ -518,16 +573,32 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                         <span className="block mt-0.5">{unitLabel(tpl.business_unit_id)}</span>
                       </td>
                       <td>
-                        <div className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-xs text-slate-800 leading-relaxed">
-                          {tpl.body}
+                        <div
+                          onClick={() => setViewingTemplate(tpl)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setViewingTemplate(tpl); } }}
+                          title="Klik untuk membuka Mode Lihat Nyaman"
+                          className="cursor-pointer max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 hover:border-teal-300 hover:bg-white p-3 transition-colors"
+                        >
+                          <CopyRichTextContent content={tpl.body} className="text-xs text-slate-800 leading-relaxed" />
                         </div>
                       </td>
                       <td>
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                           <button
                             type="button"
+                            className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
+                            onClick={() => setViewingTemplate(tpl)}
+                            title="Buka Mode Lihat & Baca Naskah (Nyaman / Teleprompter)"
+                          >
+                            <Eye size={13} />
+                            <span>Mode Lihat</span>
+                          </button>
+                          <button
+                            type="button"
                             className={`${button} !px-2.5 !py-1 !text-xs inline-flex items-center gap-1`}
-                            onClick={() => copyToClipboard(tpl.body, tpl.id)}
+                            onClick={() => copyToClipboard(stripCopyRichText(tpl.body), tpl.id)}
                           >
                             <Copy size={13} />
                             <span>{copiedId === tpl.id ? 'Tersalin!' : 'Salin'}</span>
@@ -688,6 +759,24 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
             </div>
           )}
         </section>
+      )}
+
+      {viewingTemplate && (
+        <CopyScriptViewerModal
+          template={viewingTemplate}
+          onClose={() => setViewingTemplate(null)}
+          onEdit={canEdit ? (tpl) => {
+            setViewingTemplate(null);
+            setActiveTab('scripts');
+            setEditingTemplate(tpl);
+          } : undefined}
+          onUseForIdea={canEdit ? (tpl) => {
+            setViewingTemplate(null);
+            setInitialScriptForIdea(tpl);
+            setEditor('new');
+            setActiveTab('ideas');
+          } : undefined}
+        />
       )}
     </div>
   );

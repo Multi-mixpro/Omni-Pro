@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { formatScriptForBrief, stripCopyRichText } from './CopyRichText';
 import { advanceTask, ideas, pendingTaskDecisions, safeOutputUrl, saveIdea, saveTask, setTaskChecklistItem, tasks, type Draft, type Idea, type Task } from './repository';
 
 const { from, chain } = vi.hoisted(() => {
@@ -131,5 +132,26 @@ describe('creative repository', () => {
     }
     expect(safeOutputUrl('https://res.cloudinary.com/example/image/upload/demo.jpg'))
       .toBe('https://res.cloudinary.com/example/image/upload/demo.jpg');
+  });
+
+  it('strips rich text HTML tags and formats script with explanation for task brief', () => {
+    const richHtml = '<b><span style="color:#0f766e">[HOOK]</span></b><br><i>Tampil rapi</i> setiap hari!';
+    expect(stripCopyRichText(richHtml)).toBe('[HOOK]\nTampil rapi setiap hari!');
+    const briefBlock = formatScriptForBrief({
+      id: 'tpl-1',
+      title: 'Hook 3 Detik',
+      description: 'Fokus kamera close-up pada jahitan.',
+      format: 'hook',
+      output_type: 'video',
+      platform: 'tiktok',
+      body: richHtml,
+      business_unit_id: null,
+      is_archived: false,
+      updated_at: '2026-11-13T00:00:00Z',
+    }, 'Gunakan talent wanita.');
+    expect(briefBlock).toContain('LAMPIRAN SKRIP: Hook 3 Detik');
+    expect(briefBlock).toContain('Fokus kamera close-up pada jahitan.');
+    expect(briefBlock).toContain('Gunakan talent wanita.');
+    expect(briefBlock).toContain('[HOOK]\nTampil rapi setiap hari!');
   });
 });

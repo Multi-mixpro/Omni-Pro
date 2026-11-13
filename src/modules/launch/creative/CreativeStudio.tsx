@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, Copy, FileText, Plus, Trash2 } from 'lucide-react';
+import { Bookmark, Copy, Eye, FileText, Plus, Trash2 } from 'lucide-react';
+import { CopyRichTextContent, CopyScriptViewerModal, stripCopyRichText } from './CopyRichText';
 import { CreativePager } from './CreativeAccounts';
 import { button, CopyTemplateForm, errorText, primary } from './CreativeForms';
 import {
@@ -16,6 +17,7 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
   const [activeTab, setActiveTab] = useState<'tasks' | 'templates'>('tasks');
   const [page, setPage] = useState(0);
   const [editingTemplate, setEditingTemplate] = useState<CopyTemplate | 'new' | null>(null);
+  const [viewingTemplate, setViewingTemplate] = useState<CopyTemplate | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const query = useQuery({
@@ -123,9 +125,15 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
                         </span>
                       )}
                       {tpl && (
-                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                          Skrip: {tpl.title}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setViewingTemplate(tpl)}
+                          title="Buka Mode Lihat Nyaman untuk skrip tugas ini"
+                          className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                        >
+                          <span>Skrip: {tpl.title}</span>
+                          <Eye size={11} />
+                        </button>
                       )}
                     </div>
                     <p className="text-xs text-slate-600">{taskStatuses[row.status]} · {row.campaign?.name ?? 'Tanpa kampanye'}</p>
@@ -134,6 +142,16 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {tpl && (
+                      <button
+                        type="button"
+                        onClick={() => setViewingTemplate(tpl)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
+                      >
+                        <Eye size={13} />
+                        <span>Mode Lihat Skrip</span>
+                      </button>
+                    )}
                     {canEdit && <button type="button" className={button} onClick={() => onEdit(row)}>Edit brief</button>}
                     <button type="button" className={primary} onClick={() => onOpen(row.id)}>Versi &amp; review</button>
                   </div>
@@ -162,17 +180,33 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
             <table className="creative-table w-full text-sm">
               <thead>
                 <tr>
-                  <th scope="col" className="w-60">Judul Naskah</th>
+                  <th scope="col" className="w-60">Judul &amp; Penjelasan Skrip</th>
                   <th scope="col" className="w-40">Format &amp; Output</th>
                   <th scope="col" className="w-32">Platform</th>
-                  <th scope="col">Isi Copywriting / Skrip</th>
-                  <th scope="col" className="w-44 text-right">Aksi</th>
+                  <th scope="col">Pratinjau Copywriting / Skrip</th>
+                  <th scope="col" className="w-56 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {templatesQuery.data?.map(tpl => (
                   <tr key={tpl.id} className="align-top">
-                    <td className="font-bold text-slate-900">{tpl.title}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => setViewingTemplate(tpl)}
+                        className="text-left font-bold text-slate-900 hover:text-teal-800 hover:underline"
+                      >
+                        {tpl.title}
+                      </button>
+                      {tpl.description ? (
+                        <div className="mt-1.5 rounded-lg border border-amber-200/80 bg-amber-50/70 px-2 py-1.5 text-xs text-amber-950">
+                          <span className="font-bold text-amber-900 block">Penjelasan / Arahan Brief:</span>
+                          <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap leading-snug">{tpl.description}</p>
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-xs italic text-slate-400">Belum ada catatan penjelasan</p>
+                      )}
+                    </td>
                     <td>
                       <div className="flex flex-col items-start gap-1">
                         <span className="rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800">
@@ -189,16 +223,32 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
                       </span>
                     </td>
                     <td>
-                      <div className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-xs text-slate-800">
-                        {tpl.body}
+                      <div
+                        onClick={() => setViewingTemplate(tpl)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setViewingTemplate(tpl); } }}
+                        title="Klik untuk membuka Mode Lihat Nyaman"
+                        className="cursor-pointer max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 hover:border-teal-300 hover:bg-white p-3 transition-colors"
+                      >
+                        <CopyRichTextContent content={tpl.body} className="text-xs text-slate-800 leading-relaxed" />
                       </div>
                     </td>
                     <td>
                       <div className="flex flex-wrap items-center justify-end gap-1.5">
                         <button
                           type="button"
+                          className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
+                          onClick={() => setViewingTemplate(tpl)}
+                          title="Buka Mode Lihat & Baca Naskah (Nyaman / Teleprompter)"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Mode Lihat</span>
+                        </button>
+                        <button
+                          type="button"
                           className={`${button} !px-2.5 !py-1 !text-xs inline-flex items-center gap-1`}
-                          onClick={() => copyToClipboard(tpl.body, tpl.id)}
+                          onClick={() => copyToClipboard(stripCopyRichText(tpl.body), tpl.id)}
                         >
                           <Copy className="w-3.5 h-3.5" />
                           <span>{copiedId === tpl.id ? 'Tersalin!' : 'Salin'}</span>
@@ -235,6 +285,18 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
             </table>
           </div>
         </section>
+      )}
+
+      {viewingTemplate && (
+        <CopyScriptViewerModal
+          template={viewingTemplate}
+          onClose={() => setViewingTemplate(null)}
+          onEdit={canEdit ? (tpl) => {
+            setViewingTemplate(null);
+            setActiveTab('templates');
+            setEditingTemplate(tpl);
+          } : undefined}
+        />
       )}
     </div>
   );
