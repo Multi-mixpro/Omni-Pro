@@ -1,0 +1,254 @@
+/* ==========================================================================
+   Super-App Design Layer — loaded after creativeWorkspace.css
+   Goals: smooth motion, soft depth, consistent radii, friendly tone, same
+   system in light + dark. Tokens first, then components.
+   ========================================================================== */
+
+.creative-shell {
+  --sa-radius-lg: 24px;
+  --sa-radius-md: 16px;
+  --sa-radius-sm: 12px;
+  --sa-ease: cubic-bezier(.22, .8, .24, 1);
+  --sa-card: #ffffff;
+  --sa-card-soft: #f6f9ff;
+  --sa-line: #e6edf7;
+  --sa-ink: #0f172a;
+  --sa-muted: #64748b;
+  --sa-brand: #1463ff;
+  --sa-brand-2: #7c5cff;
+  --sa-shadow-sm: 0 1px 2px rgba(15, 23, 42, .04), 0 2px 8px -2px rgba(15, 23, 42, .05);
+  --sa-shadow-md: 0 10px 30px -10px rgba(30, 64, 175, .18), 0 2px 6px rgba(15, 23, 42, .04);
+  --sa-shadow-lg: 0 24px 60px -20px rgba(30, 64, 175, .28);
+  background:
+    radial-gradient(900px 500px at 0% -10%, #dbe9ff 0%, transparent 60%),
+    radial-gradient(800px 500px at 100% -5%, #efe4ff 0%, transparent 55%),
+    radial-gradient(700px 500px at 100% 100%, #dcf7ee 0%, transparent 55%),
+    #f5f8fe;
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+[data-theme='dark'] .creative-shell {
+  --sa-card: #111622;
+  --sa-card-soft: #161d2c;
+  --sa-line: #1f2940;
+  --sa-ink: #f1f5f9;
+  --sa-muted: #94a3b8;
+  --sa-brand: #3b82f6;
+  --sa-brand-2: #8b5cf6;
+  --sa-shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --sa-shadow-md: 0 14px 34px -12px rgba(0, 0, 0, .65);
+  --sa-shadow-lg: 0 28px 70px -20px rgba(0, 0, 0, .8);
+  background:
+    radial-gradient(800px 480px at 0% -10%, rgba(37, 99, 235, .13) 0%, transparent 60%),
+    radial-gradient(700px 480px at 100% 0%, rgba(139, 92, 246, .10) 0%, transparent 55%),
+    #090c12;
+  background-attachment: fixed;
+}
+
+/* ---- Smooth page motion --------------------------------------------- */
+@keyframes sa-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes sa-pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+.creative-layout > div > * { animation: sa-rise .42s var(--sa-ease) both; }
+.creative-layout > div > *:nth-child(2) { animation-delay: .04s; }
+.creative-layout > div > *:nth-child(3) { animation-delay: .08s; }
+.creative-layout > div > *:nth-child(n+4) { animation-delay: .12s; }
+.creative-shell dialog[open] { animation: sa-pop .26s var(--sa-ease) both; }
+.creative-shell dialog::backdrop { animation: sa-fade .25s ease both; }
+@keyframes sa-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .creative-layout > div > *, .creative-shell dialog[open] { animation: none; }
+}
+
+/* ---- Cards (all panels share one surface language) ------------------- */
+.creative-shell :is(.creative-sidebar, .creative-toolbar, .creative-filter, .creative-calendar, .creative-access-card) {
+  border-radius: var(--sa-radius-lg);
+  border: 1px solid var(--sa-line);
+  background: color-mix(in srgb, var(--sa-card) 92%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: var(--sa-shadow-md);
+}
+.creative-shell section[class*='rounded-3xl'],
+.creative-shell section[class*='rounded-2xl'],
+.creative-shell section[class*='rounded-xl'] {
+  border-radius: var(--sa-radius-lg);
+  border-color: var(--sa-line);
+}
+.creative-shell section.bg-white, .creative-shell [class~='bg-white'].border {
+  box-shadow: var(--sa-shadow-sm);
+}
+
+/* ---- Header: hero feel ----------------------------------------------- */
+.creative-shell .creative-toolbar {
+  position: relative;
+  overflow: hidden;
+}
+.creative-shell .creative-toolbar::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--sa-brand), var(--sa-brand-2));
+  border-radius: 24px 0 0 24px;
+}
+.creative-shell .creative-toolbar h1 {
+  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem);
+  letter-spacing: -.04em;
+}
+.creative-eyebrow { letter-spacing: .14em; }
+.creative-eyebrow span { box-shadow: 0 0 0 4px color-mix(in srgb, var(--sa-brand) 22%, transparent); }
+
+/* ---- Sidebar: app-rail ------------------------------------------------ */
+.creative-nav-item {
+  border-radius: 14px !important;
+  transition: background-color .22s var(--sa-ease), color .22s var(--sa-ease), transform .22s var(--sa-ease), box-shadow .22s var(--sa-ease);
+}
+.creative-nav-item:hover { transform: translateX(2px); }
+.creative-nav-item:active { transform: scale(.98); }
+.creative-nav-item[aria-current='page'] {
+  background: linear-gradient(135deg, var(--sa-brand), var(--sa-brand-2)) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--sa-brand) 70%, transparent) !important;
+}
+.creative-nav-item[aria-current='page'] .creative-color-icon { background: rgba(255, 255, 255, .22) !important; color: #fff !important; }
+.creative-nav-item[aria-current='page']:hover { transform: none; }
+.creative-nav-label { letter-spacing: .12em; font-size: 10px; opacity: .85; }
+.creative-color-icon { border-radius: 11px; transition: transform .22s var(--sa-ease); }
+.creative-nav-item:hover .creative-color-icon { transform: scale(1.08) rotate(-3deg); }
+.creative-sidebar { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--sa-muted) 35%, transparent) transparent; }
+
+/* ---- Buttons: unified, tactile --------------------------------------- */
+.creative-shell :is(button, a)[class*='rounded-full'],
+.creative-shell :is(button, a)[class~='border-slate-300'] {
+  transition: transform .18s var(--sa-ease), box-shadow .18s var(--sa-ease), background-color .18s, border-color .18s, color .18s;
+}
+.creative-shell :is(button, a)[class*='rounded-full']:hover:not(:disabled) { transform: translateY(-1px); }
+.creative-shell :is(button, a)[class*='rounded-full']:active:not(:disabled) { transform: translateY(0) scale(.97); }
+.creative-shell :is(button, a)[class~='bg-teal-800'],
+.creative-shell button[class*='bg-[#1463ff]'] {
+  background-image: linear-gradient(135deg, var(--sa-brand), color-mix(in srgb, var(--sa-brand) 72%, var(--sa-brand-2)));
+  box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--sa-brand) 75%, transparent);
+}
+.creative-shell :is(button, a)[class~='bg-teal-800']:hover:not(:disabled) { box-shadow: 0 14px 28px -8px color-mix(in srgb, var(--sa-brand) 80%, transparent); }
+.creative-shell button[aria-pressed='true'][class~='border-slate-300'] {
+  background: color-mix(in srgb, var(--sa-brand) 12%, var(--sa-card));
+  color: var(--sa-brand);
+  border-color: color-mix(in srgb, var(--sa-brand) 45%, transparent);
+  font-weight: 700;
+}
+
+/* ---- Inputs ----------------------------------------------------------- */
+.creative-shell :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
+  border-radius: 14px;
+  transition: border-color .18s, box-shadow .18s, background-color .18s;
+}
+.creative-shell :is(input:not([type='checkbox'], [type='radio']), select, textarea):focus {
+  border-color: var(--sa-brand);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sa-brand) 16%, transparent);
+  outline: none;
+}
+.creative-shell input[type='checkbox'] { accent-color: var(--sa-brand); width: 1rem; height: 1rem; border-radius: 5px; }
+
+/* ---- Task cards & kanban --------------------------------------------- */
+.creative-task-card {
+  border-radius: var(--sa-radius-md) !important;
+  border: 1px solid var(--sa-line) !important;
+  border-inline-start: 4px solid var(--task-accent) !important;
+  background: var(--sa-card) !important;
+  box-shadow: var(--sa-shadow-sm);
+  transition: transform .22s var(--sa-ease), box-shadow .22s var(--sa-ease), border-color .22s;
+}
+.creative-task-card:hover { transform: translateY(-2px); box-shadow: var(--sa-shadow-md); }
+.creative-focus-card { border-radius: 20px !important; box-shadow: var(--sa-shadow-sm); }
+.creative-focus-card:hover { transform: translateY(-3px); box-shadow: var(--sa-shadow-md); }
+.creative-template-card, .creative-metric-card { border-radius: var(--sa-radius-md); }
+
+/* ---- Tables ----------------------------------------------------------- */
+.creative-table { border-collapse: separate; border-spacing: 0; }
+.creative-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 800;
+}
+.creative-table tbody tr { transition: background-color .15s; }
+.creative-table tbody tr:hover { background: color-mix(in srgb, var(--sa-brand) 6%, var(--sa-card)); }
+
+/* ---- Dialog / modal: sheet style ------------------------------------- */
+.creative-shell dialog {
+  border-radius: 28px;
+  border: 1px solid var(--sa-line);
+  box-shadow: var(--sa-shadow-lg);
+  background: var(--sa-card);
+  color: var(--sa-ink);
+}
+.creative-shell dialog::backdrop { background: rgba(9, 12, 24, .5); backdrop-filter: blur(6px); }
+@media (max-width: 639px) {
+  .creative-shell dialog[open] {
+    width: 100vw; max-width: 100vw; margin: auto 0 0; max-height: 92dvh;
+    border-radius: 28px 28px 0 0;
+    animation: sa-sheet .32s var(--sa-ease) both;
+  }
+}
+@keyframes sa-sheet { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---- Scrollbars ------------------------------------------------------- */
+.creative-shell * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--sa-muted) 40%, transparent) transparent; }
+.creative-shell *::-webkit-scrollbar { width: 8px; height: 8px; }
+.creative-shell *::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--sa-muted) 40%, transparent); border-radius: 99px; }
+
+/* ---- Mobile bottom tab bar (super-app navigation) --------------------- */
+.creative-bottom-nav {
+  position: fixed;
+  z-index: 45;
+  left: 12px; right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--sa-card) 88%, transparent);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid var(--sa-line);
+  box-shadow: 0 18px 40px -10px rgba(15, 23, 42, .28);
+}
+.creative-bottom-nav button {
+  display: grid; justify-items: center; gap: 2px;
+  padding: 7px 4px; border-radius: 18px;
+  font-size: 10.5px; font-weight: 700; color: var(--sa-muted);
+  transition: background-color .2s var(--sa-ease), color .2s var(--sa-ease), transform .2s var(--sa-ease);
+}
+.creative-bottom-nav button:active { transform: scale(.94); }
+.creative-bottom-nav button[aria-current='page'] {
+  color: #fff;
+  background: linear-gradient(135deg, var(--sa-brand), var(--sa-brand-2));
+  box-shadow: 0 8px 18px -6px color-mix(in srgb, var(--sa-brand) 70%, transparent);
+}
+.creative-bottom-icon { position: relative; display: inline-grid; place-items: center; }
+.creative-bottom-icon i {
+  position: absolute; top: -6px; right: -10px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center;
+  border-radius: 99px; background: #ef4444; color: #fff;
+  font: 800 9px/1 'JetBrains Mono', monospace; font-style: normal;
+  box-shadow: 0 0 0 2px var(--sa-card);
+}
+@media (max-width: 1023px) {
+  .creative-shell { padding-bottom: 6.5rem; }
+  /* Top rail becomes a compact app bar; full menu reachable via "Menu" button */
+  .creative-sidebar { border-radius: 20px; }
+}
+body:has(.creative-bottom-nav) .workspace-theme-control { bottom: calc(5.8rem + env(safe-area-inset-bottom)); }
+
+/* ---- Dark mode comfort ------------------------------------------------ */
+[data-theme='dark'] .creative-shell :is(.creative-sidebar, .creative-toolbar, .creative-filter, .creative-calendar, .creative-access-card) {
+  background: color-mix(in srgb, #111622 90%, transparent) !important;
+  border-color: var(--sa-line) !important;
+}
+[data-theme='dark'] .creative-task-card { background: #111622 !important; }
+[data-theme='dark'] .creative-task-card:hover { background: #151c2b !important; }
+[data-theme='dark'] .creative-shell .creative-toolbar::before { opacity: .9; }
+[data-theme='dark'] .creative-bottom-nav { box-shadow: 0 18px 40px -10px rgba(0, 0, 0, .75); }

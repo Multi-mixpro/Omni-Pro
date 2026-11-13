@@ -23,6 +23,7 @@ import {
   type Campaign, type Filters, type Idea, type Task,
 } from './repository';
 import './creativeWorkspace.css';
+import './superapp.css';
 
 const ChannelHub = lazy(() => import('./ChannelHub').then(module => ({ default: module.ChannelHub })));
 const CreativeAccounts = lazy(() => import('./CreativeAccounts').then(module => ({ default: module.CreativeAccounts })));
@@ -897,5 +898,20 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       </>}
       </div>
     </div>
+    <nav className="creative-bottom-nav lg:hidden" aria-label="Navigasi cepat">
+      {([
+        ['overview', 'Beranda', LayoutDashboard],
+        ['work', 'Tugas', ListTodo],
+        ['ideas', 'Ide', Lightbulb],
+        ['calendar', 'Kalender', CalendarDays],
+        ['inbox', 'Inbox', Bell],
+      ] as const).filter(([id]) => visibleNavigation.some(group => group.items.some(item => item.id === id))).map(([id, label, Icon]) => {
+        const badge = sectionBadgeCount(id as Section);
+        return <button key={id} type="button" aria-current={section === id ? 'page' : undefined} onClick={() => openSection(id as Section)}>
+          <span className="creative-bottom-icon"><Icon size={19} />{badge.count > 0 && <i>{badge.count > 99 ? '99+' : badge.count}</i>}</span>
+          <span>{label}</span>
+        </button>;
+      })}
+    </nav>
   </main>;
 }
