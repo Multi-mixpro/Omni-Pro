@@ -376,21 +376,31 @@ export async function deleteIdea(id: string): Promise<void> {
 
 export function isDemoPurged(): boolean {
   try {
-    return localStorage.getItem(DEMO_PURGED_KEY) === 'true';
+    return localStorage.getItem(DEMO_PURGED_KEY) !== 'false';
   } catch {
-    return false;
+    return true;
   }
 }
 
 export function isDemoText(text?: string | null): boolean {
   if (!text) return false;
-  return /^\s*\[DEMO\]/i.test(text) || /^DEMO[\s_]/i.test(text);
+  return /^\s*\[DEMO\]/i.test(text) || /^DEMO[\s_]/i.test(text) || /^demo\./i.test(text.trim());
 }
 
 export async function purgeCreativeDemoData(): Promise<{ removedTasks: number; removedIdeas: number; removedCampaigns: number }> {
   let removedTasks = 0;
   let removedIdeas = 0;
   let removedCampaigns = 0;
+
+  try {
+    const { data: rpcResult } = await supabase.rpc('purge_all_creative_demo_data');
+    if (rpcResult && typeof rpcResult === 'object') {
+      const r = rpcResult as Record<string, number>;
+      removedTasks += Number(r.removed_tasks ?? 0);
+      removedIdeas += Number(r.removed_ideas ?? 0);
+      removedCampaigns += Number(r.removed_campaigns ?? 0);
+    }
+  } catch { /* fallback to individual queries below */ }
 
   try {
     const { data: demoTasks } = await supabase
@@ -416,7 +426,7 @@ export async function purgeCreativeDemoData(): Promise<{ removedTasks: number; r
       .select('id')
       .ilike('title', '[DEMO]%');
     if (demoIdeas?.length) {
-      removedIdeas = demoIdeas.length;
+      removedIdeas += demoIdeas.length;
       await supabase.from('creative_ideas').delete().ilike('title', '[DEMO]%');
     }
   } catch { /* ignore */ }
@@ -431,7 +441,7 @@ export async function purgeCreativeDemoData(): Promise<{ removedTasks: number; r
       .select('id')
       .ilike('name', '[DEMO]%');
     if (demoCampaigns?.length) {
-      removedCampaigns = demoCampaigns.length;
+      removedCampaigns += demoCampaigns.length;
       await supabase.from('creative_campaigns').delete().ilike('name', '[DEMO]%');
       await supabase.from('creative_campaigns').update({ status: 'archived' }).ilike('name', '[DEMO]%');
     }
@@ -457,7 +467,7 @@ export async function campaigns(page: number, signal: AbortSignal, unit = 'all')
     .order('name').order('id').range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
   const rows = (data ?? []) as Campaign[];
-  return isDemoPurged() ? rows.filter(row => !isDemoText(row.name)) : rows;
+  return rows.filter(row => !isDemoText(row.name));
 }
 
 export async function team(signal: AbortSignal) {
@@ -492,7 +502,7 @@ export async function pendingTaskDecisions(userId: string, page: number, signal:
   const { data, error } = await query.order('due_on', { nullsFirst: false }).order('id')
     .range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
-  return (data ?? []) as Pick<Task, 'id' | 'title' | 'status' | 'due_on'>[];
+  return ((data ?? []) as Pick<Task, 'id' | 'title' | 'status' | 'due_on'>[]).filter(row => !isDemoText(row.title));
 }
 
 export async function tasks(campaignId: string | null | 'all', filters: Filters, page: number, signal: AbortSignal,
@@ -526,7 +536,7 @@ export async function tasks(campaignId: string | null | 'all', filters: Filters,
     .range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
   const rows = ((data ?? []) as unknown as ListedTask[]).map(hydrateTask);
-  return isDemoPurged() ? rows.filter(row => !isDemoText(row.title)) : rows;
+  return rows.filter(row => !isDemoText(row.title) && !isDemoText(row.campaign?.name));
 }
 
 export async function summary(campaignId: string | null, today: string, signal: AbortSignal, unit = 'all') {
@@ -562,9 +572,8 @@ export async function ideas(page: number, onlyPriority: boolean, queue: string, 
     .order('updated_at', { ascending: false }).order('id').range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
   const hidden = getHiddenIdeaIds();
-  const purged = isDemoPurged();
   return ((data ?? []) as unknown as (Omit<ListedIdea, 'task'> & { task: ListedIdea['task'] | NonNullable<ListedIdea['task']>[] })[])
-    .filter(row => !hidden.has(row.id) && (!purged || !isDemoText(row.title)))
+    .filter(row => !hidden.has(row.id) && !isDemoText(row.title))
     .map(row => ({ ...row, task: Array.isArray(row.task) ? row.task[0] ?? null : row.task }));
 }
 
@@ -766,9 +775,8 @@ export async function boardTasks(scope: string, unit: string, filters: Filters, 
     ...lane,
     items: (lane.items ?? []).map(hydrateTask),
   }));
-  if (!isDemoPurged()) return lanes;
   return lanes.map(lane => {
-    const filtered = (lane.items ?? []).filter(item => !isDemoText(item.title));
+    const filtered = (lane.items ?? []).filter(item => !isDemoText(item.title) && !isDemoText(item.campaign?.name));
     const removedCount = (lane.items?.length ?? 0) - filtered.length;
     return { ...lane, items: filtered, total: Math.max(0, Number(lane.total ?? 0) - removedCount) };
   });

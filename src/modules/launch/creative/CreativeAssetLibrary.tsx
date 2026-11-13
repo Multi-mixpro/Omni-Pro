@@ -4,7 +4,7 @@ import { ExternalLink, Image } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { CreativePager } from './CreativeAccounts';
 import { button, errorText } from './CreativeForms';
-import { PAGE_SIZE, safeOutputUrl } from './repository';
+import { isDemoText, PAGE_SIZE, safeOutputUrl } from './repository';
 
 export function CreativeAssetLibrary({ userId, unit, scope, onTask }: {
   userId: string; unit: string; scope: string; onTask: (id: string) => void;
@@ -19,7 +19,7 @@ export function CreativeAssetLibrary({ userId, unit, scope, onTask }: {
       if (scope !== 'all') query = scope === 'standalone' ? query.is('campaign_id', null) : query.eq('campaign_id', scope);
       const { data, error } = await query.order('updated_at', { ascending: false }).order('id').range(start, start + PAGE_SIZE).abortSignal(signal);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).filter(item => !isDemoText(item.title) && !/example\.com/i.test(item.output_url ?? ''));
     },
   });
 

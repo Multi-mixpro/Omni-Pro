@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { PAGE_SIZE, safeOutputUrl, type Task } from './repository';
+import { isDemoText, PAGE_SIZE, safeOutputUrl, type Task } from './repository';
 import { channelPlatforms } from './channelRepository';
 
 export type SocialAccount = {
@@ -24,7 +24,7 @@ export async function accounts(unit: string, page: number, signal: AbortSignal, 
   if (search.trim()) query = query.ilike('handle', `%${search.trim().replace(/[\\%_]/g, '\\$&')}%`);
   const { data, error } = await query.order('handle').order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
-  return (data ?? []) as SocialAccount[];
+  return ((data ?? []) as SocialAccount[]).filter(row => !isDemoText(row.handle) && !/example\.com/i.test(row.profile_url ?? ''));
 }
 
 export async function saveAccount(draft: Omit<SocialAccount, 'id' | 'updated_at'>, previous?: SocialAccount) {
@@ -70,7 +70,9 @@ export async function publications(column: 'task_id' | 'account_id', id: string,
   const { data, error } = await supabase.from('creative_publications').select('id,published_url,published_at,account:creative_accounts(handle,platform)')
     .eq(column, id).order('published_at', { ascending: false }).order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
-  return (data ?? []) as unknown as Publication[];
+  return ((data ?? []) as unknown as Publication[]).filter(
+    row => !isDemoText(row.account?.handle) && !/example\.com/i.test(row.published_url ?? ''),
+  );
 }
 
 export async function publicationTaskId(id: string) {
@@ -102,5 +104,5 @@ export async function taskEvents(scope: 'task' | 'inbox', id: string, signal: Ab
   query = scope === 'task' ? query.eq('task_id', id) : query.eq('recipient_id', id).eq('kind', 'nudge');
   const { data, error } = await query.order('created_at', { ascending: false }).order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
-  return (data ?? []) as unknown as TaskEvent[];
+  return ((data ?? []) as unknown as TaskEvent[]).filter(row => !isDemoText(row.task?.title) && !isDemoText(row.detail));
 }

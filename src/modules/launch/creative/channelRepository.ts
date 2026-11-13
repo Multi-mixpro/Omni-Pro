@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { PAGE_SIZE, platforms } from './repository';
+import { isDemoText, PAGE_SIZE, platforms } from './repository';
 
 export const channelPlatforms = {
   marketplace: platforms.marketplace, instagram: platforms.instagram, tiktok: platforms.tiktok,
@@ -45,7 +45,9 @@ export async function channelActivations(unit: string, campaign: string, page: n
   else if (review === 'evaluated') query = query.eq('status', 'evaluated');
   const { data, error } = await query.order('review_on').order('id').range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
-  return (data ?? []) as unknown as Activation[];
+  return ((data ?? []) as unknown as Activation[]).filter(
+    row => !isDemoText(row.name) && !isDemoText(row.campaign?.name) && !isDemoText(row.account?.handle),
+  );
 }
 
 export async function saveActivation(draft: ActivationDraft, previous?: Activation) {
@@ -84,7 +86,7 @@ export async function monthEvents(unit: string, scope: string, from: string, unt
   const rows: CalendarEvent[] = [];
   for (let page = 0; ; page += 1) {
     const batch = await calendarEvents(unit, scope, from, until, page, signal, size);
-    rows.push(...batch.slice(0, size));
+    rows.push(...batch.slice(0, size).filter(row => !isDemoText(row.title)));
     if (batch.length <= size) return rows;
     signal.throwIfAborted();
   }

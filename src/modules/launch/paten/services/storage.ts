@@ -22,12 +22,6 @@ import {
   Supplier,
   TaskItem,
 } from '../types';
-type MockModule = typeof import('../data/mockData');
-let _mockCache: MockModule | null = null;
-async function loadMock(): Promise<MockModule> {
-  if (!_mockCache) _mockCache = await import('../data/mockData');
-  return _mockCache;
-}
 
 // Supabase compatibility rows span multiple evolving legacy table shapes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -525,8 +519,6 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
   ]);
 
   const value = (index: number) => queries[index];
-  const allowDemoData = import.meta.env.VITE_PATEN_DEMO_MODE === 'true';
-  const mock = allowDemoData ? await loadMock() : null;
   const bridge = value(0);
   const projects = value(1);
   const profiles = master.profiles;
@@ -564,19 +556,17 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
 
   const articleBase = projects.map((project) => legacyArticle(project, related));
   const suppliers = rowsFor(
-    supplierBase.length ? supplierBase : mock ? mock.INITIAL_SUPPLIERS : [],
+    supplierBase,
     'supplier',
     bridge,
   );
   const materials = rowsFor(
-    materialsRaw.length
-      ? materialsRaw.map((row) => mapMaterial(row, materialLinks, supplierMap))
-      : mock ? mock.INITIAL_MATERIALS : [],
+    materialsRaw.map((row) => mapMaterial(row, materialLinks, supplierMap)),
     'material',
     bridge,
   );
   const services = rowsFor(
-    servicesRaw.length ? servicesRaw.map(mapService) : mock ? mock.INITIAL_SERVICES : [],
+    servicesRaw.map(mapService),
     'service',
     bridge,
   );
@@ -677,15 +667,15 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
   });
 
   const articles = rowsFor(
-    articleBase.length ? articleBase : mock ? mock.INITIAL_ARTICLES : [],
+    articleBase,
     'article',
     bridge,
   );
-  const tasks = rowsFor(tasksBase.length ? tasksBase : mock ? mock.INITIAL_TASKS : [], 'task', bridge);
-  const blockers = rowsFor(blockersBase.length ? blockersBase : mock ? mock.INITIAL_BLOCKERS : [], 'blocker', bridge);
-  const decisions = rowsFor(decisionsBase.length ? decisionsBase : mock ? mock.INITIAL_DECISIONS : [], 'decision', bridge);
-  const approvals = rowsFor(approvalsBase.length ? approvalsBase : mock ? mock.INITIAL_APPROVALS : [], 'approval', bridge);
-  const updates = rowsFor(updatesBase.length ? updatesBase : mock ? mock.INITIAL_PROGRESS_UPDATES : [], 'progress_update', bridge);
+  const tasks = rowsFor(tasksBase, 'task', bridge);
+  const blockers = rowsFor(blockersBase, 'blocker', bridge);
+  const decisions = rowsFor(decisionsBase, 'decision', bridge);
+  const approvals = rowsFor(approvalsBase, 'approval', bridge);
+  const updates = rowsFor(updatesBase, 'progress_update', bridge);
   const hasRemoteData = projects.length > 0 || bridge.length > 0 || suppliersRaw.length > 0;
 
     return {

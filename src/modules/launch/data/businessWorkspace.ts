@@ -14,7 +14,9 @@ export function useWorkspaceUnits() {
     const { data, error } = await supabase.from('business_units')
       .select('*').order('name').abortSignal(signal);
     if (error) throw error;
-    return data as WorkspaceUnit[];
+    return ((data ?? []) as WorkspaceUnit[]).filter(
+      unit => unit.code !== 'DEMO_CREATIVE' && !/^\s*\[DEMO\]/i.test(unit.name) && !/^DEMO[\s_]/i.test(unit.name),
+    );
   } });
 }
 
