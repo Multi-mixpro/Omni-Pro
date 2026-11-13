@@ -569,14 +569,28 @@ export async function ideas(page: number, onlyPriority: boolean, queue: string, 
 }
 
 async function save(table: string, values: Record<string, string | number | boolean | string[] | ChecklistItem[] | CreativeBrief | null | undefined>, previous?: Row) {
-  const target = supabase.from(table);
-  const query = previous
-    ? target.update(values).eq('id', previous.id).eq('updated_at', previous.updated_at)
-    : target.insert(values);
-  const { data, error } = await query.select('id').maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error('Data sudah diubah pengguna lain. Segarkan dan buka ulang sebelum menyimpan.');
-  return data.id as string;
+  let currentValues = { ...values };
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const target = supabase.from(table);
+    const query = previous
+      ? target.update(currentValues).eq('id', previous.id).eq('updated_at', previous.updated_at)
+      : target.insert(currentValues);
+    const { data, error } = await query.select('id').maybeSingle();
+    if (!error) {
+      if (!data) throw new Error('Data sudah diubah pengguna lain. Segarkan dan buka ulang sebelum menyimpan.');
+      return data.id as string;
+    }
+    const msg = typeof error.message === 'string' ? error.message : '';
+    const missingColMatch = msg.match(/Could not find the '([^']+)' column/i);
+    if (missingColMatch && missingColMatch[1] && missingColMatch[1] in currentValues && missingColMatch[1] !== 'additional_platforms') {
+      const nextValues = { ...currentValues };
+      delete nextValues[missingColMatch[1]];
+      currentValues = nextValues;
+      continue;
+    }
+    throw error;
+  }
+  throw new Error('Gagal menyimpan data ke database.');
 }
 
 export const saveCampaign = (values: Draft<Campaign>, previous?: Campaign) => save('creative_campaigns', values, previous);
