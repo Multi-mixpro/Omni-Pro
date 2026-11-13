@@ -1196,6 +1196,8 @@ async function syncNormalizedRecords(
       })
       .in('id', validRemovedIds);
     if (error) throw error;
+  } else if (type === 'task') {
+    await supabase.from('launch_tasks').delete().in('id', validRemovedIds);
   }
 }
 

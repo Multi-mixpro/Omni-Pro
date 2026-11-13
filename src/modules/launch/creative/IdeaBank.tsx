@@ -1,84 +1,694 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Bookmark, Copy, ExternalLink, FileText, Lightbulb, Link2, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { useWorkspaceUnits } from '../data/businessWorkspace';
-import { button, errorText, field, IdeaForm, Options, primary } from './CreativeForms';
-import { ideas, ideaQueues, PAGE_SIZE, platforms, safeOutputUrl, taskStatuses, type Idea } from './repository';
+import { button, CopyTemplateForm, errorText, field, IdeaForm, Options, primary } from './CreativeForms';
+import {
+  copyFormats,
+  copyTemplates,
+  deleteCopyTemplate,
+  deleteIdea,
+  getIdeaAttachedScript,
+  ideas,
+  ideaQueues,
+  isDemoText,
+  outputTypes,
+  PAGE_SIZE,
+  platforms,
+  purgeCreativeDemoData,
+  safeOutputUrl,
+  taskStatuses,
+  type CopyTemplate,
+  type Idea,
+} from './repository';
 
 export function ReferenceLinks({ urls }: { urls: string[] }) {
   const links = [...new Set(urls.map(safeOutputUrl).filter(Boolean))];
   if (!links.length) return null;
-  return <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-    {links.map((url, index) => <li key={url}>
-      <a href={url} target="_blank" rel="noopener noreferrer" className="font-medium text-teal-800 underline">
-        Referensi {index + 1} · {new URL(url).hostname}
-      </a>
-    </li>)}
-  </ul>;
+  return (
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      {links.map((url, index) => (
+        <li key={url}>
+          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-teal-800 underline">
+            <span>Referensi {index + 1} · {new URL(url).hostname}</span>
+            <ExternalLink size={12} aria-hidden="true" />
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
 }
+
+type IdeaBankTab = 'ideas' | 'scripts' | 'references';
 
 export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string; canEdit: boolean; onConvert: (idea: Idea) => void; unit: string }) {
   const client = useQueryClient();
   const units = useWorkspaceUnits();
+  const [activeTab, setActiveTab] = useState<IdeaBankTab>('ideas');
   const [page, setPage] = useState(0);
   const [priority, setPriority] = useState(false);
   const [queue, setQueue] = useState('');
+  const [searchIdea, setSearchIdea] = useState('');
   const [editor, setEditor] = useState<Idea | 'new' | null>(null);
+  const [initialScriptForIdea, setInitialScriptForIdea] = useState<CopyTemplate | undefined>(undefined);
+  const [editingTemplate, setEditingTemplate] = useState<CopyTemplate | 'new' | null>(null);
+  const [scriptSearch, setScriptSearch] = useState('');
+  const [scriptFormatFilter, setScriptFormatFilter] = useState('');
+  const [scriptOutputFilter, setScriptOutputFilter] = useState('');
+  const [referencePlatformFilter, setReferencePlatformFilter] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+
   const query = useQuery({
     queryKey: ['creative', userId, 'ideas', unit, page, priority, queue],
     queryFn: ({ signal }) => ideas(page, priority, queue, signal, unit),
   });
+
+  const templatesQuery = useQuery({
+    queryKey: ['creative-copy-library', unit],
+    queryFn: ({ signal }) => copyTemplates(signal, unit),
+  });
+
+  const removeIdeaMutation = useMutation({
+    mutationFn: (id: string) => deleteIdea(id),
+    onSuccess: () => {
+      setNotice('Ide dihapus dari daftar.');
+      void client.invalidateQueries({ queryKey: ['creative', userId, 'ideas'] });
+    },
+  });
+
+  const removeTemplateMutation = useMutation({
+    mutationFn: (id: string) => deleteCopyTemplate(id),
+    onSuccess: () => {
+      setNotice('Naskah dihapus dari Bank Copywriting.');
+      void client.invalidateQueries({ queryKey: ['creative-copy-library'] });
+    },
+  });
+
+  const purgeDemoMutation = useMutation({
+    mutationFn: () => purgeCreativeDemoData(),
+    onSuccess: () => {
+      setNotice('Seluruh data demo/dummy berhasil dibersihkan.');
+      void client.invalidateQueries({ queryKey: ['creative'] });
+    },
+  });
+
   const saved = () => {
     setEditor(null);
+    setInitialScriptForIdea(undefined);
     setPage(0);
-    setNotice('Ide tersimpan.');
+    setNotice('Ide beserta lampiran naskah tersimpan.');
     void client.invalidateQueries({ queryKey: ['creative', userId, 'ideas'] });
     void client.invalidateQueries({ queryKey: ['creative', userId, 'tasks'] });
   };
-  return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4" aria-labelledby="idea-bank-heading">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h2 id="idea-bank-heading" className="font-bold">Bank Ide &amp; Referensi</h2>
-        <p className="mt-1 text-sm text-slate-600">Kumpulkan inspirasi, tandai yang perlu dikerjakan, lalu jadikan tugas untuk tim.</p>
-      </div>
-      {canEdit && <button className={primary} onClick={() => { setEditor('new'); setNotice(''); }}>Tambah ide</button>}
-    </div>
-    {notice && <p role="status" className="text-sm text-teal-800">{notice}</p>}
-    {editor && canEdit && <IdeaForm key={editor === 'new' ? 'new' : editor.id} idea={editor === 'new' ? undefined : editor}
-      defaultUnit={unit === 'all' || unit === 'unassigned' ? undefined : unit}
-      onCancel={() => setEditor(null)} onSaved={saved} />}
-    <div className="flex flex-wrap gap-3">
-      <label className="text-sm font-medium">Antrean
-        <select className={field} value={queue} onChange={event => { setQueue(event.target.value); setPage(0); }}>
-          <option value="">Semua ide</option><Options values={ideaQueues} />
-        </select>
-      </label>
-      <label className="inline-flex items-center gap-2 text-sm font-medium">
-        <input type="checkbox" checked={priority} onChange={event => { setPriority(event.target.checked); setPage(0); }} /> Hanya ide prioritas
-      </label>
-    </div>
-    {query.isPending && <p role="status" className="text-sm text-slate-600">Memuat ide…</p>}
-    {query.error && <p role="alert" className="text-sm text-red-700">Ide belum dapat dimuat: {errorText(query.error)}</p>}
-    {query.isSuccess && !query.data.length && <p className="text-sm text-slate-600">Belum ada ide pada filter ini.</p>}
-    <ul className="divide-y divide-slate-200">
-      {query.data?.slice(0, PAGE_SIZE).map(idea => <li key={idea.id} className="flex flex-wrap justify-between gap-3 py-4">
-        <div className="min-w-0 flex-1 space-y-2">
-          <h3 className="break-words font-semibold">{idea.title}</h3>
-          {unit === 'all' && <p className="text-sm text-slate-600">{units.data?.find(row => row.id === idea.business_unit_id)?.name ?? 'Unit belum ditetapkan'}</p>}
-          <p className="text-sm text-slate-600">{[idea.platform, ...(idea.additional_platforms ?? [])].map(platform => platforms[platform]).join(', ')}{idea.prioritized ? ' · Prioritas' : ''} · {idea.task ? 'Tugas: ' + taskStatuses[idea.task.status] : ideaQueues[idea.queue_state]}</p>
-          {idea.brief && <p className="whitespace-pre-wrap break-words text-sm">{idea.brief}</p>}
-          <ReferenceLinks urls={idea.reference_urls} />
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {});
+  };
+
+  const ideaRows = (query.data ?? []).filter(item => {
+    if (!searchIdea.trim()) return true;
+    const q = searchIdea.trim().toLowerCase();
+    return item.title.toLowerCase().includes(q) || item.brief.toLowerCase().includes(q);
+  });
+
+  const hasDemoIdeas = (query.data ?? []).some(item => isDemoText(item.title));
+
+  const templateMap = new Map((templatesQuery.data ?? []).map(tpl => [tpl.id, tpl]));
+
+  const filteredTemplates = (templatesQuery.data ?? []).filter(tpl => {
+    if (scriptFormatFilter && tpl.format !== scriptFormatFilter) return false;
+    if (scriptOutputFilter && tpl.output_type !== scriptOutputFilter) return false;
+    if (scriptSearch.trim()) {
+      const q = scriptSearch.trim().toLowerCase();
+      if (!tpl.title.toLowerCase().includes(q) && !tpl.body.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const referenceEntries = (query.data ?? []).flatMap(idea => {
+    const validUrls = [...new Set((idea.reference_urls ?? []).map(safeOutputUrl).filter(Boolean))];
+    return validUrls.map((url, idx) => {
+      let hostname = url;
+      try {
+        hostname = new URL(url).hostname.replace(/^www\./, '');
+      } catch { /* ignore */ }
+      return {
+        key: `${idea.id}-${idx}`,
+        url,
+        hostname,
+        idea,
+      };
+    });
+  }).filter(entry => !referencePlatformFilter || entry.idea.platform === referencePlatformFilter || entry.idea.additional_platforms?.includes(referencePlatformFilter as Idea['platform']));
+
+  const unitLabel = (id?: string | null) =>
+    id ? units.data?.find(row => row.id === id)?.name ?? 'Unit bisnis' : 'Semua unit / Umum';
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-navigation Tabs for Bank Ide */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-100 bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Menu Bank Ide">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'ideas'}
+            aria-pressed={activeTab === 'ideas'}
+            className={`${activeTab === 'ideas' ? primary : button} inline-flex items-center gap-1.5`}
+            onClick={() => { setActiveTab('ideas'); setNotice(''); }}
+          >
+            <Lightbulb className="w-4 h-4" />
+            <span>Ide Konten</span>
+            {query.data && query.data.length > 0 && (
+              <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
+                activeTab === 'ideas' ? 'bg-white/25 text-white' : 'bg-teal-100 text-teal-800'
+              }`}>
+                {query.data.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'scripts'}
+            aria-pressed={activeTab === 'scripts'}
+            className={`${activeTab === 'scripts' ? primary : button} inline-flex items-center gap-1.5`}
+            onClick={() => { setActiveTab('scripts'); setNotice(''); }}
+          >
+            <Bookmark className="w-4 h-4" />
+            <span>List Copywriting &amp; Skrip (Tabel)</span>
+            {templatesQuery.data && templatesQuery.data.length > 0 && (
+              <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
+                activeTab === 'scripts' ? 'bg-white/25 text-white' : 'bg-teal-100 text-teal-800'
+              }`}>
+                {templatesQuery.data.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'references'}
+            aria-pressed={activeTab === 'references'}
+            className={`${activeTab === 'references' ? primary : button} inline-flex items-center gap-1.5`}
+            onClick={() => { setActiveTab('references'); setNotice(''); }}
+          >
+            <Link2 className="w-4 h-4" />
+            <span>Referensi Bank Ide</span>
+            {referenceEntries.length > 0 && (
+              <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
+                activeTab === 'references' ? 'bg-white/25 text-white' : 'bg-teal-100 text-teal-800'
+              }`}>
+                {referenceEntries.length}
+              </span>
+            )}
+          </button>
         </div>
-        {canEdit && <div className="flex flex-wrap items-start gap-2">
-          <button className={button} onClick={() => { setEditor(idea); setNotice(''); document.getElementById('idea-bank-heading')?.scrollIntoView({ block: 'start' }); }}>Edit ide</button>
-          {!idea.task && idea.queue_state === 'ready' && <button className={button} onClick={() => onConvert(idea)}>Jadikan tugas</button>}
-        </div>}
-      </li>)}
-    </ul>
-    {(page > 0 || (query.data?.length ?? 0) > PAGE_SIZE) && <div className="flex flex-wrap items-center gap-2">
-      <button className={button} disabled={page === 0} onClick={() => setPage(page - 1)}>Sebelumnya</button>
-      <span className="text-sm">Halaman {page + 1}</span>
-      <button className={button} disabled={(query.data?.length ?? 0) <= PAGE_SIZE} onClick={() => setPage(page + 1)}>Berikutnya</button>
-    </div>}
-  </section>;
+
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit && hasDemoIdeas && (
+            <button
+              type="button"
+              disabled={purgeDemoMutation.isPending}
+              className={`${button} !text-rose-700 hover:!bg-rose-50 inline-flex items-center gap-1.5`}
+              onClick={() => {
+                if (confirm('Bersihkan seluruh ide dan tugas [DEMO] dari ruang kerja?')) {
+                  purgeDemoMutation.mutate();
+                }
+              }}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{purgeDemoMutation.isPending ? 'Membersihkan…' : 'Bersihkan Data Demo'}</span>
+            </button>
+          )}
+          {canEdit && activeTab === 'ideas' && (
+            <button
+              type="button"
+              className={`${primary} inline-flex items-center gap-1.5`}
+              onClick={() => {
+                setInitialScriptForIdea(undefined);
+                setEditor('new');
+                setNotice('');
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah ide</span>
+            </button>
+          )}
+          {canEdit && activeTab === 'scripts' && !editingTemplate && (
+            <button
+              type="button"
+              className={`${primary} inline-flex items-center gap-1.5`}
+              onClick={() => {
+                setEditingTemplate('new');
+                setNotice('');
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Copy / Skrip</span>
+            </button>
+          )}
+          {canEdit && activeTab === 'references' && (
+            <button
+              type="button"
+              className={`${primary} inline-flex items-center gap-1.5`}
+              onClick={() => {
+                setInitialScriptForIdea(undefined);
+                setEditor('new');
+                setActiveTab('ideas');
+                setNotice('');
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Ide &amp; Referensi</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {notice && <p role="status" className="rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-sm font-semibold text-teal-800">{notice}</p>}
+
+      {/* TAB 1: DAFTAR IDE KONTEN */}
+      {activeTab === 'ideas' && (
+        <section className="space-y-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm" aria-labelledby="idea-bank-heading">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 id="idea-bank-heading" className="text-lg font-bold">Bank Ide &amp; Perencanaan Konten</h2>
+              <p className="mt-0.5 text-sm text-slate-600">
+                Kumpulkan ide konten, lampirkan naskah copywriting/skrip dari tabel Bank Copy, lalu jadikan tugas produksi untuk tim.
+              </p>
+            </div>
+          </div>
+
+          {editor && canEdit && (
+            <IdeaForm
+              key={editor === 'new' ? `new-${initialScriptForIdea?.id ?? ''}` : editor.id}
+              idea={editor === 'new' ? undefined : editor}
+              initialTemplate={editor === 'new' ? initialScriptForIdea : undefined}
+              defaultUnit={unit === 'all' || unit === 'unassigned' ? undefined : unit}
+              onCancel={() => {
+                setEditor(null);
+                setInitialScriptForIdea(undefined);
+              }}
+              onSaved={saved}
+            />
+          )}
+
+          <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
+            <label className="min-w-[200px] flex-1 text-xs font-semibold text-slate-700">
+              Cari judul / catatan ide
+              <div className="relative mt-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  className={`${field} !pl-8`}
+                  placeholder="Ketik kata kunci ide…"
+                  value={searchIdea}
+                  onChange={e => setSearchIdea(e.target.value)}
+                />
+              </div>
+            </label>
+            <label className="text-xs font-semibold text-slate-700">
+              Antrean
+              <select className={`${field} mt-1`} value={queue} onChange={event => { setQueue(event.target.value); setPage(0); }}>
+                <option value="">Semua ide</option>
+                <Options values={ideaQueues} />
+              </select>
+            </label>
+            <label className="inline-flex min-h-[38px] items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+              <input type="checkbox" checked={priority} onChange={event => { setPriority(event.target.checked); setPage(0); }} />
+              <span>Hanya ide prioritas</span>
+            </label>
+          </div>
+
+          {query.isPending && <p role="status" className="text-sm text-slate-600">Memuat ide…</p>}
+          {query.error && <p role="alert" className="text-sm text-red-700">Ide belum dapat dimuat: {errorText(query.error)}</p>}
+          {query.isSuccess && !ideaRows.length && <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-600">Belum ada ide pada filter ini.</p>}
+
+          <ul className="divide-y divide-slate-200">
+            {ideaRows.slice(0, PAGE_SIZE).map(idea => {
+              const attachedScriptId = getIdeaAttachedScript(idea.id);
+              const attachedScript = attachedScriptId ? templateMap.get(attachedScriptId) : undefined;
+              return (
+                <li key={idea.id} className="flex flex-wrap justify-between gap-3 py-4">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h3 className="break-words font-bold text-slate-900">{idea.title}</h3>
+                      {idea.prioritized && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">Prioritas</span>
+                      )}
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        {idea.task ? 'Tugas: ' + taskStatuses[idea.task.status] : ideaQueues[idea.queue_state]}
+                      </span>
+                      {attachedScript && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800">
+                          <FileText size={12} />
+                          <span>Naskah: {attachedScript.title}</span>
+                        </span>
+                      )}
+                    </div>
+                    {unit === 'all' && (
+                      <p className="text-xs font-medium text-slate-600">
+                        {units.data?.find(row => row.id === idea.business_unit_id)?.name ?? 'Unit belum ditetapkan'}
+                      </p>
+                    )}
+                    <p className="text-sm text-slate-600">
+                      Platform: {[idea.platform, ...(idea.additional_platforms ?? [])].map(platform => platforms[platform]).join(', ')}
+                    </p>
+                    {idea.brief && <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{idea.brief}</p>}
+                    {attachedScript && (
+                      <details className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs">
+                        <summary className="cursor-pointer font-bold text-teal-800">
+                          Lihat Lampiran Skrip ({copyFormats[attachedScript.format] ?? attachedScript.format} · {outputTypes[attachedScript.output_type] ?? attachedScript.output_type})
+                        </summary>
+                        <p className="mt-2 whitespace-pre-wrap font-mono text-slate-700">{attachedScript.body}</p>
+                      </details>
+                    )}
+                    <ReferenceLinks urls={idea.reference_urls} />
+                  </div>
+                  {canEdit && (
+                    <div className="flex flex-wrap items-start gap-2">
+                      <button
+                        type="button"
+                        className={button}
+                        onClick={() => {
+                          setEditor(idea);
+                          setNotice('');
+                          document.getElementById('idea-bank-heading')?.scrollIntoView({ block: 'start' });
+                        }}
+                      >
+                        Edit ide
+                      </button>
+                      {!idea.task && idea.queue_state === 'ready' && (
+                        <button type="button" className={primary} onClick={() => onConvert(idea)}>
+                          Jadikan tugas
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={`${button} !text-red-700 hover:!bg-red-50 inline-flex items-center gap-1`}
+                        title="Hapus ide ini"
+                        aria-label={`Hapus ${idea.title}`}
+                        onClick={() => {
+                          if (confirm(`Hapus ide "${idea.title}" dari Bank Ide?`)) {
+                            removeIdeaMutation.mutate(idea.id);
+                          }
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          {(page > 0 || (query.data?.length ?? 0) > PAGE_SIZE) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button className={button} disabled={page === 0} onClick={() => setPage(page - 1)}>Sebelumnya</button>
+              <span className="text-sm">Halaman {page + 1}</span>
+              <button className={button} disabled={(query.data?.length ?? 0) <= PAGE_SIZE} onClick={() => setPage(page + 1)}>Berikutnya</button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* TAB 2: LIST NASKAH & COPYWRITING (TABEL) */}
+      {activeTab === 'scripts' && (
+        <section className="space-y-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm" aria-label="List Tabel Copywriting dan Skrip Naskah">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">Daftar Tabel Copywriting &amp; Bank Skrip Naskah</h2>
+              <p className="mt-0.5 text-sm text-slate-600">
+                Simpan dan kelola daftar naskah copywriting, hook video, skrip 30-60 detik, dan caption dalam tampilan tabel. Lampirkan langsung ke Ide atau Tugas Baru.
+              </p>
+            </div>
+          </div>
+
+          {editingTemplate && canEdit && (
+            <CopyTemplateForm
+              template={editingTemplate === 'new' ? undefined : editingTemplate}
+              defaultUnit={unit === 'all' || unit === 'unassigned' ? undefined : unit}
+              onCancel={() => setEditingTemplate(null)}
+              onSaved={() => {
+                setEditingTemplate(null);
+                setNotice('Naskah copywriting berhasil disimpan ke daftar tabel.');
+                void client.invalidateQueries({ queryKey: ['creative-copy-library'] });
+              }}
+            />
+          )}
+
+          {/* Filter Bar for Copywriting Table */}
+          <div className="grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-3">
+            <label className="text-xs font-semibold text-slate-700">
+              Cari judul / isi skrip
+              <div className="relative mt-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  className={`${field} !pl-8`}
+                  placeholder="Cari hook, skrip, caption…"
+                  value={scriptSearch}
+                  onChange={e => setScriptSearch(e.target.value)}
+                />
+              </div>
+            </label>
+            <label className="text-xs font-semibold text-slate-700">
+              Filter format naskah
+              <select className={`${field} mt-1`} value={scriptFormatFilter} onChange={e => setScriptFormatFilter(e.target.value)}>
+                <option value="">Semua format naskah</option>
+                <Options values={copyFormats} />
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-slate-700">
+              Filter tipe output
+              <select className={`${field} mt-1`} value={scriptOutputFilter} onChange={e => setScriptOutputFilter(e.target.value)}>
+                <option value="">Semua tipe output</option>
+                <Options values={outputTypes} />
+              </select>
+            </label>
+          </div>
+
+          {templatesQuery.isPending && <p role="status" className="text-sm text-slate-600">Memuat tabel naskah…</p>}
+          {templatesQuery.isError && <p role="alert" className="text-sm text-red-700">{errorText(templatesQuery.error)}</p>}
+
+          {filteredTemplates.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
+              Belum ada naskah copywriting atau skrip yang cocok dengan filter ini.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="creative-table w-full text-sm">
+                <thead>
+                  <tr>
+                    <th scope="col" className="w-60">Judul Naskah</th>
+                    <th scope="col" className="w-40">Format &amp; Output</th>
+                    <th scope="col" className="w-36">Platform &amp; Unit</th>
+                    <th scope="col">Isi Copywriting / Skrip Naskah</th>
+                    <th scope="col" className="w-56 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTemplates.map(tpl => (
+                    <tr key={tpl.id} className="align-top">
+                      <td className="font-bold text-slate-900">
+                        {tpl.title}
+                      </td>
+                      <td>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800">
+                            {copyFormats[tpl.format] ?? tpl.format}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                            {outputTypes[tpl.output_type] ?? tpl.output_type}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="text-xs text-slate-600">
+                        <span className="block font-semibold text-slate-800">
+                          {tpl.platform ? platforms[tpl.platform] : 'Semua platform'}
+                        </span>
+                        <span className="block mt-0.5">{unitLabel(tpl.business_unit_id)}</span>
+                      </td>
+                      <td>
+                        <div className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-xs text-slate-800 leading-relaxed">
+                          {tpl.body}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            className={`${button} !px-2.5 !py-1 !text-xs inline-flex items-center gap-1`}
+                            onClick={() => copyToClipboard(tpl.body, tpl.id)}
+                          >
+                            <Copy size={13} />
+                            <span>{copiedId === tpl.id ? 'Tersalin!' : 'Salin'}</span>
+                          </button>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              className={`${primary} !px-2.5 !py-1 !text-xs`}
+                              onClick={() => {
+                                setInitialScriptForIdea(tpl);
+                                setEditor('new');
+                                setActiveTab('ideas');
+                              }}
+                            >
+                              + Buat Ide
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button
+                              type="button"
+                              className={`${button} !px-2.5 !py-1 !text-xs`}
+                              onClick={() => setEditingTemplate(tpl)}
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button
+                              type="button"
+                              className={`${button} !px-2 !py-1 !text-xs !text-red-700 hover:!bg-red-50`}
+                              title="Hapus naskah ini"
+                              aria-label={`Hapus ${tpl.title}`}
+                              onClick={() => {
+                                if (confirm(`Hapus naskah "${tpl.title}" dari tabel Bank Copy?`)) {
+                                  removeTemplateMutation.mutate(tpl.id);
+                                }
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* TAB 3: REFERENSI BANK IDE (TAB MENU TERPISAH) */}
+      {activeTab === 'references' && (
+        <section className="space-y-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm" aria-label="Referensi Bank Ide">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">Katalog Referensi Bank Ide</h2>
+              <p className="mt-0.5 text-sm text-slate-600">
+                Daftar seluruh tautan referensi kompetitor, benchmark visual, dan contoh konten yang tersimpan di Bank Ide.
+              </p>
+            </div>
+            <label className="text-xs font-semibold text-slate-700">
+              Filter platform
+              <select
+                className={`${field} mt-1 min-w-[160px]`}
+                value={referencePlatformFilter}
+                onChange={e => setReferencePlatformFilter(e.target.value)}
+              >
+                <option value="">Semua platform</option>
+                <Options values={platforms} />
+              </select>
+            </label>
+          </div>
+
+          {query.isPending && <p role="status" className="text-sm text-slate-600">Memuat referensi…</p>}
+
+          {referenceEntries.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
+              <p className="font-semibold text-slate-800">Belum ada tautan referensi pada filter ini.</p>
+              <p className="mt-1 text-xs">Tambahkan tautan referensi saat membuat atau mengedit ide konten.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="creative-table w-full text-sm">
+                <thead>
+                  <tr>
+                    <th scope="col">Sumber &amp; Tautan Referensi</th>
+                    <th scope="col">Ide Terkait</th>
+                    <th scope="col">Platform</th>
+                    <th scope="col">Status Ide</th>
+                    <th scope="col" className="text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {referenceEntries.map(({ key, url, hostname, idea }) => (
+                    <tr key={key}>
+                      <td>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 font-bold text-teal-800 underline break-all"
+                        >
+                          <span>{hostname}</span>
+                          <ExternalLink size={13} className="shrink-0" />
+                        </a>
+                        <p className="mt-0.5 text-xs text-slate-500 truncate max-w-xs">{url}</p>
+                      </td>
+                      <td>
+                        <strong className="block text-slate-900">{idea.title}</strong>
+                        {idea.brief && <p className="text-xs text-slate-600 line-clamp-1 mt-0.5">{idea.brief}</p>}
+                      </td>
+                      <td>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                          {[idea.platform, ...(idea.additional_platforms ?? [])].map(p => platforms[p]).join(', ')}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-800">
+                          {idea.task ? 'Tugas: ' + taskStatuses[idea.task.status] : ideaQueues[idea.queue_state]}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`${button} !px-2.5 !py-1 !text-xs inline-flex items-center gap-1`}
+                          >
+                            <span>Buka</span>
+                            <ExternalLink size={12} />
+                          </a>
+                          <button
+                            type="button"
+                            className={`${button} !px-2.5 !py-1 !text-xs inline-flex items-center gap-1`}
+                            onClick={() => copyToClipboard(url, key)}
+                          >
+                            <Copy size={12} />
+                            <span>{copiedId === key ? 'Tersalin' : 'Salin URL'}</span>
+                          </button>
+                          {canEdit && !idea.task && idea.queue_state === 'ready' && (
+                            <button
+                              type="button"
+                              className={`${primary} !px-2.5 !py-1 !text-xs`}
+                              onClick={() => onConvert(idea)}
+                            >
+                              Jadikan tugas
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  );
 }

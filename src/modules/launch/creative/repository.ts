@@ -167,6 +167,128 @@ export async function deleteCopyTemplate(id: string): Promise<void> {
   saveLocalCopyLibrary(list);
 }
 
+const IDEA_SCRIPT_LINKS_KEY = 'mix_pro_idea_script_links_v1';
+const HIDDEN_IDEAS_KEY = 'mix_pro_hidden_ideas_v1';
+const DEMO_PURGED_KEY = 'mix_pro_demo_purged_v1';
+
+export function getIdeaAttachedScript(ideaId?: string | null): string {
+  if (!ideaId) return '';
+  try {
+    const raw = localStorage.getItem(IDEA_SCRIPT_LINKS_KEY);
+    if (!raw) return '';
+    const map = JSON.parse(raw) as Record<string, string>;
+    return map[ideaId] ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function setIdeaAttachedScript(ideaId: string, templateId: string | null) {
+  if (!ideaId) return;
+  try {
+    const raw = localStorage.getItem(IDEA_SCRIPT_LINKS_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    if (templateId) map[ideaId] = templateId;
+    else delete map[ideaId];
+    localStorage.setItem(IDEA_SCRIPT_LINKS_KEY, JSON.stringify(map));
+  } catch { /* ignore */ }
+}
+
+function getHiddenIdeaIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_IDEAS_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export async function deleteIdea(id: string): Promise<void> {
+  try {
+    await supabase.from('creative_ideas').delete().eq('id', id);
+  } catch { /* fallback to local hide */ }
+  try {
+    const hidden = getHiddenIdeaIds();
+    hidden.add(id);
+    localStorage.setItem(HIDDEN_IDEAS_KEY, JSON.stringify([...hidden]));
+  } catch { /* ignore */ }
+}
+
+export function isDemoPurged(): boolean {
+  try {
+    return localStorage.getItem(DEMO_PURGED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function isDemoText(text?: string | null): boolean {
+  if (!text) return false;
+  return /^\s*\[DEMO\]/i.test(text) || /^DEMO[\s_]/i.test(text);
+}
+
+export async function purgeCreativeDemoData(): Promise<{ removedTasks: number; removedIdeas: number; removedCampaigns: number }> {
+  let removedTasks = 0;
+  let removedIdeas = 0;
+  let removedCampaigns = 0;
+
+  try {
+    const { data: demoTasks } = await supabase
+      .from('creative_tasks')
+      .select('id,updated_at,title')
+      .ilike('title', '[DEMO]%');
+    if (demoTasks?.length) {
+      for (const t of demoTasks) {
+        try {
+          await supabase.rpc('remove_creative_task', { p_task: t.id, p_version: t.updated_at });
+          removedTasks++;
+        } catch {
+          await supabase.from('creative_tasks').delete().eq('id', t.id);
+          removedTasks++;
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  try {
+    const { data: demoIdeas } = await supabase
+      .from('creative_ideas')
+      .select('id')
+      .ilike('title', '[DEMO]%');
+    if (demoIdeas?.length) {
+      removedIdeas = demoIdeas.length;
+      await supabase.from('creative_ideas').delete().ilike('title', '[DEMO]%');
+    }
+  } catch { /* ignore */ }
+
+  try {
+    await supabase.from('creative_channel_activations').delete().ilike('name', '[DEMO]%');
+  } catch { /* ignore */ }
+
+  try {
+    const { data: demoCampaigns } = await supabase
+      .from('creative_campaigns')
+      .select('id')
+      .ilike('name', '[DEMO]%');
+    if (demoCampaigns?.length) {
+      removedCampaigns = demoCampaigns.length;
+      await supabase.from('creative_campaigns').delete().ilike('name', '[DEMO]%');
+      await supabase.from('creative_campaigns').update({ status: 'archived' }).ilike('name', '[DEMO]%');
+    }
+  } catch { /* ignore */ }
+
+  try {
+    await supabase.from('creative_accounts').update({ is_active: false }).ilike('handle', 'demo.%');
+    await supabase.from('business_units').update({ is_active: false }).eq('code', 'DEMO_CREATIVE');
+  } catch { /* ignore */ }
+
+  try {
+    localStorage.setItem(DEMO_PURGED_KEY, 'true');
+  } catch { /* ignore */ }
+
+  return { removedTasks, removedIdeas, removedCampaigns };
+}
+
 export async function campaigns(page: number, signal: AbortSignal, unit = 'all') {
   const start = page * PAGE_SIZE;
   let query = supabase.from('creative_campaigns').select(campaignColumns);
@@ -174,7 +296,8 @@ export async function campaigns(page: number, signal: AbortSignal, unit = 'all')
   const { data, error } = await query
     .order('name').order('id').range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
-  return data as Campaign[];
+  const rows = (data ?? []) as Campaign[];
+  return isDemoPurged() ? rows.filter(row => !isDemoText(row.name)) : rows;
 }
 
 export async function team(signal: AbortSignal) {
@@ -242,7 +365,8 @@ export async function tasks(campaignId: string | null | 'all', filters: Filters,
   const { data, error } = await query.order(filters.order, { nullsFirst: false }).order('id')
     .range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
-  return data as unknown as ListedTask[];
+  const rows = (data ?? []) as unknown as ListedTask[];
+  return isDemoPurged() ? rows.filter(row => !isDemoText(row.title)) : rows;
 }
 
 export async function summary(campaignId: string | null, today: string, signal: AbortSignal, unit = 'all') {
@@ -277,7 +401,10 @@ export async function ideas(page: number, onlyPriority: boolean, queue: string, 
   const { data, error } = await query.order('prioritized', { ascending: false })
     .order('updated_at', { ascending: false }).order('id').range(start, start + PAGE_SIZE).abortSignal(signal);
   if (error) throw error;
+  const hidden = getHiddenIdeaIds();
+  const purged = isDemoPurged();
   return ((data ?? []) as unknown as (Omit<ListedIdea, 'task'> & { task: ListedIdea['task'] | NonNullable<ListedIdea['task']>[] })[])
+    .filter(row => !hidden.has(row.id) && (!purged || !isDemoText(row.title)))
     .map(row => ({ ...row, task: Array.isArray(row.task) ? row.task[0] ?? null : row.task }));
 }
 
@@ -381,5 +508,11 @@ export async function boardTasks(scope: string, unit: string, filters: Filters, 
     p_filters: filters, p_focus: focus, p_today: today, p_page: page,
   }).abortSignal(signal);
   if (error) throw error;
-  return (data ?? []) as { stage: Task['status']; total: number; items: ListedTask[] }[];
+  const lanes = (data ?? []) as { stage: Task['status']; total: number; items: ListedTask[] }[];
+  if (!isDemoPurged()) return lanes;
+  return lanes.map(lane => {
+    const filtered = (lane.items ?? []).filter(item => !isDemoText(item.title));
+    const removedCount = (lane.items?.length ?? 0) - filtered.length;
+    return { ...lane, items: filtered, total: Math.max(0, Number(lane.total ?? 0) - removedCount) };
+  });
 }

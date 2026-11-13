@@ -62,7 +62,7 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
             onClick={() => setActiveTab('templates')}
           >
             <Bookmark className="w-3.5 h-3.5" />
-            <span>Bank Copy &amp; Skrip Reusable</span>
+            <span>List Tabel Copywriting &amp; Skrip</span>
             {templatesQuery.data && templatesQuery.data.length > 0 && (
               <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
                 activeTab === 'templates' ? 'bg-white/25 text-white' : 'bg-teal-100 text-teal-800'
@@ -99,7 +99,7 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
 
       {/* Tab 1: Active Tasks with brief & copy versions */}
       {activeTab === 'tasks' && (
-        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4" aria-label="Studio brief dan copy">
+        <section className="space-y-3 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm" aria-label="Studio brief dan copy">
           <div>
             <h2 className="text-lg font-bold">Brief dan naskah produksi</h2>
             <p className="text-sm text-slate-600">Lengkapi brief, tulis naskah, lalu buka riwayat versi dan keputusan dari tugas yang sama.</p>
@@ -110,11 +110,24 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
           <ul className="divide-y divide-slate-100">
             {query.data?.slice(0, PAGE_SIZE).map(row => {
               const objective = row.creative_brief?.objective;
+              const tpl = row.copy_template_id ? templatesQuery.data?.find(t => t.id === row.copy_template_id) : undefined;
               return (
                 <li key={row.id} className="flex flex-wrap items-center gap-3 py-3">
                   <span className="creative-studio-icon"><FileText size={17} /></span>
                   <div className="min-w-0 flex-1 break-words">
-                    <h3 className="font-semibold">{row.title}</h3>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h3 className="font-semibold">{row.title}</h3>
+                      {row.output_type && row.output_type !== 'other' && (
+                        <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">
+                          {outputTypes[row.output_type] ?? row.output_type}
+                        </span>
+                      )}
+                      {tpl && (
+                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                          Skrip: {tpl.title}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-600">{taskStatuses[row.status]} · {row.campaign?.name ?? 'Tanpa kampanye'}</p>
                     <p className="mt-1 line-clamp-2 text-sm text-slate-600">
                       {typeof objective === 'string' && objective ? objective : row.brief || 'Brief belum diisi.'}
@@ -132,81 +145,94 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
         </section>
       )}
 
-      {/* Tab 2: Bank Copywriting & Skrip Reusable */}
+      {/* Tab 2: Bank Copywriting & Skrip Reusable (List Tabel) */}
       {activeTab === 'templates' && (
-        <section className="space-y-4" aria-label="Bank copywriting dan skrip reusable">
-          <div className="rounded-2xl border border-teal-100 bg-white p-4 shadow-sm">
-            <h2 className="text-lg font-bold">Koleksi Copywriting, Hook &amp; Skrip Reusable</h2>
+        <section className="space-y-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm" aria-label="Bank copywriting dan skrip reusable">
+          <div>
+            <h2 className="text-lg font-bold">List Tabel Copywriting, Hook &amp; Skrip Naskah</h2>
             <p className="text-sm text-slate-600">
-              Simpan format hook video, caption jualan, alur skrip 30-60 detik, dan template listing yang sudah terbukti menghasilkan interaksi tinggi untuk dipakai ulang saat membuat tugas baru.
+              Daftar naskah ini tersinkronisasi penuh dengan <strong>Bank Ide</strong> dan <strong>Form Tugas Baru</strong>.
             </p>
           </div>
 
           {templatesQuery.isPending && <p role="status" className="text-sm text-slate-600">Memuat koleksi bank copy…</p>}
           {templatesQuery.isError && <p role="alert" className="text-sm text-red-700">{errorText(templatesQuery.error)}</p>}
 
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {templatesQuery.data?.map(tpl => (
-              <article key={tpl.id} className="creative-template-card rounded-2xl border border-teal-100 bg-white p-4 shadow-sm flex flex-col justify-between gap-3">
-                <div className="space-y-2.5">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800">
-                      {copyFormats[tpl.format] ?? tpl.format}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                      {outputTypes[tpl.output_type] ?? tpl.output_type}
-                    </span>
-                    {tpl.platform && (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="creative-table w-full text-sm">
+              <thead>
+                <tr>
+                  <th scope="col" className="w-60">Judul Naskah</th>
+                  <th scope="col" className="w-40">Format &amp; Output</th>
+                  <th scope="col" className="w-32">Platform</th>
+                  <th scope="col">Isi Copywriting / Skrip</th>
+                  <th scope="col" className="w-44 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {templatesQuery.data?.map(tpl => (
+                  <tr key={tpl.id} className="align-top">
+                    <td className="font-bold text-slate-900">{tpl.title}</td>
+                    <td>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800">
+                          {copyFormats[tpl.format] ?? tpl.format}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                          {outputTypes[tpl.output_type] ?? tpl.output_type}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
                       <span className="rounded-full bg-indigo-50 text-indigo-700 px-2.5 py-0.5 text-xs font-semibold">
-                        {platforms[tpl.platform] ?? tpl.platform}
+                        {tpl.platform ? platforms[tpl.platform] : 'Semua platform'}
                       </span>
-                    )}
-                  </div>
-                  <h3 className="font-bold text-slate-900 leading-snug">{tpl.title}</h3>
-                  <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-700 leading-relaxed font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
-                    {tpl.body}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100">
-                  <button
-                    type="button"
-                    className={`${button} !px-3 !py-1.5 !text-xs inline-flex items-center gap-1.5`}
-                    onClick={() => copyToClipboard(tpl.body, tpl.id)}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>{copiedId === tpl.id ? 'Tersalin!' : 'Salin naskah'}</span>
-                  </button>
-
-                  <div className="flex items-center gap-1.5">
-                    {canEdit && (
-                      <button
-                        type="button"
-                        className={`${button} !px-3 !py-1.5 !text-xs`}
-                        onClick={() => setEditingTemplate(tpl)}
-                      >
-                        Edit
-                      </button>
-                    )}
-                    {canEdit && (
-                      <button
-                        type="button"
-                        className={`${button} !px-2.5 !py-1.5 !text-xs !text-red-700 hover:!bg-red-50 inline-flex items-center gap-1`}
-                        title="Hapus template ini"
-                        aria-label={`Hapus ${tpl.title}`}
-                        onClick={() => {
-                          if (confirm(`Hapus template "${tpl.title}" dari Bank Copy?`)) {
-                            removeTemplate.mutate(tpl.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </article>
-            ))}
+                    </td>
+                    <td>
+                      <div className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-xs text-slate-800">
+                        {tpl.body}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          className={`${button} !px-2.5 !py-1 !text-xs inline-flex items-center gap-1`}
+                          onClick={() => copyToClipboard(tpl.body, tpl.id)}
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>{copiedId === tpl.id ? 'Tersalin!' : 'Salin'}</span>
+                        </button>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            className={`${button} !px-2.5 !py-1 !text-xs`}
+                            onClick={() => setEditingTemplate(tpl)}
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {canEdit && (
+                          <button
+                            type="button"
+                            className={`${button} !px-2 !py-1 !text-xs !text-red-700 hover:!bg-red-50`}
+                            title="Hapus template ini"
+                            aria-label={`Hapus ${tpl.title}`}
+                            onClick={() => {
+                              if (confirm(`Hapus template "${tpl.title}" dari Bank Copy?`)) {
+                                removeTemplate.mutate(tpl.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       )}

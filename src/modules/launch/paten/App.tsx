@@ -363,6 +363,23 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
     void StorageService.saveTasks(updated).catch(() => setTasks(previous));
   };
 
+  const handleDeleteTask = (taskId: string) => {
+    if (!canEdit) return;
+    const previous = tasks;
+    const updated = tasks.filter((t) => t.id !== taskId);
+    setTasks(updated);
+    void StorageService.saveTasks(updated).catch(() => setTasks(previous));
+  };
+
+  const handlePurgeTasks = (taskIds: string[]) => {
+    if (!canEdit || !taskIds.length) return;
+    const idSet = new Set(taskIds);
+    const previous = tasks;
+    const updated = tasks.filter((t) => !idSet.has(t.id));
+    setTasks(updated);
+    void StorageService.saveTasks(updated).catch(() => setTasks(previous));
+  };
+
   const handleResolveBlocker = (blockerId: string) => {
     if (!canEdit) return;
     const previous = blockers;
@@ -728,6 +745,8 @@ export default function App({ currentUser, permissions = [] }: PatenAppProps) {
               decisions={scopedDecisions}
               onUpdateTask={handleUpdateTask}
               onCreateTask={handleCreateTask}
+              onDeleteTask={canEdit ? handleDeleteTask : undefined}
+              onPurgeTasks={canEdit ? handlePurgeTasks : undefined}
               onResolveBlocker={handleResolveBlocker}
               onCreateBlocker={handleCreateBlocker}
               onResolveDecision={handleResolveDecision}

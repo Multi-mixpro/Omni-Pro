@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ShieldCheck, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { ProjectDiscussion } from '../discussion/ProjectDiscussion';
@@ -16,7 +16,7 @@ import { channelSummary, type CalendarEvent } from './channelRepository';
 import { publicationTaskId } from './commandRepository';
 import { focusLabels, jakartaToday, mondayWeek, type Focus } from './schedule';
 import {
-  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, outputTypes, PAGE_SIZE, platforms, priorities, removeTask, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
+  advanceTask, boardTasks, BOARD_PAGE_SIZE, campaigns, campaignStatuses, isDemoText, outputTypes, PAGE_SIZE, platforms, priorities, purgeCreativeDemoData, removeTask, safeOutputUrl, summary, tasks, taskStatuses, team, workload, workstreams,
   type Campaign, type Filters, type Idea, type Task,
 } from './repository';
 import './creativeWorkspace.css';
@@ -63,7 +63,7 @@ const navigation = [
   ] },
   { label: 'Administrasi', items: [
     { id: 'team', label: 'Tim & PIC', icon: Users },
-    { id: 'access', label: 'Pengaturan Akses', icon: ShieldCheck },
+    { id: 'access', label: 'Pengguna & Hak Akses', icon: ShieldCheck },
   ] },
 ] as const;
 const sectionColors: Record<Section, string> = {
@@ -121,9 +121,14 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const location = useLocation();
   const navigate = useNavigate();
   const client = useQueryClient();
+  const isOwnerRole = permissions.includes('launch.admin');
+  const visibleNavigation = navigation.map(group => ({
+    ...group,
+    items: group.items.filter(item => item.id !== 'access' || isOwnerRole),
+  })).filter(group => group.items.length > 0);
   const search = new URLSearchParams(location.search);
   const requestedSection = search.get('section');
-  const section: Section = navigation.flatMap(group => [...group.items]).some(item => item.id === requestedSection)
+  const section: Section = visibleNavigation.flatMap(group => [...group.items]).some(item => item.id === requestedSection)
     ? requestedSection as Section : search.get('mine') === '1' ? 'work' : 'overview';
   const setSection = (next: Section) => {
     const params = new URLSearchParams(location.search);
@@ -287,6 +292,15 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       void client.invalidateQueries({ queryKey: ['business-execution', userId] });
     },
   });
+  const purgeDemo = useMutation({
+    mutationFn: purgeCreativeDemoData,
+    onSuccess: (res) => {
+      setPage(0);
+      setNotice(`Data demo/dummy dibersihkan (${res.removedTasks} tugas, ${res.removedIdeas} ide, ${res.removedCampaigns} kampanye).`);
+      refresh();
+      void client.invalidateQueries({ queryKey: ['business-execution', userId] });
+    },
+  });
   const tasksOnPage = taskQuery.data?.slice(0, PAGE_SIZE) ?? [];
   const boardStatuses: Task['status'][] = ['todo', 'doing', 'review', 'ready', 'blocked', 'done', 'cancelled'];
   const taskGroups = taskView === 'board'
@@ -295,6 +309,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       return { status, rows: lane?.items ?? [], total: Number(lane?.total ?? 0) };
     })
     : [{ status: null, rows: tasksOnPage, total: tasksOnPage.length }];
+  const hasDemoItems = taskGroups.some(group => group.rows.some(row => isDemoText(row.title))) || campaignList.some(c => isDemoText(c.name));
   const hasNextTasks = taskView === 'board' ? taskGroups.some(group => group.total > (page + 1)*BOARD_PAGE_SIZE) : (taskQuery.data?.length ?? 0) > PAGE_SIZE;
   const activeSection = navigation.flatMap(group => [...group.items]).find(item => item.id === section)?.label;
   const highlights = (currentCampaign ? [currentCampaign] : [...campaignList]
@@ -318,7 +333,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
             }}>{sidebarCompact ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
         </div>
         <nav id="creative-navigation" aria-label="Bagian Creative Dashboard" className="creative-navigation">
-          {navigation.map(group => <div key={group.label} className="creative-nav-group">
+          {visibleNavigation.map(group => <div key={group.label} className="creative-nav-group">
             <p className="creative-nav-label px-2 text-[10px] font-bold uppercase tracking-widest">{group.label}</p>
             {group.items.map(({ id,label,icon:Icon }) => <button key={id} aria-current={section === id ? 'page' : undefined} aria-label={label} title={label}
               className="creative-nav-item flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold"
@@ -337,6 +352,21 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
           {canSwitchWorkspace && <Link to="/launch/app" className={button + ' inline-flex items-center gap-2'}><ArrowLeft size={16} /> Pilih ruang kerja</Link>}
           <AccountSignOut name={userName} className={button + ' inline-flex items-center gap-2'} />
           <button className={button + ' inline-flex items-center gap-2'} disabled={loading} onClick={refresh}><RefreshCw size={15} /> Segarkan</button>
+          {(canRemove || canEdit) && hasDemoItems && (
+            <button
+              type="button"
+              className={button + ' !text-rose-700 hover:!bg-rose-50 inline-flex items-center gap-1.5'}
+              disabled={purgeDemo.isPending}
+              onClick={() => {
+                if (confirm('Bersihkan seluruh tugas, ide, dan kampanye [DEMO] / dummy dari ruang kerja?')) {
+                  purgeDemo.mutate();
+                }
+              }}
+            >
+              <Sparkles size={15} />
+              <span>{purgeDemo.isPending ? 'Membersihkan…' : 'Bersihkan Data Demo'}</span>
+            </button>
+          )}
           {canEdit && section === 'campaigns' && <button className={primary + ' inline-flex items-center gap-2'} onClick={() => openEditor({ kind: 'campaign' })}><Plus size={16} /> Kampanye baru</button>}
           {canEdit && (section === 'overview' || section === 'work') && <button className={primary + ' inline-flex items-center gap-2'} disabled={currentCampaign?.status === 'archived'} onClick={() => openEditor({ kind: 'task' })}><Plus size={16} /> Tugas baru</button>}
         </div>
@@ -483,7 +513,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         onFocus={openFocus} onAds={() => openSection('ads','overdue')} onTask={setDetailId} onDecisions={() => openSection('decisions')} /></Suspense>}
       {detailId && <EditorDialog onClose={() => setDetailId(null)}><Suspense fallback={sectionLoading}><CreativeTaskDetail key={detailId} taskId={detailId} userId={userId} canEdit={canEdit}
         onClose={() => setDetailId(null)} onChanged={taskChanged} /></Suspense></EditorDialog>}
-      {canRemove && taskToRemove && <EditorDialog label="Hapus tugas kreatif" onClose={() => setTaskToRemove(null)}>
+      {(canRemove || canEdit) && taskToRemove && <EditorDialog label="Hapus tugas kreatif" onClose={() => setTaskToRemove(null)}>
         <form className="space-y-4 p-5 sm:p-6" aria-busy={removal.isPending} onSubmit={event => {
           event.preventDefault();
           if (!removal.isPending) removal.mutate(taskToRemove);
@@ -588,7 +618,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
                   onClick={() => { setNotice(''); quickUpdate.mutate({ task, status: action.status }); }}>{updating ? 'Menyimpan…' : action.label}</button>}
                 <button className={canEdit && publishable && task.status === 'ready' && !awaitingApproval ? primary : button} onClick={() => setDetailId(task.id)}>{canEdit && publishable && task.status === 'ready' && !awaitingApproval ? 'Catat tayang' : 'Detail'}</button>
                 {canEdit && <button className={button} disabled={updating} aria-label={'Edit ' + task.title} onClick={() => openEditor({ kind: 'task', row: task })}>Edit</button>}
-                {canRemove && <button className={button + ' inline-flex items-center gap-1.5 !text-red-700 hover:!bg-red-50'} disabled={updating}
+                {(canRemove || (canEdit && isDemoText(task.title))) && <button className={button + ' inline-flex items-center gap-1.5 !text-red-700 hover:!bg-red-50'} disabled={updating}
                   aria-label={'Hapus ' + task.title} onClick={() => { removal.reset(); setNotice(''); setTaskToRemove(task); }}><Trash2 size={14} aria-hidden="true" /> Hapus</button>}
               </div>
             </li>;

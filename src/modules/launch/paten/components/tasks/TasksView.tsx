@@ -9,6 +9,8 @@ import {
   ShieldAlert,
   Info,
   GitBranch,
+  Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { Article, TaskItem, BlockerItem, DecisionRequest } from '../../types';
 
@@ -19,11 +21,27 @@ interface TasksViewProps {
   decisions: DecisionRequest[];
   onUpdateTask?: (task: TaskItem) => void;
   onCreateTask?: (task: TaskItem) => void;
+  onDeleteTask?: (taskId: string) => void;
+  onPurgeTasks?: (taskIds: string[]) => void;
   onResolveBlocker?: (blockerId: string) => void;
   onCreateBlocker?: (blocker: BlockerItem) => void;
   onResolveDecision?: (decisionId: string, choice: string) => void;
   currentUserName?: string;
   currentUserId?: string;
+}
+
+const DEFAULT_TEMPLATE_TASK_TITLES = new Set([
+  'Buat dan dokumentasikan sample pertama',
+  'Susun HPP dan harga rekomendasi',
+  'Finalkan varian warna dan size chart',
+  'Jalankan QC pada master sample',
+  'Berikan keputusan produksi massal',
+]);
+
+export function isDummyOrTemplateLaunchTask(task: TaskItem): boolean {
+  if (/^\s*\[DEMO\]/i.test(task.title) || /dummy|contoh|simulasi/i.test(task.title)) return true;
+  if (DEFAULT_TEMPLATE_TASK_TITLES.has(task.title.trim())) return true;
+  return false;
 }
 
 export const TasksView: React.FC<TasksViewProps> = ({
@@ -33,6 +51,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
   decisions,
   onUpdateTask,
   onCreateTask,
+  onDeleteTask,
+  onPurgeTasks,
   onResolveBlocker,
   onCreateBlocker,
   onResolveDecision,
@@ -54,6 +74,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [blockerArticleId, setBlockerArticleId] = useState(articles[0]?.id || '');
   const [blkDesc, setBlkDesc] = useState('');
   const [blkSev, setBlkSev] = useState<'Critical' | 'Major' | 'Moderate'>('Critical');
+
+  const dummyOrTemplateTasks = tasks.filter(isDummyOrTemplateLaunchTask);
 
   const handleToggleTaskStatus = (task: TaskItem) => {
     if (!onUpdateTask) return;
@@ -121,7 +143,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
           <div className="flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-[#087E79]" />
             <h1 className="text-lg font-extrabold text-slate-900">
-              Manajemen Tugas & Hambatan (Tasks & Blockers)
+              Manajemen Tugas &amp; Hambatan (Tasks &amp; Blockers)
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -129,7 +151,22 @@ export const TasksView: React.FC<TasksViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {activeTab === 'tasks' && onPurgeTasks && dummyOrTemplateTasks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Bersihkan ${dummyOrTemplateTasks.length} tugas bawaan/dummy dari daftar aktif?`)) {
+                  onPurgeTasks(dummyOrTemplateTasks.map(t => t.id));
+                }
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-bold hover:bg-rose-100 transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Bersihkan Tugas Dummy ({dummyOrTemplateTasks.length})</span>
+            </button>
+          )}
+
           {activeTab === 'tasks' && (
             <button
               onClick={() => setShowTaskModal(true)}
@@ -152,13 +189,13 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
       </div>
 
-      {/* Penjelasan tujuan tiap tab — supaya beda Tugas/Blocker/Keputusan jelas. */}
+      {/* Penjelasan tujuan tiap tab */}
       <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         <div className="flex gap-2">
           <span className="p-1.5 rounded-lg bg-white text-[#087E79] shrink-0 h-fit border border-slate-200"><CheckSquare className="w-3.5 h-3.5" /></span>
           <div className="text-[11px] leading-snug">
             <p className="font-extrabold text-slate-900">Tugas</p>
-            <p className="text-slate-500">Pekerjaan yang harus dikerjakan seseorang, punya PIC & tenggat. Klik status untuk memajukannya.</p>
+            <p className="text-slate-500">Pekerjaan yang harus dikerjakan seseorang, punya PIC &amp; tenggat. Klik status untuk memajukannya atau hapus jika sudah tidak diperlukan.</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -220,40 +257,68 @@ export const TasksView: React.FC<TasksViewProps> = ({
       {/* Tasks List */}
       {activeTab === 'tasks' && (
         <div className="space-y-3">
-          {tasks.map((tsk) => (
-            <div
-              key={tsk.id}
-              className="p-4 rounded-2xl bg-white border border-slate-200 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-all"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono font-bold text-[#087E79]">
-                    {tsk.articleCode}
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
-                    Priority: {tsk.priority}
+          {tasks.length === 0 ? (
+            <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs font-semibold">
+              Belum ada tugas aktif pada lingkup ini. Klik <strong>+ Tambah Tugas</strong> untuk membuat tugas baru.
+            </div>
+          ) : (
+            tasks.map((tsk) => (
+              <div
+                key={tsk.id}
+                className="p-4 rounded-2xl bg-white border border-slate-200 flex flex-wrap items-center justify-between gap-3 shadow-2xs hover:border-slate-300 transition-all"
+              >
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-mono font-bold text-[#087E79]">
+                      {tsk.articleCode}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                      Priority: {tsk.priority}
+                    </span>
+                    {isDummyOrTemplateLaunchTask(tsk) && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                        Template Bawaan
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-extrabold text-xs text-slate-900 break-words">{tsk.title}</h3>
+                  <span className="text-[11px] text-slate-500 font-medium block">
+                    PIC: {tsk.picName} · Target Due: {tsk.dueDate}
                   </span>
                 </div>
-                <h3 className="font-extrabold text-xs text-slate-900">{tsk.title}</h3>
-                <span className="text-[11px] text-slate-500 font-medium block">
-                  PIC: {tsk.picName} · Target Due: {tsk.dueDate}
-                </span>
-              </div>
 
-              <button
-                onClick={() => handleToggleTaskStatus(tsk)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border ${
-                  tsk.status === 'Completed'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : tsk.status === 'In Progress'
-                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                }`}
-              >
-                {tsk.status} (Klik Ubah)
-              </button>
-            </div>
-          ))}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => handleToggleTaskStatus(tsk)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border ${
+                      tsk.status === 'Completed'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : tsk.status === 'In Progress'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    {tsk.status} (Klik Ubah)
+                  </button>
+                  {onDeleteTask && (
+                    <button
+                      type="button"
+                      title="Hapus tugas ini"
+                      aria-label={`Hapus ${tsk.title}`}
+                      onClick={() => {
+                        if (confirm(`Hapus tugas "${tsk.title}"?`)) {
+                          onDeleteTask(tsk.id);
+                        }
+                      }}
+                      className="p-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -463,7 +528,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Detail Masalah & Dampak</label>
+                <label className="block font-bold text-slate-700 mb-1">Detail Masalah &amp; Dampak</label>
                 <textarea
                   rows={3}
                   value={blkDesc}

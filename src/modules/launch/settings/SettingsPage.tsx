@@ -232,16 +232,19 @@ export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'cre
     onSuccess: refreshAccess,
   });
 
-  if (!isAdmin) {
+  const currentMember = members.data?.find(person => person.id === auth.data?.profile?.id);
+  const isOwnerRole = isAdmin && (!currentMember?.role_code || currentMember.role_code === 'owner');
+
+  if (!isOwnerRole) {
     return (
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
         <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center shadow-2xs">
           <span className="inline-flex p-3 rounded-2xl bg-amber-100 text-amber-600 mb-3">
             <ShieldCheck className="w-7 h-7" />
           </span>
-          <h3 className="font-extrabold text-base text-slate-900">Akses pengaturan terbatas</h3>
+          <h3 className="font-extrabold text-base text-slate-900">Khusus Role Owner</h3>
           <p className="text-xs text-slate-500 mt-1">
-            Hanya owner atau admin yang dapat mengelola pengguna dan hak akses artikel.
+            Menu Pengaturan Sistem — Pengguna &amp; Hak Akses hanya tersedia untuk akun dengan role Owner.
           </p>
         </div>
       </div>
@@ -324,7 +327,7 @@ export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'cre
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-extrabold uppercase tracking-wider">
-                Pengaturan Sistem
+                Pengaturan Sistem · Owner Role
               </span>
               <h1 className="font-extrabold text-base sm:text-lg text-slate-900">Pengguna &amp; Hak Akses</h1>
             </div>

@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
 import {
-  briefFields, campaignStatuses, copyFormats, copyTemplates, ideaQueues, outputTypes, platforms, priorities, safeOutputUrl, saveCampaign, saveCopyTemplate, saveIdea, saveTask, taskStatuses, workstreams,
+  briefFields, campaignStatuses, copyFormats, copyTemplates, getIdeaAttachedScript, ideaQueues, outputTypes, platforms, priorities, safeOutputUrl, saveCampaign, saveCopyTemplate, saveIdea, saveTask, setIdeaAttachedScript, taskStatuses, workstreams,
   type Campaign, type CopyTemplate, type Idea, type Task, type TeamMember,
 } from './repository';
 
@@ -116,7 +116,7 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
   const [selectedCampaign, setSelectedCampaign] = useState(task ? task.campaign_id ?? '' : campaignId ?? '');
   const [platform, setPlatform] = useState<Task['platform']>(task?.platform ?? sourceIdea?.platform ?? 'internal');
   const [outputType, setOutputType] = useState<Task['output_type']>(task?.output_type ?? 'post');
-  const [selectedTemplateId, setSelectedTemplateId] = useState(task?.copy_template_id ?? '');
+  const [selectedTemplateId, setSelectedTemplateId] = useState(task?.copy_template_id ?? getIdeaAttachedScript(sourceIdea?.id) ?? '');
   const [briefText, setBriefText] = useState(task?.brief ?? sourceIdea?.brief ?? '');
   const templates = useQuery({ queryKey: ['creative-copy-library', defaultUnit ?? 'all'], queryFn: ({ signal }) => copyTemplates(signal, defaultUnit ?? 'all') });
   const selectedTemplate = templates.data?.find(t => t.id === selectedTemplateId);
@@ -294,10 +294,18 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
   </Editor>;
 }
 
-export function IdeaForm({ idea, defaultUnit, onCancel, onSaved }: Omit<Common, 'members'> & { idea?: Idea; defaultUnit?: string }) {
+export function IdeaForm({ idea, defaultUnit, initialTemplate, onCancel, onSaved }: Omit<Common, 'members'> & { idea?: Idea; defaultUnit?: string; initialTemplate?: CopyTemplate }) {
   const [selectedPlatforms, setSelectedPlatforms] = useState<Idea['platform'][]>(
-    idea ? [idea.platform, ...new Set(idea.additional_platforms ?? [])] : ['internal'],
+    idea ? [idea.platform, ...new Set(idea.additional_platforms ?? [])] : initialTemplate?.platform ? [initialTemplate.platform] : ['internal'],
   );
+  const [attachedScriptId, setAttachedScriptId] = useState<string>(() => idea ? getIdeaAttachedScript(idea.id) : initialTemplate?.id ?? '');
+  const [briefText, setBriefText] = useState<string>(idea?.brief ?? initialTemplate?.body ?? '');
+  const templates = useQuery({
+    queryKey: ['creative-copy-library', defaultUnit ?? 'all'],
+    queryFn: ({ signal }) => copyTemplates(signal, defaultUnit ?? 'all'),
+  });
+  const selectedScript = templates.data?.find(tpl => tpl.id === attachedScriptId);
+
   function togglePlatform(platform: Idea['platform'], checked: boolean) {
     setSelectedPlatforms(current => {
       if (!checked) return current.filter(choice => choice !== platform);
@@ -306,7 +314,7 @@ export function IdeaForm({ idea, defaultUnit, onCancel, onSaved }: Omit<Common, 
     });
   }
   return <Editor title={idea ? 'Edit ide konten' : 'Tambah ide konten'} onCancel={onCancel} onSaved={onSaved}
-    onSave={data => {
+    onSave={async data => {
       const [platform, ...additionalPlatforms] = selectedPlatforms;
       if (!platform) throw new Error('Pilih minimal satu platform tujuan.');
       const inputs = value(data, 'references').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
@@ -318,13 +326,15 @@ export function IdeaForm({ idea, defaultUnit, onCancel, onSaved }: Omit<Common, 
       if (references.some(url => !url || url.length > 1024)) {
         throw new Error('Setiap referensi harus berupa tautan HTTP atau HTTPS yang valid (maksimal 1024 karakter).');
       }
-      return saveIdea({
+      const savedId = await saveIdea({
         title: value(data, 'title'), brief, platform, additional_platforms: additionalPlatforms,
         reference_urls: [...new Set(references)], prioritized: data.has('prioritized'), queue_state: queue,
         business_unit_id: value(data, 'businessUnit') || null,
       }, idea);
+      setIdeaAttachedScript(savedId, attachedScriptId || null);
+      return savedId;
     }}>
-    <Label title="Judul ide"><input name="title" className={field} maxLength={160} required defaultValue={idea?.title} /></Label>
+    <Label title="Judul ide"><input name="title" className={field} maxLength={160} required defaultValue={idea?.title ?? initialTemplate?.title} /></Label>
     <UnitField current={idea ? idea.business_unit_id : defaultUnit} required={!idea} />
     <fieldset className="min-w-0 rounded-lg border border-slate-200 px-3 pb-3">
       <legend className="px-1 text-sm font-medium">Platform tujuan</legend>
@@ -336,8 +346,64 @@ export function IdeaForm({ idea, defaultUnit, onCancel, onSaved }: Omit<Common, 
         </label>)}
       </div>
     </fieldset>
-    <Label title="Antrean ide"><select name="queue" className={field} defaultValue={idea?.queue_state ?? 'candidate'}><Options values={ideaQueues} /></select></Label>
-    <Label title="Catatan: apa yang perlu dibuat atau diadaptasi?"><textarea name="brief" className={field} rows={4} maxLength={2000} defaultValue={idea?.brief} /></Label>
+    <Label title="Antrean ide"><select name="queue" className={field} defaultValue={idea?.queue_state ?? (initialTemplate ? 'ready' : 'candidate')}><Options values={ideaQueues} /></select></Label>
+    <div className="space-y-2 sm:col-span-2 rounded-xl border border-teal-100 bg-teal-50 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label htmlFor="idea-copy-template" className="font-bold text-slate-800">
+          Lampirkan Naskah dari List Copywriting / Skrip (opsional)
+        </label>
+        {templates.data && templates.data.length > 0 && (
+          <span className="text-xs font-semibold text-teal-800">{templates.data.length} naskah di Bank Ide</span>
+        )}
+      </div>
+      <select
+        id="idea-copy-template"
+        name="ideaCopyTemplate"
+        className={field}
+        value={attachedScriptId}
+        onChange={event => {
+          const nextId = event.target.value;
+          setAttachedScriptId(nextId);
+          const tpl = templates.data?.find(item => item.id === nextId);
+          if (tpl?.platform) {
+            togglePlatform(tpl.platform, true);
+          }
+        }}
+      >
+        <option value="">-- Tanpa lampiran naskah / Tulis catatan mandiri --</option>
+        {templates.data?.map(tpl => (
+          <option key={tpl.id} value={tpl.id}>
+            [{copyFormats[tpl.format] ?? tpl.format} · {outputTypes[tpl.output_type] ?? tpl.output_type}] {tpl.title}
+          </option>
+        ))}
+      </select>
+      {selectedScript ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-700">
+              Lampiran: {selectedScript.title} ({copyFormats[selectedScript.format] ?? selectedScript.format})
+            </span>
+            <button
+              type="button"
+              className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-bold text-teal-800 hover:bg-teal-200 transition-colors"
+              onClick={() => {
+                setBriefText(prev => prev.trim() ? `${prev.trim()}\n\n${selectedScript.body}` : selectedScript.body);
+              }}
+            >
+              + Salin Naskah ke Catatan Ide
+            </button>
+          </div>
+          <p className="max-h-24 overflow-y-auto whitespace-pre-wrap font-mono text-xs text-slate-700">
+            {selectedScript.body}
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-600">
+          Pilih naskah copywriting/skrip dari Bank Ide agar otomatis terlampir saat ide diubah menjadi tugas produksi.
+        </p>
+      )}
+    </div>
+    <Label title="Catatan: apa yang perlu dibuat atau diadaptasi?"><textarea name="brief" className={field} rows={4} maxLength={2000} value={briefText} onChange={event => setBriefText(event.target.value)} /></Label>
     <Label title="Tautan referensi (maksimal 5, satu per baris)"><textarea name="references" className={field} rows={4} maxLength={5124}
       placeholder="https://…" defaultValue={idea?.reference_urls.join('\n')} /></Label>
     <label className="flex items-center gap-2 text-sm font-semibold">
