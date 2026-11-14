@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Bold,
   BookOpen,
@@ -409,15 +410,16 @@ export function CopyRichTextEditor({
 }
 
 type ViewerDisplayMode = 'pdf' | 'teleprompter';
-type PdfZoomLevel = '90' | '100' | '115' | '130';
+type PdfZoomLevel = '90' | '100' | '115' | '130' | 'fit';
 type ReaderTheme = 'light' | 'sepia' | 'studio';
 type ReaderFontSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const PDF_ZOOM_CLASS: Record<PdfZoomLevel, { label: string; textClass: string; maxWidth: string }> = {
   '90': { label: '90%', textClass: 'text-[14px] leading-[1.75]', maxWidth: 'max-w-[680px]' },
-  '100': { label: '100% (A4 Standar)', textClass: 'text-[15.5px] leading-[1.8]', maxWidth: 'max-w-[760px]' },
-  '115': { label: '115% (Nyaman)', textClass: 'text-[17.5px] leading-[1.85]', maxWidth: 'max-w-[840px]' },
-  '130': { label: '130% (Besar)', textClass: 'text-[20px] leading-[1.9]', maxWidth: 'max-w-[920px]' },
+  '100': { label: '100% (A4)', textClass: 'text-[15.5px] leading-[1.8]', maxWidth: 'max-w-[780px]' },
+  '115': { label: '115%', textClass: 'text-[17px] leading-[1.85]', maxWidth: 'max-w-[880px]' },
+  '130': { label: '130%', textClass: 'text-[19px] leading-[1.9]', maxWidth: 'max-w-[1000px]' },
+  'fit': { label: 'Layar Penuh Luas', textClass: 'text-[19px] leading-[1.9]', maxWidth: 'max-w-5xl' },
 };
 
 const READER_FONT_CLASS: Record<ReaderFontSize, { label: string; bodyClass: string }> = {
@@ -667,8 +669,21 @@ export function CopyScriptViewerModal({
   const [pdfZoom, setPdfZoom] = useState<PdfZoomLevel>('100');
   const [fontSize, setFontSize] = useState<ReaderFontSize>('lg');
   const [readerTheme, setReaderTheme] = useState<ReaderTheme>('light');
-  const [wideMode, setWideMode] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(true);
   const [copiedMode, setCopiedMode] = useState<'plain' | 'full' | null>(null);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
 
   const plainText = stripCopyRichText(template.body);
   const wordCount = plainText.split(/\s+/).filter(Boolean).length;
@@ -685,23 +700,30 @@ export function CopyScriptViewerModal({
     setTimeout(() => setCopiedMode(null), 1800);
   }
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs p-2 sm:p-5 flex items-center justify-center overflow-y-auto"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-0 sm:p-2 md:p-3 overflow-hidden"
       role="dialog"
       aria-modal="true"
       aria-labelledby="script-viewer-title"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className={`w-full ${wideMode ? 'max-w-5xl' : 'max-w-3xl'} max-h-[calc(100vh-1.5rem)] flex flex-col rounded-3xl border border-slate-300 bg-white shadow-2xl overflow-hidden transition-all`}
+        className={`w-full ${
+          isFullscreen
+            ? 'h-full max-h-screen rounded-none border-0'
+            : 'h-full sm:h-[96vh] max-w-[1560px] rounded-2xl sm:rounded-3xl border border-slate-700 shadow-2xl'
+        } flex flex-col bg-white overflow-hidden transition-all`}
       >
         {/* Top Modal Header with PDF vs Teleprompter Mode Switch */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-900 text-white px-5 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-900 text-white px-4 sm:px-6 py-3 shrink-0">
           <div className="space-y-0.5 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">
                 <FileText className="w-3 h-3" />
-                PDF SCRIPT VIEWER
+                DOKUMEN PDF NASKAH
               </span>
               <span className="text-xs font-mono text-slate-300 truncate">
                 {pdfSlug}.pdf
@@ -728,7 +750,7 @@ export function CopyScriptViewerModal({
                 }`}
               >
                 <FileText className="w-3.5 h-3.5" />
-                <span>📄 Mode Dokumen PDF</span>
+                <span>📄 Dokumen PDF (A4)</span>
               </button>
               <button
                 type="button"
@@ -740,7 +762,7 @@ export function CopyScriptViewerModal({
                 }`}
               >
                 <BookOpen className="w-3.5 h-3.5" />
-                <span>🎬 Mode Teleprompter</span>
+                <span>🎬 Teleprompter</span>
               </button>
             </div>
 
@@ -751,22 +773,24 @@ export function CopyScriptViewerModal({
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-xs transition-colors"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Cetak / Download PDF</span>
+              <span className="hidden sm:inline">Cetak / Download PDF</span>
+              <span className="sm:hidden">PDF</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setWideMode(w => !w)}
-              title={wideMode ? 'Perkecil Jendela' : 'Perlebar Jendela'}
+              onClick={() => setIsFullscreen(f => !f)}
+              title={isFullscreen ? 'Keluar Mode Layar Penuh' : 'Mode Layar Penuh (Maksimal)'}
               className="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
             >
-              {wideMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
             <button
               type="button"
               onClick={onClose}
               aria-label="Tutup mode lihat naskah"
-              className="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
+              title="Tutup (Esc)"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-700 bg-rose-600 text-white hover:bg-rose-500"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1026,6 +1050,8 @@ export function CopyScriptViewerModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 }
 
 export function OpenScriptReaderButton({
