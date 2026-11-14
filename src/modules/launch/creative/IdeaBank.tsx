@@ -41,11 +41,13 @@ export function ReferenceLinks({ urls }: { urls: string[] }) {
 }
 
 type IdeaBankTab = 'ideas' | 'scripts' | 'references';
+type IdeaSortOrder = 'newest' | 'unit_asc' | 'unit_desc' | 'title_asc';
 
 export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string; canEdit: boolean; onConvert: (idea: Idea) => void; unit: string }) {
   const client = useQueryClient();
   const units = useWorkspaceUnits();
   const [activeTab, setActiveTab] = useState<IdeaBankTab>('ideas');
+  const [sortBy, setSortBy] = useState<IdeaSortOrder>('newest');
   const [page, setPage] = useState(0);
   const [priority, setPriority] = useState(false);
   const [queue, setQueue] = useState('');
@@ -114,46 +116,76 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
     }).catch(() => {});
   };
 
-  const ideaRows = (query.data ?? []).filter(item => {
-    if (!searchIdea.trim()) return true;
-    const q = searchIdea.trim().toLowerCase();
-    return item.title.toLowerCase().includes(q) || item.brief.toLowerCase().includes(q);
-  });
+  const unitLabel = (id?: string | null) =>
+    id ? units.data?.find(row => row.id === id)?.name ?? 'Unit bisnis' : 'Semua unit / Umum';
+
+  const unitSortKey = (id?: string | null) =>
+    id ? (units.data?.find(row => row.id === id)?.name ?? 'zzz').toLowerCase() : 'zzz_umum';
+
+  const compareBySortOrder = (
+    unitA: string | null | undefined,
+    unitB: string | null | undefined,
+    titleA: string,
+    titleB: string,
+  ) => {
+    if (sortBy === 'unit_asc') {
+      const cmp = unitSortKey(unitA).localeCompare(unitSortKey(unitB), 'id');
+      return cmp !== 0 ? cmp : titleA.localeCompare(titleB, 'id');
+    }
+    if (sortBy === 'unit_desc') {
+      const cmp = unitSortKey(unitB).localeCompare(unitSortKey(unitA), 'id');
+      return cmp !== 0 ? cmp : titleA.localeCompare(titleB, 'id');
+    }
+    if (sortBy === 'title_asc') {
+      return titleA.localeCompare(titleB, 'id');
+    }
+    return 0;
+  };
+
+  const ideaRows = (query.data ?? [])
+    .filter(item => {
+      if (!searchIdea.trim()) return true;
+      const q = searchIdea.trim().toLowerCase();
+      return item.title.toLowerCase().includes(q) || item.brief.toLowerCase().includes(q);
+    })
+    .sort((a, b) => compareBySortOrder(a.business_unit_id, b.business_unit_id, a.title, b.title));
 
   const hasDemoIdeas = (query.data ?? []).some(item => isDemoText(item.title));
 
   const templateMap = new Map((templatesQuery.data ?? []).map(tpl => [tpl.id, tpl]));
 
-  const filteredTemplates = (templatesQuery.data ?? []).filter(tpl => {
-    if (scriptFormatFilter && tpl.format !== scriptFormatFilter) return false;
-    if (scriptOutputFilter && tpl.output_type !== scriptOutputFilter) return false;
-    if (scriptSearch.trim()) {
-      const q = scriptSearch.trim().toLowerCase();
-      const plainBody = stripCopyRichText(tpl.body).toLowerCase();
-      const desc = (tpl.description ?? '').toLowerCase();
-      if (!tpl.title.toLowerCase().includes(q) && !plainBody.includes(q) && !desc.includes(q)) return false;
-    }
-    return true;
-  });
+  const filteredTemplates = (templatesQuery.data ?? [])
+    .filter(tpl => {
+      if (scriptFormatFilter && tpl.format !== scriptFormatFilter) return false;
+      if (scriptOutputFilter && tpl.output_type !== scriptOutputFilter) return false;
+      if (scriptSearch.trim()) {
+        const q = scriptSearch.trim().toLowerCase();
+        const plainBody = stripCopyRichText(tpl.body).toLowerCase();
+        const desc = (tpl.description ?? '').toLowerCase();
+        if (!tpl.title.toLowerCase().includes(q) && !plainBody.includes(q) && !desc.includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => compareBySortOrder(a.business_unit_id, b.business_unit_id, a.title, b.title));
 
-  const referenceEntries = (query.data ?? []).flatMap(idea => {
-    const validUrls = [...new Set((idea.reference_urls ?? []).map(safeOutputUrl).filter(Boolean))];
-    return validUrls.map((url, idx) => {
-      let hostname = url;
-      try {
-        hostname = new URL(url).hostname.replace(/^www\./, '');
-      } catch { /* ignore */ }
-      return {
-        key: `${idea.id}-${idx}`,
-        url,
-        hostname,
-        idea,
-      };
-    });
-  }).filter(entry => !referencePlatformFilter || entry.idea.platform === referencePlatformFilter || entry.idea.additional_platforms?.includes(referencePlatformFilter as Idea['platform']));
-
-  const unitLabel = (id?: string | null) =>
-    id ? units.data?.find(row => row.id === id)?.name ?? 'Unit bisnis' : 'Semua unit / Umum';
+  const referenceEntries = (query.data ?? [])
+    .flatMap(idea => {
+      const validUrls = [...new Set((idea.reference_urls ?? []).map(safeOutputUrl).filter(Boolean))];
+      return validUrls.map((url, idx) => {
+        let hostname = url;
+        try {
+          hostname = new URL(url).hostname.replace(/^www\./, '');
+        } catch { /* ignore */ }
+        return {
+          key: `${idea.id}-${idx}`,
+          url,
+          hostname,
+          idea,
+        };
+      });
+    })
+    .filter(entry => !referencePlatformFilter || entry.idea.platform === referencePlatformFilter || entry.idea.additional_platforms?.includes(referencePlatformFilter as Idea['platform']))
+    .sort((a, b) => compareBySortOrder(a.idea.business_unit_id, b.idea.business_unit_id, a.idea.title, b.idea.title));
 
   return (
     <div className="space-y-4">
@@ -328,6 +360,15 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                 <Options values={ideaQueues} />
               </select>
             </label>
+            <label className="text-xs font-semibold text-slate-700">
+              Urutkan
+              <select className={`${field} mt-1`} value={sortBy} onChange={event => setSortBy(event.target.value as IdeaSortOrder)}>
+                <option value="newest">Terbaru</option>
+                <option value="unit_asc">Unit Bisnis (A → Z)</option>
+                <option value="unit_desc">Unit Bisnis (Z → A)</option>
+                <option value="title_asc">Judul (A → Z)</option>
+              </select>
+            </label>
             <label className="inline-flex min-h-[38px] items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
               <input type="checkbox" checked={priority} onChange={event => { setPriority(event.target.checked); setPage(0); }} />
               <span>Hanya ide prioritas</span>
@@ -490,7 +531,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
 
           {/* Filter Bar for Copywriting Table */}
           <div className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-end">
-            <div className="grid grid-cols-1 gap-3 flex-1 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 flex-1 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-xs font-semibold text-slate-700">
                 Cari judul / isi skrip
                 <div className="relative mt-1">
@@ -516,6 +557,15 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                 <select className={`${field} mt-1`} value={scriptOutputFilter} onChange={e => setScriptOutputFilter(e.target.value)}>
                   <option value="">Semua tipe output</option>
                   <Options values={outputTypes} />
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-slate-700">
+                Urutkan
+                <select className={`${field} mt-1`} value={sortBy} onChange={e => setSortBy(e.target.value as IdeaSortOrder)}>
+                  <option value="newest">Terbaru</option>
+                  <option value="unit_asc">Unit Bisnis (A → Z)</option>
+                  <option value="unit_desc">Unit Bisnis (Z → A)</option>
+                  <option value="title_asc">Judul Skrip (A → Z)</option>
                 </select>
               </label>
             </div>
@@ -609,7 +659,19 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                   <tr>
                     <th scope="col" className="w-56">Judul &amp; Penjelasan Skrip</th>
                     <th scope="col" className="w-36">Format &amp; Output</th>
-                    <th scope="col" className="w-32">Platform &amp; Unit</th>
+                    <th scope="col" className="w-36">
+                      <button
+                        type="button"
+                        onClick={() => setSortBy(prev => prev === 'unit_asc' ? 'unit_desc' : 'unit_asc')}
+                        className="inline-flex items-center gap-1 font-extrabold uppercase tracking-wider hover:text-blue-600 cursor-pointer"
+                        title="Klik untuk mengurutkan berdasarkan Unit Bisnis"
+                      >
+                        <span>Platform &amp; Unit</span>
+                        <span className="text-[10px]">
+                          {sortBy === 'unit_asc' ? '▲' : sortBy === 'unit_desc' ? '▼' : '⇅'}
+                        </span>
+                      </button>
+                    </th>
                     <th scope="col">Pratinjau Naskah Copywriting</th>
                     <th scope="col" className="w-60 text-right">Aksi</th>
                   </tr>
@@ -740,17 +802,32 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                 Daftar seluruh tautan referensi kompetitor, benchmark visual, dan contoh konten yang tersimpan di Bank Ide.
               </p>
             </div>
-            <label className="text-xs font-semibold text-slate-700">
-              Filter platform
-              <select
-                className={`${field} mt-1 min-w-[160px]`}
-                value={referencePlatformFilter}
-                onChange={e => setReferencePlatformFilter(e.target.value)}
-              >
-                <option value="">Semua platform</option>
-                <Options values={platforms} />
-              </select>
-            </label>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-xs font-semibold text-slate-700">
+                Filter platform
+                <select
+                  className={`${field} mt-1 min-w-[160px]`}
+                  value={referencePlatformFilter}
+                  onChange={e => setReferencePlatformFilter(e.target.value)}
+                >
+                  <option value="">Semua platform</option>
+                  <Options values={platforms} />
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-slate-700">
+                Urutkan
+                <select
+                  className={`${field} mt-1 min-w-[160px]`}
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as IdeaSortOrder)}
+                >
+                  <option value="newest">Terbaru</option>
+                  <option value="unit_asc">Unit Bisnis (A → Z)</option>
+                  <option value="unit_desc">Unit Bisnis (Z → A)</option>
+                  <option value="title_asc">Judul (A → Z)</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           {query.isPending && <p role="status" className="text-sm text-slate-600">Memuat referensi…</p>}
