@@ -107,11 +107,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const friendlyError = isTrigger500
       ? 'Database Supabase menolak pembuatan user baru karena izin fungsi trigger (handle_new_auth_user / provision_auth_user) tercabut saat hardening. Jalankan SQL perbaikan trigger di Supabase SQL Editor.'
       : cleanMsg;
+    const sqlFixScript = [
+      'GRANT USAGE ON SCHEMA public TO supabase_auth_admin, postgres, service_role;',
+      'CREATE OR REPLACE FUNCTION public.handle_new_auth_user()',
+      'RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, pg_temp AS $$',
+      'BEGIN',
+      '  BEGIN',
+      '    PERFORM public.provision_auth_user(new.id);',
+      '  EXCEPTION WHEN OTHERS THEN',
+      '    NULL;',
+      '  END;',
+      '  RETURN new;',
+      'END; $$;',
+      'GRANT EXECUTE ON FUNCTION public.handle_new_auth_user() TO supabase_auth_admin, postgres, service_role, authenticated, anon;',
+      'GRANT EXECUTE ON FUNCTION public.provision_auth_user(uuid) TO supabase_auth_admin, postgres, service_role, authenticated, anon;',
+    ].join('\n');
     return res.status(400).json({
       error: friendlyError,
-      sql_fix: isTrigger500
-        ? 'GRANT EXECUTE ON FUNCTION public.handle_new_auth_user() TO supabase_auth_admin, postgres, service_role;\nGRANT EXECUTE ON FUNCTION public.provision_auth_user(uuid) TO supabase_auth_admin, postgres, service_role;'
-        : undefined,
+      sql_fix: isTrigger500 ? sqlFixScript : undefined,
     });
   }
 

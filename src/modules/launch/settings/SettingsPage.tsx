@@ -296,7 +296,21 @@ export function SettingsPage({ variant = 'launch' }: { variant?: 'launch' | 'cre
       const sqlFix = typeof err?.sql_fix === 'string' && err.sql_fix
         ? err.sql_fix
         : (isEmptyObject || message.includes('handle_new_auth_user'))
-        ? 'GRANT EXECUTE ON FUNCTION public.handle_new_auth_user() TO supabase_auth_admin, postgres, service_role;\nGRANT EXECUTE ON FUNCTION public.provision_auth_user(uuid) TO supabase_auth_admin, postgres, service_role;'
+        ? [
+            'GRANT USAGE ON SCHEMA public TO supabase_auth_admin, postgres, service_role;',
+            'CREATE OR REPLACE FUNCTION public.handle_new_auth_user()',
+            'RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, pg_temp AS $$',
+            'BEGIN',
+            '  BEGIN',
+            '    PERFORM public.provision_auth_user(new.id);',
+            '  EXCEPTION WHEN OTHERS THEN',
+            '    NULL;',
+            '  END;',
+            '  RETURN new;',
+            'END; $$;',
+            'GRANT EXECUTE ON FUNCTION public.handle_new_auth_user() TO supabase_auth_admin, postgres, service_role, authenticated, anon;',
+            'GRANT EXECUTE ON FUNCTION public.provision_auth_user(uuid) TO supabase_auth_admin, postgres, service_role, authenticated, anon;',
+          ].join('\n')
         : null;
       setCreateError(message);
       setCreateSqlFix(sqlFix);
