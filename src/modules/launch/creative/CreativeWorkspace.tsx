@@ -114,7 +114,7 @@ function EditorDialog({ children, onClose, label = 'Form pekerjaan kreatif' }: {
     event.preventDefault();
     if (!ref.current?.querySelector('form[aria-busy="true"]')) onClose();
   }}
-    className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-auto rounded-2xl bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-950/60">
+    className="m-auto max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-2xl overflow-auto rounded-3xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/70 dark:border dark:border-slate-800 dark:bg-[#111622] dark:text-slate-100">
     {children}
   </dialog>;
 }
@@ -480,106 +480,133 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
           </div>
         </div>
       </aside>
-      <div className="min-w-0 space-y-4">
-      <header className="creative-toolbar flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.05)] sm:p-6">
-        <div>
-          <p className="creative-eyebrow mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"><span /> Creative Hub</p>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{activeSection}</h1>
-          <p className="mt-1 text-sm text-slate-600">{sectionDescriptions[section]}</p>
-        </div>
-        <div className="creative-toolbar-actions flex flex-wrap items-center gap-2 md:justify-end">
-          <NotificationBell
-            items={notif.items}
-            countsByCategory={notif.countsByCategory}
-            isUnread={notif.isUnread}
-            onMarkAsRead={notif.markAsRead}
-            onMarkAllAsRead={notif.markAllAsRead}
-            onRefresh={() => void notif.refetch()}
-            buttonClassName={button + ' relative inline-flex items-center gap-2'}
-            onSelectNotification={item => {
-              if (item.workspace === 'launch') {
-                if (item.articleId && item.targetSection === 'discussion') {
-                  navigate(`/launch/app/projects/${encodeURIComponent(item.articleId)}?view=discussion`);
-                } else if (item.targetSection) {
-                  navigate(`/launch/app/${item.targetSection}`);
-                } else {
-                  navigate('/launch/app/today');
+      <div className="min-w-0 space-y-3.5">
+      <header className="creative-toolbar rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-4 lg:px-5 lg:py-3.5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[#111622]">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="creative-eyebrow mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest"><span /> Creative Hub</p>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl text-slate-900 dark:text-white">{activeSection}</h1>
+              <span className="hidden text-xs text-slate-400 dark:text-slate-600 sm:inline">•</span>
+              <p className="text-xs text-slate-600 dark:text-slate-400 sm:text-sm">{sectionDescriptions[section]}</p>
+            </div>
+          </div>
+          <div className="creative-toolbar-actions flex flex-wrap items-center gap-2">
+            <NotificationBell
+              items={notif.items}
+              countsByCategory={notif.countsByCategory}
+              isUnread={notif.isUnread}
+              onMarkAsRead={notif.markAsRead}
+              onMarkAllAsRead={notif.markAllAsRead}
+              onRefresh={() => void notif.refetch()}
+              buttonClassName={button + ' relative inline-flex items-center gap-2 !py-1.5 !px-3 !text-xs'}
+              onSelectNotification={item => {
+                if (item.workspace === 'launch') {
+                  if (item.articleId && item.targetSection === 'discussion') {
+                    navigate(`/launch/app/projects/${encodeURIComponent(item.articleId)}?view=discussion`);
+                  } else if (item.targetSection) {
+                    navigate(`/launch/app/${item.targetSection}`);
+                  } else {
+                    navigate('/launch/app/today');
+                  }
+                  return;
                 }
-                return;
-              }
-              if (item.taskId) {
-                setDetailId(item.taskId);
-                return;
-              }
-              if (item.campaignId) {
-                openSection('campaigns');
-                setDiscussionCampaign(item.campaignId);
-                return;
-              }
-              if (item.targetSection === 'ads' && item.targetId) {
-                openSection('ads');
-                setAdsActivation(item.targetId);
-                return;
-              }
-              if (item.targetSection) {
-                openSection(item.targetSection as Section);
-              }
-            }}
-          />
-          {canSwitchWorkspace && <Link to="/launch/app" className={button + ' inline-flex items-center gap-2'}><ArrowLeft size={16} /> Pilih ruang kerja</Link>}
-          <AccountSignOut name={userName} className={button + ' inline-flex items-center gap-2'} />
-          <button className={button + ' inline-flex items-center gap-2'} disabled={loading} onClick={refresh}><RefreshCw size={15} /> Segarkan</button>
-          {(canRemove || canEdit) && hasDemoItems && (
-            <button
-              type="button"
-              className={button + ' !text-rose-700 hover:!bg-rose-50 inline-flex items-center gap-1.5'}
-              disabled={purgeDemo.isPending}
-              onClick={() => {
-                if (confirm('Bersihkan seluruh tugas, ide, dan kampanye [DEMO] / dummy dari ruang kerja?')) {
-                  purgeDemo.mutate();
+                if (item.taskId) {
+                  setDetailId(item.taskId);
+                  return;
+                }
+                if (item.campaignId) {
+                  openSection('campaigns');
+                  setDiscussionCampaign(item.campaignId);
+                  return;
+                }
+                if (item.targetSection === 'ads' && item.targetId) {
+                  openSection('ads');
+                  setAdsActivation(item.targetId);
+                  return;
+                }
+                if (item.targetSection) {
+                  openSection(item.targetSection as Section);
                 }
               }}
-            >
-              <Sparkles size={15} />
-              <span>{purgeDemo.isPending ? 'Membersihkan…' : 'Bersihkan Data Demo'}</span>
-            </button>
-          )}
-          {canEdit && section === 'campaigns' && <button className={primary + ' inline-flex items-center gap-2'} onClick={() => openEditor({ kind: 'campaign' })}><Plus size={16} /> Kampanye baru</button>}
-          {canEdit && (section === 'overview' || section === 'work') && <button className={primary + ' inline-flex items-center gap-2'} disabled={currentCampaign?.status === 'archived'} onClick={() => openEditor({ kind: 'task' })}><Plus size={16} /> Tugas baru</button>}
-        </div>
-      </header>
-
-      {section !== 'access' && <div className={panel + ' creative-filter !py-3.5'} aria-label="Filter ruang kerja">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="creative-filter-heading !mb-0 shrink-0">
-            <strong>Lingkup ruang kerja</strong>
-            <span>Pilih unit bisnis &amp; kampanye aktif</span>
+            />
+            {canSwitchWorkspace && <Link to="/launch/app" className={button + ' inline-flex items-center gap-1.5 !py-1.5 !px-3 !text-xs'}><ArrowLeft size={14} /> <span className="hidden sm:inline">Pilih ruang kerja</span></Link>}
+            <button className={button + ' inline-flex items-center gap-1.5 !py-1.5 !px-3 !text-xs'} disabled={loading} onClick={refresh} title="Segarkan data"><RefreshCw size={13} /> <span className="hidden sm:inline">Segarkan</span></button>
+            {(canRemove || canEdit) && hasDemoItems && (
+              <button
+                type="button"
+                className={button + ' !text-rose-700 hover:!bg-rose-50 inline-flex items-center gap-1.5 !py-1.5 !px-3 !text-xs dark:!text-rose-400 dark:hover:!bg-rose-950/40'}
+                disabled={purgeDemo.isPending}
+                onClick={() => {
+                  if (confirm('Bersihkan seluruh tugas, ide, dan kampanye [DEMO] / dummy dari ruang kerja?')) {
+                    purgeDemo.mutate();
+                  }
+                }}
+              >
+                <Sparkles size={13} />
+                <span>{purgeDemo.isPending ? 'Membersihkan…' : 'Bersihkan Data Demo'}</span>
+              </button>
+            )}
+            {canEdit && section === 'campaigns' && <button className={primary + ' inline-flex items-center gap-1.5 !py-1.5 !px-3.5 !text-xs'} onClick={() => openEditor({ kind: 'campaign' })}><Plus size={15} /> Kampanye baru</button>}
+            {canEdit && (section === 'overview' || section === 'work') && <button className={primary + ' inline-flex items-center gap-1.5 !py-1.5 !px-3.5 !text-xs'} disabled={currentCampaign?.status === 'archived'} onClick={() => openEditor({ kind: 'task' })}><Plus size={15} /> Tugas baru</button>}
+            <AccountSignOut name={userName} className={button + ' inline-flex items-center gap-1.5 !py-1.5 !px-3 !text-xs'} />
           </div>
-          <div className="creative-filter-fields flex flex-1 flex-wrap items-center justify-end gap-2.5">
-            <label className="min-w-0 flex-[1_1_13rem] max-w-md space-y-1 text-xs font-semibold">
-              <span className="sr-only">Unit bisnis</span>
-              <select className={field} aria-label="Unit bisnis" value={unit} onChange={event => { setUnit(event.target.value); changeScope('all'); }}>
-                <option value="all">Semua unit bisnis</option>
-                <option value="unassigned">Unit belum ditetapkan</option>
-                {defaultUnit && !units.data?.some(row => row.id === defaultUnit) && <option value={defaultUnit}>Unit terpilih</option>}
-                {units.data?.map(row => <option key={row.id} value={row.id}>{row.name} · {unitSectors[row.sector]}{row.is_active ? '' : ' (arsip)'}</option>)}
-              </select>
-            </label>
-            {!['campaigns','accounts','ideas'].includes(section) && <>
-              <label className="min-w-0 flex-[1_1_13rem] max-w-md space-y-1 text-xs font-semibold">
-                <span className="sr-only">Lingkup pekerjaan</span>
-                <select className={field} aria-label="Lingkup pekerjaan" value={scope} onChange={event => changeScope(event.target.value)}>
-                  <option value="all">Semua pekerjaan</option>
-                  {section !== 'ads' && <option value="standalone">Tanpa kampanye</option>}
-                  {campaignList.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}{campaign.status === 'archived' ? ' (arsip)' : ''}</option>)}
+        </div>
+
+        {/* Sub-bar Filter Lingkup Ruang Kerja Terintegrasi (Tanpa card memanjang terpisah) */}
+        {section !== 'access' && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Lingkup:
+              </span>
+              <label className="inline-flex items-center">
+                <span className="sr-only">Unit bisnis</span>
+                <select
+                  className={`${field} !h-8 !py-1 !px-3 !text-xs !rounded-full bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-200 max-w-xs font-semibold`}
+                  aria-label="Unit bisnis"
+                  value={unit}
+                  onChange={event => { setUnit(event.target.value); changeScope('all'); }}
+                >
+                  <option value="all">Semua unit bisnis</option>
+                  <option value="unassigned">Unit belum ditetapkan</option>
+                  {defaultUnit && !units.data?.some(row => row.id === defaultUnit) && <option value={defaultUnit}>Unit terpilih</option>}
+                  {units.data?.map(row => <option key={row.id} value={row.id}>{row.name} · {unitSectors[row.sector]}{row.is_active ? '' : ' (arsip)'}</option>)}
                 </select>
               </label>
-              {campaignQuery.hasNextPage && <button className={button} disabled={campaignQuery.isFetchingNextPage} onClick={() => void campaignQuery.fetchNextPage()}>Muat kampanye lain</button>}
-            </>}
+
+              {!['campaigns','accounts','ideas'].includes(section) && (
+                <label className="inline-flex items-center">
+                  <span className="sr-only">Lingkup pekerjaan</span>
+                  <select
+                    className={`${field} !h-8 !py-1 !px-3 !text-xs !rounded-full bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-200 max-w-xs font-semibold`}
+                    aria-label="Lingkup pekerjaan"
+                    value={scope}
+                    onChange={event => changeScope(event.target.value)}
+                  >
+                    <option value="all">Semua pekerjaan</option>
+                    {section !== 'ads' && <option value="standalone">Tanpa kampanye</option>}
+                    {campaignList.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}{campaign.status === 'archived' ? ' (arsip)' : ''}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {campaignQuery.hasNextPage && !['campaigns','accounts','ideas'].includes(section) && (
+                <button
+                  className={`${button} !h-8 !py-1 !px-2.5 !text-xs !rounded-full`}
+                  disabled={campaignQuery.isFetchingNextPage}
+                  onClick={() => void campaignQuery.fetchNextPage()}
+                >
+                  + Lebih banyak
+                </button>
+              )}
+            </div>
+
+            {!canEdit && <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Mode lihat saja</span>}
           </div>
-        </div>
-        {units.isError && <p role="alert" className="mt-2 w-full text-sm text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
-      </div>}
+        )}
+        {units.isError && <p role="alert" className="mt-2 text-xs text-red-700">Daftar unit bisnis belum dapat dimuat.</p>}
+      </header>
 
       {!canEdit && section !== 'access' && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
       {section === 'access' && <Suspense fallback={sectionLoading}><CreativeAccess permissions={permissions} userName={userName} userId={userId} /></Suspense>}
@@ -898,20 +925,5 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       </>}
       </div>
     </div>
-    <nav className="creative-bottom-nav lg:hidden" aria-label="Navigasi cepat">
-      {([
-        ['overview', 'Beranda', LayoutDashboard],
-        ['work', 'Tugas', ListTodo],
-        ['ideas', 'Ide', Lightbulb],
-        ['calendar', 'Kalender', CalendarDays],
-        ['inbox', 'Inbox', Bell],
-      ] as const).filter(([id]) => visibleNavigation.some(group => group.items.some(item => item.id === id))).map(([id, label, Icon]) => {
-        const badge = sectionBadgeCount(id as Section);
-        return <button key={id} type="button" aria-current={section === id ? 'page' : undefined} onClick={() => openSection(id as Section)}>
-          <span className="creative-bottom-icon"><Icon size={19} />{badge.count > 0 && <i>{badge.count > 99 ? '99+' : badge.count}</i>}</span>
-          <span>{label}</span>
-        </button>;
-      })}
-    </nav>
   </main>;
 }
