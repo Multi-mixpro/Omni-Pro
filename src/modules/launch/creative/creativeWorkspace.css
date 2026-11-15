@@ -170,9 +170,10 @@ button.creative-metric-card:hover { border-color: #9cc5f0; background: #f8fbff; 
 .creative-access-card { min-width: 0; border: 1px solid var(--creative-line); border-radius: 1.35rem; background: #fff; padding: clamp(.85rem, 2vw, 1.25rem); }
 .creative-access-chip { display: inline-flex; align-items: center; gap: .45rem; border-radius: .7rem; padding: .45rem .65rem; font-size: .8rem; font-weight: 700; color: #5a687a; background: #edf1f7; }
 .creative-access-chip[data-allowed='true'] { color: #145b51; background: #ddf4e9; }
-.creative-table :is(th, td) { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--creative-line); }
-.creative-table thead { color: #194979; background: #e8f2fd; }
-.creative-table tbody tr:nth-child(even) { background: #f5f9fd; }
+.creative-table :is(th, td) { text-align: left; padding: .85rem 1rem; border-bottom: 1px solid var(--creative-line); vertical-align: middle; }
+.creative-table thead { color: #64748b; background: #f8fafc; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.creative-table tbody tr { transition: background-color .16s ease; }
+.creative-table tbody tr:hover { background: #f1f5f980; }
 .creative-table tbody tr:last-child > * { border-bottom: 0; }
 
 @media (min-width: 1024px) {
@@ -240,8 +241,8 @@ button.creative-metric-card:hover { border-color: #9cc5f0; background: #f8fbff; 
 [data-theme='dark'] .creative-template-card:hover { border-color: #55759a; box-shadow: 0 10px 26px #050a1355; }
 [data-theme='dark'] .creative-access-chip { color: #b5c5d9; background: #263347; }
 [data-theme='dark'] .creative-access-chip[data-allowed='true'] { color: #a2e3ce; background: #204239; }
-[data-theme='dark'] .creative-table thead { background: #233a56; color: #b5d7ff; }
-[data-theme='dark'] .creative-table tbody tr:nth-child(even) { background: #1e2b3d; }
+[data-theme='dark'] .creative-table thead { background: #161d2c; color: #94a3b8; }
+[data-theme='dark'] .creative-table tbody tr:hover { background: rgba(59, 130, 246, 0.06); }
 [data-theme='dark'] .creative-calendar :is(.creative-calendar-day, .creative-calendar-blank) { border-color: var(--line); background: #202f43; color: var(--ink); }
 [data-theme='dark'] .creative-calendar .creative-calendar-blank { color: #9caec5; background: #151f2c; }
 [data-theme='dark'] .creative-calendar .creative-calendar-day[aria-pressed='true'] { background: #294972; border-color: #6098e1; }

@@ -14,9 +14,9 @@ import {
   type Campaign, type CopyTemplate, type Idea, type RoutinePreset, type Task, type TeamMember,
 } from './repository';
 
-export const field = 'w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/15';
-export const button = 'rounded-full border border-slate-200/90 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50';
-export const primary = 'rounded-full bg-[#1463ff] px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_6px_16px_-3px_rgba(20,99,255,0.35)] transition-all hover:bg-[#0b52db] active:scale-[0.98] disabled:opacity-50';
+export const field = 'w-full rounded-xl border border-slate-200/90 bg-slate-50/70 px-3.5 py-2 text-sm text-slate-900 transition-all duration-150 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-3 focus:ring-blue-500/15 dark:border-slate-700/80 dark:bg-slate-900/70 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-slate-900';
+export const button = 'rounded-full border border-slate-200/90 bg-white px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50 dark:border-slate-700/80 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:border-slate-600';
+export const primary = 'rounded-full bg-[#1463ff] px-4 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-[0_6px_16px_-3px_rgba(20,99,255,0.35)] transition-all duration-150 hover:bg-[#0b52db] hover:shadow-[0_8px_20px_-4px_rgba(20,99,255,0.45)] active:scale-[0.98] disabled:opacity-50';
 
 export function errorText(error: unknown) {
   if (error && typeof error === 'object' && 'code' in error && error.code === '42501') {

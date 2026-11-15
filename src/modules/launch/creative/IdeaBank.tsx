@@ -190,7 +190,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
   return (
     <div className="space-y-4">
       {/* Sub-navigation Tabs for Bank Ide */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-100 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-3xl border border-slate-200/80 bg-white/95 p-3 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.04)] dark:border-slate-800/80 dark:bg-[#111622]/95">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Menu Bank Ide">
           <button
             type="button"
@@ -315,11 +315,11 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
 
       {/* TAB 1: DAFTAR IDE KONTEN */}
       {activeTab === 'ideas' && (
-        <section className="space-y-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm" aria-labelledby="idea-bank-heading">
+        <section className="space-y-4 rounded-3xl border border-slate-200/80 bg-white/95 p-4 sm:p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.04)] dark:border-slate-800/80 dark:bg-[#111622]/95" aria-labelledby="idea-bank-heading">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 id="idea-bank-heading" className="text-lg font-bold">Bank Ide &amp; Perencanaan Konten</h2>
-              <p className="mt-0.5 text-sm text-slate-600">
+              <h2 id="idea-bank-heading" className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">Bank Ide &amp; Perencanaan Konten</h2>
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                 Kumpulkan ide konten, lampirkan naskah copywriting/skrip dari tabel Bank Copy, lalu jadikan tugas produksi untuk tim.
               </p>
             </div>
@@ -339,8 +339,8 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
             />
           )}
 
-          <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
-            <label className="min-w-[200px] flex-1 text-xs font-semibold text-slate-700">
+          <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+            <label className="min-w-[200px] flex-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
               Cari judul / catatan ide
               <div className="relative mt-1">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -353,14 +353,14 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                 />
               </div>
             </label>
-            <label className="text-xs font-semibold text-slate-700">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
               Antrean
               <select className={`${field} mt-1`} value={queue} onChange={event => { setQueue(event.target.value); setPage(0); }}>
                 <option value="">Semua ide</option>
                 <Options values={ideaQueues} />
               </select>
             </label>
-            <label className="text-xs font-semibold text-slate-700">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
               Urutkan
               <select className={`${field} mt-1`} value={sortBy} onChange={event => setSortBy(event.target.value as IdeaSortOrder)}>
                 <option value="newest">Terbaru</option>
@@ -369,7 +369,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                 <option value="title_asc">Judul (A → Z)</option>
               </select>
             </label>
-            <label className="inline-flex min-h-[38px] items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+            <label className="inline-flex min-h-[38px] items-center gap-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
               <input type="checkbox" checked={priority} onChange={event => { setPriority(event.target.checked); setPage(0); }} />
               <span>Hanya ide prioritas</span>
             </label>
@@ -506,11 +506,11 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
 
       {/* TAB 2: LIST NASKAH & COPYWRITING (TABEL) */}
       {activeTab === 'scripts' && (
-        <section className="space-y-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm" aria-label="List Tabel Copywriting dan Skrip Naskah">
+        <section className="space-y-4 rounded-3xl border border-slate-200/80 bg-white/95 p-4 sm:p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.04)] dark:border-slate-800/80 dark:bg-[#111622]/95" aria-label="List Tabel Copywriting dan Skrip Naskah">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold">Daftar Tabel Copywriting &amp; Bank Skrip Naskah</h2>
-              <p className="mt-0.5 text-sm text-slate-600">
+              <h2 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">Daftar Tabel Copywriting &amp; Bank Skrip Naskah</h2>
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                 Simpan dan kelola daftar naskah copywriting, hook video, skrip 30-60 detik, dan caption dalam tampilan tabel. Lampirkan langsung ke Ide atau Tugas Baru.
               </p>
             </div>
@@ -530,9 +530,9 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
           )}
 
           {/* Filter Bar for Copywriting Table */}
-          <div className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 sm:flex-row sm:items-end dark:border-slate-800 dark:bg-slate-900/50">
             <div className="grid grid-cols-1 gap-3 flex-1 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Cari judul / isi skrip
                 <div className="relative mt-1">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -545,21 +545,21 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                   />
                 </div>
               </label>
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Filter format naskah
                 <select className={`${field} mt-1`} value={scriptFormatFilter} onChange={e => setScriptFormatFilter(e.target.value)}>
                   <option value="">Semua format naskah</option>
                   <Options values={copyFormats} />
                 </select>
               </label>
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Filter tipe output
                 <select className={`${field} mt-1`} value={scriptOutputFilter} onChange={e => setScriptOutputFilter(e.target.value)}>
                   <option value="">Semua tipe output</option>
                   <Options values={outputTypes} />
                 </select>
               </label>
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Urutkan
                 <select className={`${field} mt-1`} value={sortBy} onChange={e => setSortBy(e.target.value as IdeaSortOrder)}>
                   <option value="newest">Terbaru</option>
@@ -574,10 +574,10 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                 type="button"
                 onClick={() => void templatesQuery.refetch()}
                 disabled={templatesQuery.isFetching}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors shadow-2xs"
+                className={`${button} inline-flex items-center gap-1.5 !py-2`}
                 title="Segarkan sinkronisasi naskah dari database"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${templatesQuery.isFetching ? 'animate-spin text-teal-600' : 'text-slate-500'}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${templatesQuery.isFetching ? 'animate-spin text-blue-600' : 'text-slate-500 dark:text-slate-400'}`} />
                 <span>{templatesQuery.isFetching ? 'Sinkronisasi…' : 'Segarkan'}</span>
               </button>
               {(scriptSearch || scriptFormatFilter || scriptOutputFilter) && (
@@ -588,7 +588,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                     setScriptFormatFilter('');
                     setScriptOutputFilter('');
                   }}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className={`${button} !py-2`}
                 >
                   Reset Filter
                 </button>
@@ -653,7 +653,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
               <table className="creative-table w-full text-sm">
                 <thead>
                   <tr>
@@ -663,7 +663,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                       <button
                         type="button"
                         onClick={() => setSortBy(prev => prev === 'unit_asc' ? 'unit_desc' : 'unit_asc')}
-                        className="inline-flex items-center gap-1 font-extrabold uppercase tracking-wider hover:text-blue-600 cursor-pointer"
+                        className="inline-flex items-center gap-1 font-extrabold uppercase tracking-wider hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
                         title="Klik untuk mengurutkan berdasarkan Unit Bisnis"
                       >
                         <span>Platform &amp; Unit</span>
@@ -683,32 +683,32 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                         <button
                           type="button"
                           onClick={() => setViewingTemplate(tpl)}
-                          className="text-left font-bold text-slate-900 hover:text-teal-800 hover:underline"
+                          className="text-left font-bold text-slate-900 hover:text-blue-600 hover:underline dark:text-slate-100 dark:hover:text-blue-400"
                           title="Klik untuk membuka Mode Lihat & Baca Naskah"
                         >
                           {tpl.title}
                         </button>
                         {tpl.description ? (
-                          <div className="mt-1.5 rounded-lg border border-amber-200/80 bg-amber-50/70 px-2 py-1.5 text-xs text-amber-950">
-                            <span className="font-bold text-amber-900 block">Penjelasan / Arahan Brief:</span>
+                          <div className="mt-1.5 rounded-xl border border-amber-200/80 bg-amber-50/70 px-2.5 py-1.5 text-xs text-amber-950 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">
+                            <span className="font-bold text-amber-900 dark:text-amber-300 block">Arahan Brief:</span>
                             <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap leading-snug">{tpl.description}</p>
                           </div>
                         ) : (
-                          <p className="mt-1 text-xs italic text-slate-400">Belum ada catatan penjelasan skrip</p>
+                          <p className="mt-1 text-xs italic text-slate-400 dark:text-slate-500">Tanpa catatan arahan</p>
                         )}
                       </td>
                       <td>
                         <div className="flex flex-col items-start gap-1">
-                          <span className="rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800">
+                          <span className="rounded-full bg-blue-50 border border-blue-200/80 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 dark:border-blue-800/70 dark:bg-blue-950/50 dark:text-blue-300">
                             {copyFormats[tpl.format] ?? tpl.format}
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                             {outputTypes[tpl.output_type] ?? tpl.output_type}
                           </span>
                         </div>
                       </td>
-                      <td className="text-xs text-slate-600">
-                        <span className="block font-semibold text-slate-800">
+                      <td className="text-xs text-slate-600 dark:text-slate-400">
+                        <span className="block font-semibold text-slate-800 dark:text-slate-200">
                           {tpl.platform ? platforms[tpl.platform] : 'Semua platform'}
                         </span>
                         <span className="block mt-0.5">{unitLabel(tpl.business_unit_id)}</span>
@@ -720,9 +720,9 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                           tabIndex={0}
                           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setViewingTemplate(tpl); } }}
                           title="Klik untuk membuka Mode Lihat Nyaman"
-                          className="cursor-pointer max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 hover:border-teal-300 hover:bg-white p-3 transition-colors"
+                          className="cursor-pointer max-h-36 overflow-y-auto rounded-2xl border border-slate-200/80 bg-slate-50/70 hover:border-blue-300 hover:bg-white p-3 transition-all dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-blue-700 dark:hover:bg-slate-900"
                         >
-                          <CopyRichTextContent content={tpl.body} className="text-xs text-slate-800 leading-relaxed" />
+                          <CopyRichTextContent content={tpl.body} className="text-xs text-slate-800 leading-relaxed dark:text-slate-200" />
                         </div>
                       </td>
                       <td>
@@ -794,16 +794,16 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
 
       {/* TAB 3: REFERENSI BANK IDE (TAB MENU TERPISAH) */}
       {activeTab === 'references' && (
-        <section className="space-y-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm" aria-label="Referensi Bank Ide">
+        <section className="space-y-4 rounded-3xl border border-slate-200/80 bg-white/95 p-4 sm:p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.04)] dark:border-slate-800/80 dark:bg-[#111622]/95" aria-label="Referensi Bank Ide">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold">Katalog Referensi Bank Ide</h2>
-              <p className="mt-0.5 text-sm text-slate-600">
+              <h2 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">Katalog Referensi Bank Ide</h2>
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                 Daftar seluruh tautan referensi kompetitor, benchmark visual, dan contoh konten yang tersimpan di Bank Ide.
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Filter platform
                 <select
                   className={`${field} mt-1 min-w-[160px]`}
@@ -814,7 +814,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                   <Options values={platforms} />
                 </select>
               </label>
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Urutkan
                 <select
                   className={`${field} mt-1 min-w-[160px]`}
@@ -830,15 +830,15 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
             </div>
           </div>
 
-          {query.isPending && <p role="status" className="text-sm text-slate-600">Memuat referensi…</p>}
+          {query.isPending && <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Memuat referensi…</p>}
 
           {referenceEntries.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
-              <p className="font-semibold text-slate-800">Belum ada tautan referensi pada filter ini.</p>
+            <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:text-slate-400">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">Belum ada tautan referensi pada filter ini.</p>
               <p className="mt-1 text-xs">Tambahkan tautan referensi saat membuat atau mengedit ide konten.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
               <table className="creative-table w-full text-sm">
                 <thead>
                   <tr>
