@@ -10,7 +10,7 @@ import {
   stripCopyRichText,
 } from './CopyRichText';
 import {
-  briefFields, campaignStatuses, copyFormats, copyTemplates, getIdeaAttachedScript, ideaQueues, outputTypes, platforms, priorities, ROUTINE_PRESETS, safeOutputUrl, saveCampaign, saveCopyTemplate, saveIdea, saveTask, setIdeaAttachedScript, taskRoutineCategories, taskRoutineModes, taskStatuses, workstreams,
+  briefFields, campaignStatuses, copyFormats, copyTemplates, getIdeaAttachedScript, ideaQueues, ideas, outputTypes, platforms, priorities, ROUTINE_PRESETS, safeOutputUrl, saveCampaign, saveCopyTemplate, saveIdea, saveTask, setIdeaAttachedScript, taskRoutineCategories, taskRoutineModes, taskStatuses, workstreams,
   type Campaign, type CopyTemplate, type Idea, type RoutinePreset, type Task, type TeamMember,
 } from './repository';
 
@@ -58,8 +58,8 @@ export function People({ members, current, required, name = 'person' }: { member
   </select>;
 }
 
-export function Editor({ title, children, onCancel, onSave, onSaved }: {
-  title: string; children: ReactNode; onCancel: () => void;
+export function Editor({ title, subtitle, wide, children, onCancel, onSave, onSaved }: {
+  title: string; subtitle?: string; wide?: boolean; children: ReactNode; onCancel: () => void;
   onSave: (data: FormData) => Promise<string>; onSaved: (id: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -78,13 +78,22 @@ export function Editor({ title, children, onCancel, onSave, onSaved }: {
       setBusy(false);
     }
   }
-  return <form onSubmit={submit} aria-busy={busy} className="creative-editor space-y-4 rounded-xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-[#0f1624]">
-    <h2 className="text-lg font-bold">{title}</h2>
-    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-    <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">{children}</fieldset>
-    <div className="creative-editor-actions flex flex-wrap gap-2">
-      <button type="submit" className={primary} disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</button>
+  return <form onSubmit={submit} aria-busy={busy} className="creative-editor space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 dark:border-white/10 dark:bg-[#0f1624]">
+    <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3 dark:border-white/[0.06]">
+      <div>
+        <h2 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>}
+      </div>
+      <div className="flex items-center gap-2">
+        <button type="button" className={button} disabled={busy} onClick={onCancel}>Batal</button>
+        <button type="submit" className={primary} disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</button>
+      </div>
+    </div>
+    {error && <p role="alert" className="rounded-xl bg-rose-50/90 px-3 py-2 text-xs sm:text-sm font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{error}</p>}
+    <fieldset disabled={busy} className={wide ? 'grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(290px,0.9fr)] lg:items-start' : 'grid gap-3 sm:grid-cols-2'}>{children}</fieldset>
+    <div className="creative-editor-actions flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3 dark:border-white/[0.06]">
       <button type="button" className={button} disabled={busy} onClick={onCancel}>Batal</button>
+      <button type="submit" className={primary} disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</button>
     </div>
   </form>;
 }
@@ -150,11 +159,14 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
   const [criteriaText, setCriteriaText] = useState(task?.acceptance_criteria ?? initialPreset?.acceptance_criteria ?? '');
   const [checklistText, setChecklistText] = useState(task?.checklist?.map(item => item.label).join('\n') ?? initialPreset?.checklist ?? '');
   const [selectedTemplateId, setSelectedTemplateId] = useState(task?.copy_template_id ?? getIdeaAttachedScript(sourceIdea?.id) ?? '');
+  const [selectedIdeaId, setSelectedIdeaId] = useState(sourceIdea?.id ?? '');
   const [briefText, setBriefText] = useState(task?.brief ?? sourceIdea?.brief ?? initialPreset?.brief ?? '');
   const [customScriptNote, setCustomScriptNote] = useState('');
   const [viewingScript, setViewingScript] = useState<CopyTemplate | null>(null);
   const templates = useQuery({ queryKey: ['creative-copy-library', defaultUnit ?? 'all'], queryFn: ({ signal }) => copyTemplates(signal, defaultUnit ?? 'all') });
+  const ideaLibrary = useQuery({ queryKey: ['creative-idea-bank-picker', defaultUnit ?? 'all'], queryFn: ({ signal }) => ideas(0, false, '', signal, defaultUnit ?? 'all') });
   const selectedTemplate = templates.data?.find(t => t.id === selectedTemplateId);
+  const selectedIdea = ideaLibrary.data?.find(item => item.id === selectedIdeaId) ?? (sourceIdea?.id === selectedIdeaId ? sourceIdea : undefined);
 
   const applyRoutinePreset = (preset: RoutinePreset, forceOverwrite = false) => {
     setRoutineMode(preset.mode);
@@ -177,8 +189,13 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
         onClose={() => setViewingScript(null)}
       />
     )}
-    <Editor title={task ? 'Edit tugas' : sourceIdea ? 'Jadikan ide sebagai tugas' : 'Tugas kreatif baru'} onCancel={onCancel} onSaved={onSaved}
-    onSave={data => {
+    <Editor
+      wide
+      title={task ? 'Edit tugas' : sourceIdea ? 'Jadikan ide sebagai tugas' : 'Tugas kreatif baru'}
+      subtitle={routineMode === 'once' ? 'Atur brief, lampiran ide/naskah di kiri serta jadwal & PIC di kanan.' : 'Mode tugas berulang: gunakan pola frekuensi & jam tayang tanpa perlu memilih tanggal kalender.'}
+      onCancel={onCancel}
+      onSaved={onSaved}
+      onSave={data => {
       const link = value(data, 'url');
       const output = safeOutputUrl(link);
       const blocker = value(data, 'blocker');
@@ -190,13 +207,16 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
         throw new Error('Checklist maksimal 20 langkah, masing-masing 160 karakter.');
       }
       const checked = new Set(task?.checklist?.filter(item => item.done).map(item => item.label));
-      if (sourceIdea && (!value(data, 'person') || !value(data, 'due'))) throw new Error('Tentukan PIC dan deadline sebelum memasukkan ide ke antrean produksi.');
+      const isOnce = routineMode === 'once';
+      if (sourceIdea && isOnce && (!value(data, 'person') || !value(data, 'due'))) {
+        throw new Error('Tentukan PIC dan deadline sebelum memasukkan ide ke antrean produksi.');
+      }
       if (link && !output) throw new Error('Tautan hasil harus berupa URL HTTP atau HTTPS yang valid.');
       if (status === 'blocked' && !blocker) throw new Error('Isi alasan tugas terhambat.');
       const resolvedDeliverable = deliverableText.trim() || (status !== 'todo' ? `${outputTypes[outputType ?? 'video'] ?? 'Konten'} - ${titleText.trim()}` : '');
       const resolvedCriteria = criteriaText.trim() || (status !== 'todo' ? 'Sesuai brief dan standar kualitas visual brand' : '');
-      if (['doing', 'review', 'ready', 'done'].includes(status) && (!primaryPerson || !value(data, 'due'))) {
-        throw new Error('Untuk status Dikerjakan / Review / Siap Tayang / Selesai, pilih PIC utama dan Deadline pengerjaan terlebih dahulu (atau gunakan status "Belum mulai").');
+      if (isOnce && ['doing', 'review', 'ready', 'done'].includes(status) && (!primaryPerson || !value(data, 'due'))) {
+        throw new Error('Untuk status Dikerjakan / Review / Siap Tayang / Selesai pada tugas sekali buat, pilih PIC utama dan Deadline pengerjaan terlebih dahulu (atau gunakan mode Rutin Terjadwal).');
       }
       return saveTask({
         campaign_id: value(data, 'campaign') || null, title: titleText.trim() || value(data, 'title'), brief: briefText,
@@ -218,12 +238,15 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
         routine_runs: task?.routine_runs,
         routine_last_note: task?.routine_last_note,
         format: formatText.trim(), status, priority: value(data, 'priority') as Task['priority'],
-        due_on: value(data, 'due') || null, publish_on: value(data, 'publish') || null,
+        due_on: isOnce ? (value(data, 'due') || null) : (task?.due_on ?? null),
+        publish_on: isOnce ? (value(data, 'publish') || null) : (task?.publish_on ?? null),
         output_url: output, blocker: status === 'blocked' ? blocker : '',
         business_unit_id: selectedCampaign ? task?.business_unit_id ?? null : value(data, 'businessUnit') || null,
         workstream: value(data, 'workstream') as Task['workstream'],
-      }, task, sourceIdea?.id);
+      }, task, selectedIdeaId || sourceIdea?.id);
     }}>
+    {/* KOLOM KIRI: Judul, Pola, Lampiran Ide & Naskah, Brief, Checklist */}
+    <div className="space-y-4 min-w-0">
     <Label title="Judul / hasil yang dibutuhkan">
       <input
         name="title"
@@ -232,51 +255,19 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
         maxLength={160}
         value={titleText}
         onChange={e => setTitleText(e.target.value)}
-        placeholder="Contoh: VIDEO INTRODUCTION / Dokumentasi Video Customer Order"
+        placeholder="Contoh: Daily post hack garment / Video Introduction"
       />
     </Label>
-    {(task?.reviewed_at || task?.approved_at) && ['ready','done'].includes(task.status) && <p className="sm:col-span-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+    {(task?.reviewed_at || task?.approved_at) && ['ready','done'].includes(task.status) && <p className="rounded-xl bg-amber-50 p-3 text-xs sm:text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
       Brief dan hasil ini sudah disetujui. Pilih status Dikerjakan saat mengubahnya agar review dan persetujuan dapat dicatat ulang.
     </p>}
-    <Label title="Kampanye"><select name="campaign" className={field} value={selectedCampaign} onChange={event => setSelectedCampaign(event.target.value)}>
-      <option value="">Tanpa kampanye</option>
-      {task?.campaign_id && !campaignList.some(campaign => campaign.id === task.campaign_id) &&
-        <option value={task.campaign_id}>Kampanye saat ini</option>}
-      {campaignList.filter(campaign => campaign.status !== 'archived' || campaign.id === task?.campaign_id).map(campaign =>
-        <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
-    </select></Label>
-    {selectedCampaign ? <p className="self-center text-sm text-slate-600">Unit bisnis mengikuti kampanye.</p>
-      : <UnitField current={task ? task.business_unit_id : sourceIdea?.business_unit_id ?? defaultUnit} required={!task} />}
-    <div className="space-y-2">
-      <Label title="Platform utama"><select name="platform" className={field} value={platform} onChange={event => setPlatform(event.target.value as Task['platform'])}><Options values={platforms} /></select></Label>
-      <details className="rounded-lg border border-slate-200 p-2 text-sm" hidden={platform === 'internal'}>
-        <summary className="cursor-pointer font-medium">Platform tambahan</summary>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {Object.entries(platforms).filter(([id]) => id !== 'internal').map(([id, label]) => (
-            <label key={id} hidden={id === platform} className="space-x-2">
-              <input type="checkbox" name="additionalPlatform" value={id} disabled={id === platform || platform === 'internal'}
-                defaultChecked={(task ? task.additional_platforms : sourceIdea?.additional_platforms)?.includes(id as Task['platform'])} />
-              <span>{label}</span>
-            </label>
-          ))}
-        </div>
-      </details>
-    </div>
-    <Label title="Tipe output konten">
-      <select name="outputType" className={field} value={outputType} onChange={event => setOutputType(event.target.value as Task['output_type'])}>
-        <Options values={outputTypes} />
-      </select>
-    </Label>
-
-    {/* POLA PRODUKSI TUGAS: SEKALI BUAT vs KONTEN RUTINITAS (BERULANG / CUSTOMER ORDER / TESTIMONI) */}
-    <div className="sm:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3.5 space-y-3 text-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <strong className="block font-bold text-slate-900">Pola Produksi Tugas: Sekali Buat vs Konten Rutinitas (Berulang)</strong>
-          <span className="text-xs text-slate-600">
-            Pilih apakah tugas ini hanya dibuat sekali (1x video/konten) atau rutinitas berulang seperti setiap ada customer order, testimoni, dan pengiriman.
-          </span>
-        </div>
+    {/* POLA PRODUKSI TUGAS: SEKALI BUAT vs KONTEN RUTINITAS */}
+    <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/40 p-3 space-y-2.5 text-sm dark:border-indigo-500/20 dark:bg-indigo-500/5">
+      <div>
+        <strong className="block text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Pola Tugas</strong>
+        <span className="text-xs text-slate-600 dark:text-slate-400">
+          Pilih Sekali Buat (pakai tanggal deadline) atau Rutin Berulang (pakai frekuensi harian/mingguan tanpa tanggal kalender tunggal).
+        </span>
       </div>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -295,8 +286,8 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
                   setRoutineTarget(defaultPreset.target);
                 } else if (modeKey === 'scheduled_recurring' && !routineTrigger.trim()) {
                   setRoutineCategory('daily_weekly');
-                  setRoutineTrigger('Jadwal rutin berkala (Harian / 3x Seminggu / Mingguan)');
-                  setRoutineTarget('Sesuai jadwal rutin mingguan');
+                  setRoutineTrigger('Setiap Hari (Daily)');
+                  setRoutineTarget('1x posting per hari');
                 }
               }}
               className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition-all ${
@@ -312,32 +303,29 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
       </div>
 
       {routineMode !== 'once' && (
-        <div className="rounded-xl border border-indigo-200 bg-white p-3 space-y-3">
-          <div>
-            <span className="block text-xs font-bold text-slate-700 mb-1.5">
-              Preset Cepat Konten Rutinitas (Klik untuk mengisi template standar):
-            </span>
+        <details className="rounded-xl border border-indigo-200/70 bg-white/90 p-2.5 text-xs dark:border-white/10 dark:bg-[#0d1320]">
+          <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">
+            Kategori &amp; preset standar rutinitas (opsional)
+          </summary>
+          <div className="mt-2.5 space-y-2.5">
             <div className="flex flex-wrap gap-1.5">
               {ROUTINE_PRESETS.map(preset => (
                 <button
                   key={preset.id}
                   type="button"
                   onClick={() => applyRoutinePreset(preset, false)}
-                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                     routineCategory === preset.category && routineMode === preset.mode
                       ? 'border-indigo-600 bg-indigo-100 text-indigo-950 font-bold dark:border-indigo-400 dark:bg-indigo-500/20 dark:text-indigo-200'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-indigo-500/10'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300'
                   }`}
                 >
                   + {preset.label}
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            <label className="block space-y-1 text-xs font-semibold text-slate-700">
-              <span>Kategori Konten Rutinitas</span>
+            <label className="block space-y-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <span>Kategori Rutinitas</span>
               <select
                 value={routineCategory}
                 onChange={e => setRoutineCategory(e.target.value as NonNullable<Task['routine_category']>)}
@@ -346,43 +334,78 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
                 <Options values={taskRoutineCategories} />
               </select>
             </label>
-            <label className="block space-y-1 text-xs font-semibold text-slate-700">
-              <span>Target Output per Kejadian / Siklus</span>
-              <input
-                type="text"
-                value={routineTarget}
-                onChange={e => setRoutineTarget(e.target.value)}
-                placeholder="Contoh: 1 Video Dokumentasi per Customer Order"
-                className={field}
-              />
-            </label>
-            <label className="block space-y-1 text-xs font-semibold text-slate-700 sm:col-span-2">
-              <span>Pemicu / Aturan Kapan Konten Ini Dibuat</span>
-              <input
-                type="text"
-                value={routineTrigger}
-                onChange={e => setRoutineTrigger(e.target.value)}
-                placeholder="Contoh: Setiap ada customer order baru / Setiap ada testimoni pelanggan masuk"
-                className={field}
-              />
-            </label>
           </div>
+        </details>
+      )}
+    </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
-            <span className="text-xs text-slate-600">
-              Ingin mengisi otomatis Format, Hasil yang diserahkan, Kriteria penerimaan &amp; Checklist sesuai kategori ini?
-            </span>
+    {/* LAMPIRAN REFERENSI DARI BANK IDE */}
+    <div className="space-y-2.5 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 text-sm dark:border-white/10 dark:bg-white/[0.02]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label htmlFor="task-source-idea" className="font-bold text-slate-800 dark:text-slate-100">
+          Lampirkan Ide &amp; Link Referensi dari Bank Ide (opsional)
+        </label>
+        {ideaLibrary.data && ideaLibrary.data.length > 0 && (
+          <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">{ideaLibrary.data.length} ide tersimpan</span>
+        )}
+      </div>
+      <select
+        id="task-source-idea"
+        name="sourceIdea"
+        className={field}
+        value={selectedIdeaId}
+        onChange={event => {
+          const nextId = event.target.value;
+          setSelectedIdeaId(nextId);
+          const picked = ideaLibrary.data?.find(item => item.id === nextId);
+          if (picked && !task) {
+            if (!titleText.trim()) setTitleText(picked.title);
+            if (platform === 'internal' && picked.platform) setPlatform(picked.platform);
+          }
+        }}
+      >
+        <option value="">-- Tanpa lampiran dari Bank Ide --</option>
+        {ideaLibrary.data?.map(item => (
+          <option key={item.id} value={item.id}>
+            [{platforms[item.platform] ?? item.platform}] {item.title}{item.reference_urls?.length ? ` (${item.reference_urls.length} referensi)` : ''}
+          </option>
+        ))}
+      </select>
+      {selectedIdea && (
+        <div className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-2 text-xs dark:border-white/10 dark:bg-[#0d1320]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-bold text-slate-800 dark:text-slate-100">{selectedIdea.title}</span>
             <button
               type="button"
+              className="rounded-full bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-indigo-700 dark:bg-indigo-500"
               onClick={() => {
-                const match = ROUTINE_PRESETS.find(p => p.category === routineCategory) ?? ROUTINE_PRESETS[0];
-                applyRoutinePreset(match, true);
+                const refs = (selectedIdea.reference_urls ?? []).map(u => `- ${u}`).join('\n');
+                const parts = [
+                  selectedIdea.brief ? `Ide (${selectedIdea.title}):\n${selectedIdea.brief}` : `Ide: ${selectedIdea.title}`,
+                  refs ? `Link Referensi:\n${refs}` : '',
+                ].filter(Boolean).join('\n\n');
+                setBriefText(prev => prev.trim() ? `${prev.trim()}\n\n${parts}` : parts);
               }}
-              className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-900 hover:bg-indigo-100"
             >
-              Isi Standar Format &amp; Checklist Rutinitas
+              + Salin Ide &amp; Referensi ke Brief
             </button>
           </div>
+          {selectedIdea.brief && <p className="text-slate-600 dark:text-slate-300 line-clamp-3 whitespace-pre-wrap">{selectedIdea.brief}</p>}
+          {Boolean(selectedIdea.reference_urls?.length) && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {selectedIdea.reference_urls.map((url, idx) => (
+                <a
+                  key={url}
+                  href={safeOutputUrl(url) || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-800 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
+                >
+                  Referensi #{idx + 1} ↗
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -494,51 +517,148 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
         </p>
       )}
     </div>
-    <Label title="Pos kerja"><select name="workstream" className={field} defaultValue={task?.workstream ?? initialPreset?.workstream ?? 'creative'}><Options values={workstreams} /></select></Label>
-    <Label title="Format"><input name="format" className={field} maxLength={80} placeholder="Contoh: Reels 30 detik / Video Dokumentasi Order" value={formatText} onChange={e => setFormatText(e.target.value)} /></Label>
-    <div className="space-y-2">
-      <Label title={sourceIdea ? 'PIC utama (wajib)' : 'PIC utama'}><People members={members} current={task?.assignee_id} required={!!sourceIdea} /></Label>
-      <details className="rounded-lg border border-slate-200 p-2 text-sm">
-        <summary className="cursor-pointer font-medium">PIC tambahan</summary>
-        <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
-          {members.filter(member => member.is_active || task?.additional_assignee_ids?.includes(member.id)).map(member => (
-            <label key={member.id} className="flex items-center gap-2">
-              <input type="checkbox" name="additionalPerson" value={member.id} defaultChecked={task?.additional_assignee_ids?.includes(member.id)} />
-              <span>{member.full_name}{member.is_active ? '' : ' (nonaktif)'}</span>
-            </label>
-          ))}
-          {task?.additional_assignee_ids?.filter(id => !members.some(member => member.id === id)).map(id => (
-            <label key={id} className="flex items-center gap-2">
-              <input type="checkbox" name="additionalPerson" value={id} defaultChecked />
-              <span>PIC saat ini (profil tidak tersedia)</span>
-            </label>
-          ))}
-          {!members.length && <p className="text-slate-600">Belum ada anggota yang dapat dipilih.</p>}
-        </div>
-      </details>
-    </div>
-    <Label title="Reviewer"><People name="reviewer" members={members.filter(member => member.can_decide || member.id === task?.reviewer_id)} current={task?.reviewer_id} /></Label>
-    <Label title="Pemberi persetujuan"><People name="approver" members={members.filter(member => member.can_decide || member.id === task?.approver_id)} current={task?.approver_id} /></Label>
-    <Label title="Prioritas"><select name="priority" className={field} defaultValue={task?.priority ?? 'normal'}><Options values={priorities} /></select></Label>
-    <Label title={sourceIdea ? 'Deadline pengerjaan (wajib)' : 'Deadline pengerjaan'}><input name="due" className={field} required={!!sourceIdea} type="date" defaultValue={task?.due_on ?? ''} /></Label>
-    <Label title="Jadwal tayang"><input name="publish" className={field} type="date" defaultValue={task?.publish_on ?? ''} /></Label>
-    <Label title="Status"><select name="status" className={field} value={status} onChange={event => setStatus(event.target.value as Task['status'])}><Options values={taskStatuses} /></select></Label>
-    {status === 'blocked' && <Label title="Alasan terhambat"><input name="blocker" className={field} required maxLength={500} defaultValue={task?.blocker} /></Label>}
-    <Label title="Brief"><textarea name="brief" className={field} maxLength={2000} value={briefText} onChange={event => setBriefText(event.target.value)} /></Label>
-    <details className="rounded-lg border border-slate-200 p-3 sm:col-span-2">
-      <summary className="cursor-pointer text-sm font-semibold">Brief kreatif terstruktur</summary>
+
+    <Label title="Brief"><textarea name="brief" className={field} rows={4} maxLength={2000} value={briefText} onChange={event => setBriefText(event.target.value)} placeholder="Tulis arahan konten, hook, atau catatan produksi…" /></Label>
+
+    <details className="rounded-xl border border-slate-200/80 p-3 dark:border-white/10">
+      <summary className="cursor-pointer text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200">Brief kreatif terstruktur (opsional)</summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {(Object.keys(briefFields) as (keyof typeof briefFields)[]).map(key => <Label key={key} title={briefFields[key]}>
           <textarea name={`brief.${key}`} className={field} maxLength={700} rows={2} defaultValue={task?.creative_brief?.[key]} />
         </Label>)}
       </div>
     </details>
-    <Label title="Hasil yang harus diserahkan"><textarea name="deliverable" className={field} maxLength={1000} value={deliverableText} onChange={e => setDeliverableText(e.target.value)} placeholder="Contoh: 1 video siap upload / tiga versi logo dalam SVG" /></Label>
-    <Label title="Kriteria penerimaan"><textarea name="criteria" className={field} maxLength={2000} value={criteriaText} onChange={e => setCriteriaText(e.target.value)} placeholder="Contoh: Selalu menggunakan icon perusahaan & produk terlihat jelas" /></Label>
+
     <Label title="Checklist pekerjaan"><textarea name="checklist" className={field} rows={3} maxLength={3220}
       value={checklistText} onChange={e => setChecklistText(e.target.value)} placeholder="Tulis satu langkah per baris" /></Label>
-    <Label title="Catatan bukti hasil"><textarea name="evidence" className={field} maxLength={2000} defaultValue={task?.completion_note} placeholder="Isi catatan atau lampirkan tautan hasil sebelum review" /></Label>
-    <Label title="Tautan hasil / aset"><input name="url" className={field} type="url" maxLength={1024} defaultValue={task?.output_url} /></Label>
+
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Label title="Hasil yang harus diserahkan"><textarea name="deliverable" className={field} rows={2} maxLength={1000} value={deliverableText} onChange={e => setDeliverableText(e.target.value)} placeholder="Contoh: 1 video siap upload / 1 postingan Threads" /></Label>
+      <Label title="Kriteria penerimaan"><textarea name="criteria" className={field} rows={2} maxLength={2000} value={criteriaText} onChange={e => setCriteriaText(e.target.value)} placeholder="Contoh: Konsisten dengan identitas brand" /></Label>
+    </div>
+    </div>
+
+    {/* KOLOM KANAN: Properti, Jadwal Adaptif, Platform, PIC & Bukti */}
+    <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.02]">
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <Label title="Status"><select name="status" className={field} value={status} onChange={event => setStatus(event.target.value as Task['status'])}><Options values={taskStatuses} /></select></Label>
+        <Label title="Prioritas"><select name="priority" className={field} defaultValue={task?.priority ?? 'normal'}><Options values={priorities} /></select></Label>
+      </div>
+      {status === 'blocked' && <Label title="Alasan terhambat"><input name="blocker" className={field} required maxLength={500} defaultValue={task?.blocker} /></Label>}
+
+      {/* JADWAL ADAPTIF: KALENDER UNTUK 1x vs FREKUENSI UNTUK RUTIN */}
+      {routineMode === 'once' ? (
+        <div className="grid gap-2.5 sm:grid-cols-2 rounded-xl border border-slate-200/80 bg-white/80 p-2.5 dark:border-white/10 dark:bg-[#0d1320]">
+          <Label title={sourceIdea ? 'Deadline pengerjaan (wajib)' : 'Deadline pengerjaan'}><input name="due" className={field} required={!!sourceIdea} type="date" defaultValue={task?.due_on ?? ''} /></Label>
+          <Label title="Jadwal tayang"><input name="publish" className={field} type="date" defaultValue={task?.publish_on ?? ''} /></Label>
+        </div>
+      ) : (
+        <div className="space-y-2.5 rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-3 dark:border-indigo-500/25 dark:bg-indigo-500/10">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-indigo-800 dark:text-indigo-200">Pola Jadwal Berulang</span>
+            <span className="text-[11px] text-indigo-600 dark:text-indigo-300">Tanpa tanggal kalender tunggal</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {['Setiap Hari (Daily)', 'Senin – Jumat', '3x Seminggu', 'Mingguan', 'Bulanan'].map(freq => (
+              <button
+                key={freq}
+                type="button"
+                onClick={() => setRoutineTrigger(freq)}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${
+                  routineTrigger === freq
+                    ? 'bg-indigo-600 text-white dark:bg-indigo-500'
+                    : 'bg-white/90 text-slate-600 hover:bg-indigo-100 dark:bg-white/[0.06] dark:text-slate-300'
+                }`}
+              >
+                {freq}
+              </button>
+            ))}
+          </div>
+          <Label title="Aturan / Frekuensi Rutin">
+            <input
+              type="text"
+              value={routineTrigger}
+              onChange={e => setRoutineTrigger(e.target.value)}
+              placeholder="Contoh: Setiap Hari (Daily) / Setiap ada order masuk"
+              className={field}
+            />
+          </Label>
+          <Label title="Target Output / Jam Tayang (opsional)">
+            <input
+              type="text"
+              value={routineTarget}
+              onChange={e => setRoutineTarget(e.target.value)}
+              placeholder="Contoh: 10:00 WIB · 1 post/hari"
+              className={field}
+            />
+          </Label>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label title="Platform utama"><select name="platform" className={field} value={platform} onChange={event => setPlatform(event.target.value as Task['platform'])}><Options values={platforms} /></select></Label>
+        <details className="rounded-xl border border-slate-200/80 bg-white/70 p-2 text-xs dark:border-white/10 dark:bg-white/[0.03]" hidden={platform === 'internal'}>
+          <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">Platform tambahan (sinkron multi-kanal)</summary>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {Object.entries(platforms).filter(([id]) => id !== 'internal').map(([id, label]) => (
+              <label key={id} hidden={id === platform} className="flex items-center gap-2">
+                <input type="checkbox" name="additionalPlatform" value={id} disabled={id === platform || platform === 'internal'}
+                  defaultChecked={(task ? task.additional_platforms : sourceIdea?.additional_platforms)?.includes(id as Task['platform'])} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </details>
+      </div>
+
+      <Label title="Kampanye"><select name="campaign" className={field} value={selectedCampaign} onChange={event => setSelectedCampaign(event.target.value)}>
+        <option value="">Tanpa kampanye</option>
+        {task?.campaign_id && !campaignList.some(campaign => campaign.id === task.campaign_id) &&
+          <option value={task.campaign_id}>Kampanye saat ini</option>}
+        {campaignList.filter(campaign => campaign.status !== 'archived' || campaign.id === task?.campaign_id).map(campaign =>
+          <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
+      </select></Label>
+      {selectedCampaign ? <p className="text-xs text-slate-500 dark:text-slate-400">Unit bisnis mengikuti kampanye.</p>
+        : <UnitField current={task ? task.business_unit_id : sourceIdea?.business_unit_id ?? defaultUnit} required={!task} />}
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <Label title="Pos kerja"><select name="workstream" className={field} defaultValue={task?.workstream ?? initialPreset?.workstream ?? 'creative'}><Options values={workstreams} /></select></Label>
+        <Label title="Tipe output">
+          <select name="outputType" className={field} value={outputType} onChange={event => setOutputType(event.target.value as Task['output_type'])}>
+            <Options values={outputTypes} />
+          </select>
+        </Label>
+      </div>
+      <Label title="Format"><input name="format" className={field} maxLength={80} placeholder="Contoh: Reels 30 detik / Thread edukasi" value={formatText} onChange={e => setFormatText(e.target.value)} /></Label>
+
+      <div className="space-y-2">
+        <Label title={sourceIdea && routineMode === 'once' ? 'PIC utama (wajib)' : 'PIC utama'}><People members={members} current={task?.assignee_id} required={!!sourceIdea && routineMode === 'once'} /></Label>
+        <details className="rounded-xl border border-slate-200/80 bg-white/70 p-2 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+          <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">PIC tambahan, Reviewer &amp; Approver</summary>
+          <div className="mt-2 space-y-2.5">
+            <div className="max-h-32 space-y-1.5 overflow-y-auto">
+              {members.filter(member => member.is_active || task?.additional_assignee_ids?.includes(member.id)).map(member => (
+                <label key={member.id} className="flex items-center gap-2">
+                  <input type="checkbox" name="additionalPerson" value={member.id} defaultChecked={task?.additional_assignee_ids?.includes(member.id)} />
+                  <span>{member.full_name}{member.is_active ? '' : ' (nonaktif)'}</span>
+                </label>
+              ))}
+              {task?.additional_assignee_ids?.filter(id => !members.some(member => member.id === id)).map(id => (
+                <label key={id} className="flex items-center gap-2">
+                  <input type="checkbox" name="additionalPerson" value={id} defaultChecked />
+                  <span>PIC saat ini (profil tidak tersedia)</span>
+                </label>
+              ))}
+            </div>
+            <Label title="Reviewer"><People name="reviewer" members={members.filter(member => member.can_decide || member.id === task?.reviewer_id)} current={task?.reviewer_id} /></Label>
+            <Label title="Pemberi persetujuan"><People name="approver" members={members.filter(member => member.can_decide || member.id === task?.approver_id)} current={task?.approver_id} /></Label>
+          </div>
+        </details>
+      </div>
+
+      <Label title="Tautan hasil / aset"><input name="url" className={field} type="url" maxLength={1024} defaultValue={task?.output_url} placeholder="https://..." /></Label>
+      <Label title="Catatan bukti hasil"><textarea name="evidence" className={field} rows={2} maxLength={2000} defaultValue={task?.completion_note} placeholder="Catatan atau bukti sebelum review" /></Label>
+    </div>
   </Editor>
   </>;
 }

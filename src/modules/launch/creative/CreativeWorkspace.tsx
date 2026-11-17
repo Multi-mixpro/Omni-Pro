@@ -9,6 +9,7 @@ import { isProjectId } from '../discussion/repository';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { useWorkspaceNotifications } from '../notifications/useWorkspaceNotifications';
 import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
+import { CommandPalette } from './CommandPalette';
 import { button, CampaignForm, errorText, field, Options, primary, TaskForm, type TaskPresetSeed } from './CreativeForms';
 import { IdeaBank, ReferenceLinks } from './IdeaBank';
 import { CreativeOverview } from './CreativeOverview';
@@ -104,7 +105,7 @@ const statusColor: Record<Task['status'], string> = {
   blocked: 'bg-amber-100 text-amber-900', cancelled: 'bg-slate-100 text-slate-600',
 };
 
-function EditorDialog({ children, onClose, label = 'Form pekerjaan kreatif' }: { children: ReactNode; onClose: () => void; label?: string }) {
+function EditorDialog({ children, onClose, wide, label = 'Form pekerjaan kreatif' }: { children: ReactNode; onClose: () => void; wide?: boolean; label?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -115,7 +116,7 @@ function EditorDialog({ children, onClose, label = 'Form pekerjaan kreatif' }: {
     event.preventDefault();
     if (!ref.current?.querySelector('form[aria-busy="true"]')) onClose();
   }}
-    className="m-auto max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-2xl overflow-auto rounded-3xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/70 dark:border dark:border-slate-800 dark:bg-[#111622] dark:text-slate-100">
+    className={`m-auto max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-auto rounded-2xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/70 dark:border dark:border-white/10 dark:bg-[#0f1624] dark:text-slate-100 ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
     {children}
   </dialog>;
 }
@@ -149,6 +150,18 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const [taskView, setTaskView] = useState<'list' | 'board'>('board');
   const [taskSearch, setTaskSearch] = useState('');
   const [campaignSearch, setCampaignSearch] = useState('');
+  const [commandOpen, setCommandOpen] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setCommandOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
   const [adsReview, setAdsReview] = useState('');
   const [adsActivation, setAdsActivation] = useState<string>();
   const [calendarDay, setCalendarDay] = useState(jakartaToday);
@@ -502,6 +515,16 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
             </div>
           </div>
           <div className="creative-toolbar-actions flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCommandOpen(true)}
+              className={`${button} inline-flex items-center gap-1.5 !py-1.5 !px-3 !text-xs`}
+              title="Lompat cepat atau cari (Ctrl + K)"
+            >
+              <Command size={13} />
+              <span className="hidden sm:inline">Cari / Lompat</span>
+              <kbd className="hidden md:inline rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 dark:bg-white/[0.08] dark:text-slate-300">Ctrl K</kbd>
+            </button>
             <NotificationBell
               items={notif.items}
               countsByCategory={notif.countsByCategory}
@@ -718,7 +741,21 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         {campaignQuery.hasNextPage && <button className={button} disabled={campaignQuery.isFetchingNextPage} onClick={() => void campaignQuery.fetchNextPage()}>Muat kampanye lain</button>}
       </section>}
 
-      {canEdit && editor && <EditorDialog onClose={() => setEditor(null)}>
+      <CommandPalette
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        navItems={navigation.flatMap(group => group.items.map(item => ({ id: item.id, label: item.label, group: group.label })))}
+        tasks={taskGroups.flatMap(group => group.rows)}
+        campaigns={campaignList}
+        isDarkMode={isDarkMode}
+        canEdit={canEdit}
+        onNavigate={id => openSection(id as Section)}
+        onOpenTask={id => setDetailId(id)}
+        onCreateTask={() => openEditor({ kind: 'task' })}
+        onCreateRoutine={() => { openSection('routines'); openEditor({ kind: 'task', initialPreset: { workstream: 'operations', platform: 'threads', output_type: 'other', routine_mode: 'scheduled_recurring', routine_trigger: 'Setiap Hari (Daily)' } }); }}
+        onToggleTheme={() => setAppTheme(isDarkMode ? 'light' : 'dark')}
+      />
+      {canEdit && editor && <EditorDialog wide={editor.kind === 'task'} onClose={() => setEditor(null)}>
         {editor.kind === 'campaign' ? <CampaignForm key={editor.row?.id ?? 'new-campaign'} campaign={editor.row} defaultUnit={defaultUnit} members={members} onCancel={() => setEditor(null)} onSaved={saved} />
           : <TaskForm key={editor.row?.id ?? editor.sourceIdea?.id ?? editor.initialPreset?.title ?? 'new-task'} task={editor.row} sourceIdea={editor.sourceIdea} initialPreset={editor.initialPreset}
             campaignId={campaignId === 'all' ? null : campaignId} campaignList={campaignList} defaultUnit={defaultUnit} members={members} onCancel={() => setEditor(null)} onSaved={saved} />}
