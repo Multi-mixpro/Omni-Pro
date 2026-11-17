@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { mondayWeek, type Focus } from './schedule';
 
 export const platforms = {
-  instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', facebook: 'Facebook',
+  instagram: 'Instagram', threads: 'Threads', tiktok: 'TikTok', youtube: 'YouTube', facebook: 'Facebook',
   whatsapp: 'WhatsApp', marketplace: 'Marketplace', website: 'Website', internal: 'Internal', other: 'Lainnya',
 };
 export const taskStatuses = {
@@ -21,6 +21,9 @@ export const taskRoutineModes = {
   scheduled_recurring: 'Rutin Terjadwal (Harian / Mingguan / Bulanan)',
 };
 export const taskRoutineCategories = {
+  platform_optimization: 'Optimasi Akun & Profil Platform',
+  account_concept: 'Konsep Postingan & Pola Konten',
+  channel_audit: 'Audit & Pemeliharaan Kanal',
   customer_order: 'Dokumentasi Video Customer Order',
   testimonial: 'Testimoni & Review Pelanggan',
   packing_shipping: 'Dokumentasi Packing & Pengiriman Order',
@@ -36,6 +39,8 @@ export type RoutinePreset = {
   mode: keyof typeof taskRoutineModes;
   category: keyof typeof taskRoutineCategories;
   output_type: keyof typeof outputTypes;
+  platform?: keyof typeof platforms;
+  workstream?: keyof typeof workstreams;
   trigger: string;
   target: string;
   format: string;
@@ -44,6 +49,90 @@ export type RoutinePreset = {
   checklist: string[];
 };
 export const ROUTINE_PRESETS: RoutinePreset[] = [
+  {
+    id: 'preset-threads-profile-optimization',
+    label: 'Optimasi Akun & Profil Threads',
+    badge: 'Threads Profil',
+    mode: 'once',
+    category: 'platform_optimization',
+    output_type: 'other',
+    platform: 'threads',
+    workstream: 'operations',
+    trigger: 'Setup awal atau pembaruan identitas akun Threads unit bisnis',
+    target: 'Profil Threads lengkap, terverifikasi & siap posting',
+    format: 'Checklist Setup Profil & Bio Akun Threads',
+    deliverable: 'Profil Threads teroptimasi (foto profil brand, bio CTA, tautan WA/web, dan 1 pinned thread perkenalan)',
+    acceptance_criteria: 'Bio jelas menjelaskan value bisnis, tautan aktif & dapat diklik, serta konsisten dengan identitas visual brand',
+    checklist: [
+      'Sinkronkan username, display name & foto profil sesuai logo resmi unit bisnis',
+      'Tulis bio singkat yang jelas (positioning + CTA ke WhatsApp/katalog)',
+      'Pasang link tujuan aktif (Linktree / Landing Page / WA Order)',
+      'Buat & sematkan (pin) Thread perkenalan brand / layanan utama',
+      'Follow & interaksi awal dengan akun relevan / komunitas industri',
+    ],
+  },
+  {
+    id: 'preset-threads-posting-concept',
+    label: 'Konsep Postingan & Rutinitas Threads',
+    badge: 'Konsep Threads',
+    mode: 'scheduled_recurring',
+    category: 'account_concept',
+    output_type: 'post',
+    platform: 'threads',
+    workstream: 'marketing',
+    trigger: 'Rutinitas harian / mingguan posting & interaksi di Threads',
+    target: '3–5 Thread/minggu + balasan komentar aktif',
+    format: 'Konsep Postingan Teks / Carousel Ringkas / Diskusi Threads',
+    deliverable: 'Dokumen pilar topik Threads, daftar hook conversational, dan jadwal posting rutin',
+    acceptance_criteria: 'Gaya bahasa natural & memicu diskusi (tidak kaku seperti brosur), konsisten pada jam aktif audiens',
+    checklist: [
+      'Tentukan 3–4 pilar topik Threads (edukasi bahan, behind-the-scenes, opini industri, Q&A)',
+      'Susun 5 template hook pembuka yang memancing balasan/komentar',
+      'Jadwalkan posting rutin + sesi balas komentar/repost 15 menit setelah tayang',
+      'Evaluasi topik dengan engagement tertinggi setiap akhir minggu',
+    ],
+  },
+  {
+    id: 'preset-platform-profile-optimization',
+    label: 'Optimasi Profil & Bio Platform (IG / TikTok / YT)',
+    badge: 'Optimasi Profil',
+    mode: 'scheduled_recurring',
+    category: 'platform_optimization',
+    output_type: 'other',
+    platform: 'instagram',
+    workstream: 'operations',
+    trigger: 'Audit bulanan atau saat ada promo/produk baru',
+    target: 'Seluruh bio, highlight, tautan & katalog kanal up-to-date',
+    format: 'Audit Profil, Bio, Highlight & Tautan Kanal',
+    deliverable: 'Laporan & pembaruan profil kanal (bio, highlight story, link bio, info kontak)',
+    acceptance_criteria: 'Tidak ada tautan mati, informasi kontak/jam operasional akurat, dan highlight tertata rapi',
+    checklist: [
+      'Periksa & perbarui bio, kategori akun, serta nomor/link WhatsApp Order',
+      'Rapikan Highlight Story / Pinned Post / Playlist unggulan',
+      'Pastikan seluruh tautan di bio berfungsi dan mengarah ke halaman yang benar',
+      'Cek kelengkapan deskripsi akun & konsistensi branding antar platform',
+    ],
+  },
+  {
+    id: 'preset-channel-audit-maintenance',
+    label: 'Audit & Kebersihan Kanal Rutin (DM / Komentar / Katalog)',
+    badge: 'Audit Kanal',
+    mode: 'scheduled_recurring',
+    category: 'channel_audit',
+    output_type: 'other',
+    platform: 'instagram',
+    workstream: 'operations',
+    trigger: 'Rutinitas mingguan (setiap Jumat / Senin)',
+    target: '0 DM/komentar penting terlewat & katalog terawat',
+    format: 'Checklist Pemeliharaan & Kebersihan Akun',
+    deliverable: 'Catatan audit mingguan (balasan DM/komentar, pembersihan spam, update stok/harga)',
+    acceptance_criteria: 'Semua pertanyaan calon pembeli terjawab dan tidak ada komentar spam/negatif yang mengganggu',
+    checklist: [
+      'Cek seluruh DM, komentar, dan mention yang belum dibalas di tiap platform',
+      'Bersihkan komentar spam / bot dan sematkan komentar positif jika relevan',
+      'Periksa kesesuaian informasi promo atau stok produk yang masih aktif',
+    ],
+  },
   {
     id: 'preset-customer-order',
     label: 'Setiap Customer Order (Video Dokumentasi)',

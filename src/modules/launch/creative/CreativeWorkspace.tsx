@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Sun, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Repeat, Search, ShieldCheck, Sparkles, Sun, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +9,7 @@ import { isProjectId } from '../discussion/repository';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { useWorkspaceNotifications } from '../notifications/useWorkspaceNotifications';
 import { unitSectors, useWorkspaceUnits } from '../data/businessWorkspace';
-import { button, CampaignForm, errorText, field, Options, primary, TaskForm } from './CreativeForms';
+import { button, CampaignForm, errorText, field, Options, primary, TaskForm, type TaskPresetSeed } from './CreativeForms';
 import { IdeaBank, ReferenceLinks } from './IdeaBank';
 import { CreativeOverview } from './CreativeOverview';
 import { CreativeCalendar } from './CreativeCalendar';
@@ -34,6 +34,7 @@ const CreativeStudio = lazy(() => import('./CreativeStudio').then(module => ({ d
 const CreativeManagement = lazy(() => import('./CreativeManagement').then(module => ({ default: module.CreativeManagement })));
 const CreativeAssetLibrary = lazy(() => import('./CreativeAssetLibrary').then(module => ({ default: module.CreativeAssetLibrary })));
 const CreativeAccess = lazy(() => import('./CreativeAccess').then(module => ({ default: module.CreativeAccess })));
+const TaskRoutinesHub = lazy(() => import('./TaskRoutinesHub').then(module => ({ default: module.TaskRoutinesHub })));
 const sectionLoading = <p role="status" className="p-4 text-sm text-slate-600">Memuat bagian ini…</p>;
 
 const panel = 'rounded-3xl border border-slate-200/80 bg-white/95 p-4 sm:p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.04)] backdrop-blur-xs dark:border-slate-800/80 dark:bg-[#111622]/95';
@@ -41,8 +42,8 @@ const defaultFilters: Filters = { platform: '', status: '', assignee: '', workst
 const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZone: 'UTC' });
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const date = (value: string | null) => value ? dateFormat.format(new Date(value + 'T00:00:00Z')) : '—';
-type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea };
-type Section = 'overview' | 'work' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'budget' | 'assets' | 'access';
+type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea; initialPreset?: TaskPresetSeed };
+type Section = 'overview' | 'work' | 'routines' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'budget' | 'assets' | 'access';
 const navigation = [
   { label: 'Ruang kerja', items: [
     { id: 'overview', label: 'Pusat Kerja', icon: LayoutDashboard },
@@ -54,6 +55,7 @@ const navigation = [
   ] },
   { label: 'Eksekusi', items: [
     { id: 'work', label: 'Produksi & Publikasi', icon: ListTodo },
+    { id: 'routines', label: 'Task & Rutinitas', icon: Repeat },
     { id: 'studio', label: 'Studio Brief & Copy', icon: FileText },
     { id: 'decisions', label: 'Review & Persetujuan', icon: ClipboardCheck },
     { id: 'calendar', label: 'Kalender', icon: CalendarDays },
@@ -71,12 +73,13 @@ const navigation = [
   ] },
 ] as const;
 const sectionColors: Record<Section, string> = {
-  overview: 'blue', work: 'blue', studio: 'pink', decisions: 'green', campaigns: 'orange', calendar: 'red',
+  overview: 'blue', work: 'blue', routines: 'mint', studio: 'pink', decisions: 'green', campaigns: 'orange', calendar: 'red',
   ideas: 'orange', accounts: 'mint', ads: 'pink', inbox: 'red', team: 'blue', analytics: 'pink', budget: 'green', assets: 'mint', access: 'mint',
 };
 const sectionDescriptions: Record<Section, string> = {
   overview: 'Lihat target, jadwal, dan pekerjaan yang perlu ditindak.',
   work: 'Kelola tugas dari brief dan produksi sampai bukti tayang.',
+  routines: 'Kelola tugas optimasi platform (termasuk Threads), setup profil, konsep postingan, dan rutinitas operasional di luar ide & konten.',
   studio: 'Siapkan brief dan kelola versi naskah dari tugas produksi konten.',
   decisions: 'Buka tugas yang menunggu review atau persetujuan Anda.',
   campaigns: 'Rencanakan kampanye dan pantau pekerjaan yang terkait.',
@@ -631,6 +634,18 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       {section === 'decisions' && <Suspense fallback={sectionLoading}>
         <CreativeDecisionQueue key={`${unit}:${scope}`} userId={userId} unit={unit} scope={scope} onTask={setDetailId} />
       </Suspense>}
+      {section === 'routines' && <Suspense fallback={sectionLoading}>
+        <TaskRoutinesHub
+          unit={unit}
+          campaignId={campaignId}
+          canEdit={canEdit}
+          unitName={unitName}
+          person={person}
+          onOpen={setDetailId}
+          onEdit={row => openEditor({ kind: 'task', row })}
+          onCreateTask={initialPreset => openEditor({ kind: 'task', initialPreset })}
+        />
+      </Suspense>}
       {section === 'studio' && <Suspense fallback={sectionLoading}>
         <CreativeStudio key={`${unit}:${scope}`} userId={userId} unit={unit} campaign={campaignId} canEdit={canEdit}
           onOpen={setDetailId} onEdit={row => openEditor({ kind: 'task', row })} />
@@ -690,7 +705,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
 
       {canEdit && editor && <EditorDialog onClose={() => setEditor(null)}>
         {editor.kind === 'campaign' ? <CampaignForm key={editor.row?.id ?? 'new-campaign'} campaign={editor.row} defaultUnit={defaultUnit} members={members} onCancel={() => setEditor(null)} onSaved={saved} />
-          : <TaskForm key={editor.row?.id ?? editor.sourceIdea?.id ?? 'new-task'} task={editor.row} sourceIdea={editor.sourceIdea}
+          : <TaskForm key={editor.row?.id ?? editor.sourceIdea?.id ?? editor.initialPreset?.title ?? 'new-task'} task={editor.row} sourceIdea={editor.sourceIdea} initialPreset={editor.initialPreset}
             campaignId={campaignId === 'all' ? null : campaignId} campaignList={campaignList} defaultUnit={defaultUnit} members={members} onCancel={() => setEditor(null)} onSaved={saved} />}
       </EditorDialog>}
 

@@ -117,24 +117,40 @@ export function CampaignForm({ campaign, defaultUnit, members, onCancel, onSaved
   </Editor>;
 }
 
-export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUnit, members, onCancel, onSaved }: Common & {
-  task?: Task; sourceIdea?: Idea; campaignId: string | null; campaignList: Campaign[]; defaultUnit?: string;
+export type TaskPresetSeed = {
+  title?: string;
+  platform?: Task['platform'];
+  workstream?: Task['workstream'];
+  output_type?: Task['output_type'];
+  routine_mode?: NonNullable<Task['routine_mode']>;
+  routine_category?: NonNullable<Task['routine_category']>;
+  routine_trigger?: string;
+  routine_target?: string;
+  format?: string;
+  deliverable?: string;
+  acceptance_criteria?: string;
+  checklist?: string;
+  brief?: string;
+};
+
+export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaignList, defaultUnit, members, onCancel, onSaved }: Common & {
+  task?: Task; sourceIdea?: Idea; initialPreset?: TaskPresetSeed; campaignId: string | null; campaignList: Campaign[]; defaultUnit?: string;
 }) {
   const [status, setStatus] = useState(task?.status ?? 'todo');
   const [selectedCampaign, setSelectedCampaign] = useState(task ? task.campaign_id ?? '' : campaignId ?? '');
-  const [platform, setPlatform] = useState<Task['platform']>(task?.platform ?? sourceIdea?.platform ?? 'internal');
-  const [outputType, setOutputType] = useState<Task['output_type']>(task?.output_type ?? 'video');
-  const [routineMode, setRoutineMode] = useState<NonNullable<Task['routine_mode']>>(task?.routine_mode ?? 'once');
-  const [routineCategory, setRoutineCategory] = useState<NonNullable<Task['routine_category']>>(task?.routine_category ?? 'customer_order');
-  const [routineTrigger, setRoutineTrigger] = useState(task?.routine_trigger ?? '');
-  const [routineTarget, setRoutineTarget] = useState(task?.routine_target ?? '');
-  const [titleText, setTitleText] = useState(task?.title ?? sourceIdea?.title ?? '');
-  const [formatText, setFormatText] = useState(task?.format ?? '');
-  const [deliverableText, setDeliverableText] = useState(task?.deliverable ?? '');
-  const [criteriaText, setCriteriaText] = useState(task?.acceptance_criteria ?? '');
-  const [checklistText, setChecklistText] = useState(task?.checklist?.map(item => item.label).join('\n') ?? '');
+  const [platform, setPlatform] = useState<Task['platform']>(task?.platform ?? sourceIdea?.platform ?? initialPreset?.platform ?? 'internal');
+  const [outputType, setOutputType] = useState<Task['output_type']>(task?.output_type ?? initialPreset?.output_type ?? 'video');
+  const [routineMode, setRoutineMode] = useState<NonNullable<Task['routine_mode']>>(task?.routine_mode ?? initialPreset?.routine_mode ?? 'once');
+  const [routineCategory, setRoutineCategory] = useState<NonNullable<Task['routine_category']>>(task?.routine_category ?? initialPreset?.routine_category ?? 'customer_order');
+  const [routineTrigger, setRoutineTrigger] = useState(task?.routine_trigger ?? initialPreset?.routine_trigger ?? '');
+  const [routineTarget, setRoutineTarget] = useState(task?.routine_target ?? initialPreset?.routine_target ?? '');
+  const [titleText, setTitleText] = useState(task?.title ?? sourceIdea?.title ?? initialPreset?.title ?? '');
+  const [formatText, setFormatText] = useState(task?.format ?? initialPreset?.format ?? '');
+  const [deliverableText, setDeliverableText] = useState(task?.deliverable ?? initialPreset?.deliverable ?? '');
+  const [criteriaText, setCriteriaText] = useState(task?.acceptance_criteria ?? initialPreset?.acceptance_criteria ?? '');
+  const [checklistText, setChecklistText] = useState(task?.checklist?.map(item => item.label).join('\n') ?? initialPreset?.checklist ?? '');
   const [selectedTemplateId, setSelectedTemplateId] = useState(task?.copy_template_id ?? getIdeaAttachedScript(sourceIdea?.id) ?? '');
-  const [briefText, setBriefText] = useState(task?.brief ?? sourceIdea?.brief ?? '');
+  const [briefText, setBriefText] = useState(task?.brief ?? sourceIdea?.brief ?? initialPreset?.brief ?? '');
   const [customScriptNote, setCustomScriptNote] = useState('');
   const [viewingScript, setViewingScript] = useState<CopyTemplate | null>(null);
   const templates = useQuery({ queryKey: ['creative-copy-library', defaultUnit ?? 'all'], queryFn: ({ signal }) => copyTemplates(signal, defaultUnit ?? 'all') });
@@ -144,6 +160,7 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
     setRoutineMode(preset.mode);
     setRoutineCategory(preset.category);
     setOutputType(preset.output_type);
+    if (preset.platform && !task && (forceOverwrite || platform === 'internal')) setPlatform(preset.platform);
     setRoutineTrigger(preset.trigger);
     setRoutineTarget(preset.target);
     if (forceOverwrite || !titleText.trim()) setTitleText(preset.label);
@@ -477,7 +494,7 @@ export function TaskForm({ task, sourceIdea, campaignId, campaignList, defaultUn
         </p>
       )}
     </div>
-    <Label title="Pos kerja"><select name="workstream" className={field} defaultValue={task?.workstream ?? 'creative'}><Options values={workstreams} /></select></Label>
+    <Label title="Pos kerja"><select name="workstream" className={field} defaultValue={task?.workstream ?? initialPreset?.workstream ?? 'creative'}><Options values={workstreams} /></select></Label>
     <Label title="Format"><input name="format" className={field} maxLength={80} placeholder="Contoh: Reels 30 detik / Video Dokumentasi Order" value={formatText} onChange={e => setFormatText(e.target.value)} /></Label>
     <div className="space-y-2">
       <Label title={sourceIdea ? 'PIC utama (wajib)' : 'PIC utama'}><People members={members} current={task?.assignee_id} required={!!sourceIdea} /></Label>

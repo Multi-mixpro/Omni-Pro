@@ -70,6 +70,7 @@
   color: #245487;
 }
 .creative-platform-icon[data-platform='instagram'] { color: #fff; background: linear-gradient(145deg, #a52372, #c72e57 60%, #b04813); }
+.creative-platform-icon[data-platform='threads'] { color: #fff; background: #101010; }
 .creative-platform-icon[data-platform='tiktok'] { color: #fff; background: #15161a; }
 .creative-platform-icon[data-platform='youtube'] { color: #fff; background: #d71727; }
 .creative-platform-icon[data-platform='facebook'] { color: #fff; background: #0963d6; }
@@ -220,7 +221,8 @@ button.creative-metric-card:hover { border-color: #9cc5f0; background: #f8fbff; 
 [data-theme='dark'] .creative-shell .creative-metric-card:is(button):hover { background: #161d2c; border-color: #3b82f6; }
 [data-theme='dark'] .creative-shell :is(.creative-unit-chip, .creative-unit-logo) { background: #161d2c; color: #f1f5f9; }
 [data-theme='dark'] .creative-shell .creative-color-icon { box-shadow: none; }
-[data-theme='dark'] .creative-shell :is(.creative-color-icon[data-color='blue'], .creative-platform-icon:not([data-platform='instagram'], [data-platform='tiktok'], [data-platform='youtube'], [data-platform='facebook'], [data-platform='whatsapp'], [data-platform='marketplace'])) { background: rgb(var(--theme-blue-raised)); color: rgb(var(--theme-blue-text)); }
+[data-theme='dark'] .creative-shell :is(.creative-color-icon[data-color='blue'], .creative-platform-icon:not([data-platform='instagram'], [data-platform='threads'], [data-platform='tiktok'], [data-platform='youtube'], [data-platform='facebook'], [data-platform='whatsapp'], [data-platform='marketplace'])) { background: rgb(var(--theme-blue-raised)); color: rgb(var(--theme-blue-text)); }
+[data-theme='dark'] .creative-shell .creative-platform-icon[data-platform='threads'] { background: #18181b; color: #fff; border: 1px solid rgba(255, 255, 255, 0.16); }
 [data-theme='dark'] .creative-shell :is(.creative-color-icon[data-color='pink'], .creative-color-icon[data-color='red']) { background: rgb(var(--theme-coral-raised)); color: rgb(var(--theme-coral-text)); }
 [data-theme='dark'] .creative-shell :is(.creative-color-icon[data-color='mint'], .creative-color-icon[data-color='green'], .creative-platform-icon[data-platform='whatsapp']) { background: rgb(var(--theme-mint-raised)); color: rgb(var(--theme-mint-text)); }
 [data-theme='dark'] .creative-shell :is(.creative-color-icon[data-color='orange'], .creative-platform-icon[data-platform='marketplace']) { background: rgb(var(--theme-gold-raised)); color: rgb(var(--theme-gold-text)); }

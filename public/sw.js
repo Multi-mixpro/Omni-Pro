@@ -1,4 +1,4 @@
-const CACHE_NAME = 'launch-os-pwa-v19';
+const CACHE_NAME = 'launch-os-pwa-v20';
 const ASSETS_TO_CACHE = [
   '/manifest.webmanifest',
   '/favicon.svg',

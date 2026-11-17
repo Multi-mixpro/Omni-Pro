@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Facebook, Globe2, Instagram, Link2, MessageCircle, Music2, ShoppingBag, Youtube } from 'lucide-react';
+import { AtSign, Facebook, Globe2, Instagram, Link2, MessageCircle, Music2, ShoppingBag, Youtube } from 'lucide-react';
 import type { WorkspaceUnit } from '../data/businessWorkspace';
 import { channelPlatforms } from './channelRepository';
 import type { SocialAccount } from './commandRepository';
 import { safeOutputUrl } from './repository';
 
 const icons = {
-  instagram: Instagram, tiktok: Music2, youtube: Youtube, facebook: Facebook,
+  instagram: Instagram, threads: AtSign, tiktok: Music2, youtube: Youtube, facebook: Facebook,
   whatsapp: MessageCircle, marketplace: ShoppingBag, website: Globe2, other: Link2,
 };
 
