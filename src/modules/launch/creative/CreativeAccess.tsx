@@ -230,7 +230,7 @@ function AccessSwitches({ userId, roles }: { userId: string; roles: RoleOption[]
             Pilih akun anggota tim untuk mengaktifkan atau menonaktifkan izin kerja secara spesifik (ON/OFF).
           </p>
         </div>
-        <span className="rounded-full bg-teal-50 border border-teal-200 px-2.5 py-1 text-xs font-bold text-teal-800">
+        <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-xs font-bold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">
           {accessVariables.length} Variabel Kontrol Akses
         </span>
       </div>
@@ -257,16 +257,16 @@ function AccessSwitches({ userId, roles }: { userId: string; roles: RoleOption[]
           </select>
         </label>
         {member && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs">
-            <span className="block text-slate-500">Role aktif pengguna:</span>
-            <strong className="text-slate-900">{member.role_name ?? 'Tanpa role'}</strong>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs dark:border-white/10 dark:bg-white/[0.04]">
+            <span className="block text-slate-500 dark:text-slate-400">Role aktif pengguna:</span>
+            <strong className="text-slate-900 dark:text-slate-100">{member.role_name ?? 'Tanpa role'}</strong>
           </div>
         )}
       </div>
 
-      {team.isPending || (member && access.isPending) ? <p role="status" className="text-sm text-slate-600">Memuat izin akun…</p> : null}
-      {(team.error || access.error || change.error) && <p role="alert" className="text-sm text-red-700">{errorText(team.error ?? access.error ?? change.error)}</p>}
-      {notice && <p role="status" className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800">{notice}</p>}
+      {team.isPending || (member && access.isPending) ? <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Memuat izin akun…</p> : null}
+      {(team.error || access.error || change.error) && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{errorText(team.error ?? access.error ?? change.error)}</p>}
+      {notice && <p role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">{notice}</p>}
       {locked && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">
           Saklar akun Owner/Administrator dikunci selalu aktif (ON) untuk menjaga keamanan kendali utama sistem.

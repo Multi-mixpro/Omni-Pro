@@ -290,7 +290,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   };
   const sectionBadgeCount = (id: Section): { count: number; color: string } => {
     const b = notif.creativeBadges;
-    if (!b) return { count: 0, color: 'bg-teal-700' };
+    if (!b) return { count: 0, color: 'bg-indigo-600' };
     switch (id) {
       case 'overview':
         return { count: (counts ? counts.overdue + counts.blocked : b.overview), color: 'bg-rose-600' };
@@ -301,7 +301,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
       case 'campaigns':
         return { count: b.campaigns, color: 'bg-indigo-600' };
       case 'work':
-        return { count: b.work, color: 'bg-teal-700' };
+        return { count: b.work, color: 'bg-indigo-600' };
       case 'studio':
         return { count: b.studio, color: 'bg-pink-600' };
       case 'decisions':
@@ -999,13 +999,19 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
                       {unitName(task.business_unit_id)} · {task.campaign?.name ?? (task.campaign_id ? 'Kampanye terkait' : 'Tanpa kampanye')}
                     </p>
                   )}
-                  <p className="text-[11.5px]">
-                    <span className={overdue ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-300'}>
-                      Deadline {date(task.due_on)}{overdue ? ' (terlambat)' : ''}
-                    </span>
-                    <span className="mx-1 text-slate-300 dark:text-slate-600">•</span>
-                    <span>Tayang {date(task.publish_on)}</span>
-                  </p>
+                  {(!task.routine_mode || task.routine_mode === 'once' || task.due_on || task.publish_on) ? (
+                    <p className="text-[11.5px]">
+                      <span className={overdue ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-300'}>
+                        Deadline {date(task.due_on)}{overdue ? ' (terlambat)' : ''}
+                      </span>
+                      <span className="mx-1 text-slate-300 dark:text-slate-600">•</span>
+                      <span>Tayang {date(task.publish_on)}</span>
+                    </p>
+                  ) : (
+                    <p className="text-[11.5px] font-medium text-indigo-600 dark:text-indigo-300">
+                      Jadwal berulang: {task.routine_trigger || taskRoutineModes[task.routine_mode]}
+                    </p>
+                  )}
                 </div>
                 {task.reviewer_id && <p className="text-[11.5px] text-slate-500 dark:text-slate-400">Reviewer: {person(task.reviewer_id)}{task.reviewed_at ? ' · Disetujui' : ''}</p>}
                 {awaitingApproval && <p className="rounded-lg bg-amber-50/80 px-2 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">Menunggu persetujuan {person(task.approver_id ?? null)}</p>}
