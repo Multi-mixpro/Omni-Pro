@@ -234,22 +234,22 @@ button.creative-metric-card:hover { border-color: #9cc5f0; background: #f8fbff; 
 [data-theme='dark'] .creative-shell :is(button,a)[class~='border-slate-300']:hover:not(:disabled) { background-color: #1c2538; border-color: #334155; }
 [data-theme='dark'] .creative-shell button[aria-pressed='true']:not(.creative-calendar-day)[class~='border-slate-300'] { background-color: #1e3a8a; color: #dbeafe; border-color: #3b82f6; }
 [data-theme='dark'] .creative-shell dialog > .creative-editor > .creative-editor-actions { background: #111622f5; }
-[data-theme='dark'] .creative-focus-card[data-tone='coral'] { --focus-bg: #402e37; --focus-line: #694552; --focus-ink: #ffb1a0; }
-[data-theme='dark'] .creative-focus-card[data-tone='blue'] { --focus-bg: #223952; --focus-line: #3d5d81; --focus-ink: #acd3ff; }
-[data-theme='dark'] .creative-focus-card[data-tone='yellow'] { --focus-bg: #3b3426; --focus-line: #66563b; --focus-ink: #ffd18c; }
-[data-theme='dark'] .creative-focus-card[data-tone='mint'] { --focus-bg: #1f3a36; --focus-line: #3e5d56; --focus-ink: #9de3c9; }
-[data-theme='dark'] .creative-focus-card [class~='bg-white/65'] { background: #10172480; }
+[data-theme='dark'] .creative-focus-card[data-tone='coral'] { --focus-bg: rgba(244, 63, 94, 0.11); --focus-line: rgba(244, 63, 94, 0.22); --focus-ink: #fda4af; }
+[data-theme='dark'] .creative-focus-card[data-tone='blue'] { --focus-bg: rgba(59, 130, 246, 0.11); --focus-line: rgba(59, 130, 246, 0.22); --focus-ink: #93c5fd; }
+[data-theme='dark'] .creative-focus-card[data-tone='yellow'] { --focus-bg: rgba(245, 158, 11, 0.11); --focus-line: rgba(245, 158, 11, 0.22); --focus-ink: #fcd34d; }
+[data-theme='dark'] .creative-focus-card[data-tone='mint'] { --focus-bg: rgba(20, 184, 166, 0.11); --focus-line: rgba(20, 184, 166, 0.22); --focus-ink: #5eead4; }
+[data-theme='dark'] .creative-focus-card [class~='bg-white/65'] { background: rgba(15, 23, 42, 0.5); }
 [data-theme='dark'] .creative-task-card { border-inline-start-color: var(--task-accent); }
-[data-theme='dark'] .creative-task-card:hover { background-color: #22334a; }
-[data-theme='dark'] .creative-template-card:hover { border-color: #55759a; box-shadow: 0 10px 26px #050a1355; }
-[data-theme='dark'] .creative-access-chip { color: #b5c5d9; background: #263347; }
-[data-theme='dark'] .creative-access-chip[data-allowed='true'] { color: #a2e3ce; background: #204239; }
-[data-theme='dark'] .creative-table thead { background: #161d2c; color: #94a3b8; }
-[data-theme='dark'] .creative-table tbody tr:hover { background: rgba(59, 130, 246, 0.06); }
-[data-theme='dark'] .creative-calendar :is(.creative-calendar-day, .creative-calendar-blank) { border-color: var(--line); background: #202f43; color: var(--ink); }
-[data-theme='dark'] .creative-calendar .creative-calendar-blank { color: #9caec5; background: #151f2c; }
-[data-theme='dark'] .creative-calendar .creative-calendar-day[aria-pressed='true'] { background: #294972; border-color: #6098e1; }
-[data-theme='dark'] .creative-calendar .creative-calendar-day:hover { background: #294262; border-color: #6098e1; }
+[data-theme='dark'] .creative-task-card:hover { background-color: #161f33; }
+[data-theme='dark'] .creative-template-card:hover { border-color: rgba(99, 102, 241, 0.45); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35); }
+[data-theme='dark'] .creative-access-chip { color: #cbd5e1; background: rgba(255, 255, 255, 0.06); }
+[data-theme='dark'] .creative-access-chip[data-allowed='true'] { color: #6ee7b7; background: rgba(16, 185, 129, 0.15); }
+[data-theme='dark'] .creative-table thead { background: rgba(255, 255, 255, 0.03); color: #94a3b8; }
+[data-theme='dark'] .creative-table tbody tr:hover { background: rgba(99, 102, 241, 0.07); }
+[data-theme='dark'] .creative-calendar :is(.creative-calendar-day, .creative-calendar-blank) { border-color: rgba(255, 255, 255, 0.07); background: rgba(255, 255, 255, 0.025); color: #e2e8f0; }
+[data-theme='dark'] .creative-calendar .creative-calendar-blank { color: #64748b; background: rgba(255, 255, 255, 0.015); }
+[data-theme='dark'] .creative-calendar .creative-calendar-day[aria-pressed='true'] { background: rgba(99, 102, 241, 0.22); border-color: #818cf8; }
+[data-theme='dark'] .creative-calendar .creative-calendar-day:hover { background: rgba(99, 102, 241, 0.12); border-color: rgba(129, 140, 248, 0.45); }
 [data-theme='dark'] .creative-calendar .creative-calendar-day[aria-current='date'] .creative-calendar-number { color: #c4dfff; }
 [data-theme='dark'] .creative-calendar :is(.creative-calendar-weekday, .creative-calendar-legend, .creative-calendar-previews > small) { color: var(--muted); }
 [data-theme='dark'] .creative-calendar [data-kind='publish'] { --event-bg: #27466b; --event-ink: #c6e0ff; --event-dot: #80baff; }
@@ -259,10 +259,10 @@ button.creative-metric-card:hover { border-color: #9cc5f0; background: #f8fbff; 
 
 .creative-focus-card { background: var(--focus-bg); border-color: var(--focus-line); color: var(--focus-ink); transition: border-color .15s, box-shadow .15s; }
 .creative-focus-card:hover { border-color: var(--focus-ink); box-shadow: 0 4px 12px #13294718; }
-.creative-focus-card[data-tone='coral'] { --focus-bg: #fff0eb; --focus-line: #f7d9ce; --focus-ink: #9a3827; }
-.creative-focus-card[data-tone='blue'] { --focus-bg: #e7f1ff; --focus-line: #cddff7; --focus-ink: #1255a6; }
-.creative-focus-card[data-tone='yellow'] { --focus-bg: #fff3c4; --focus-line: #f5e1a3; --focus-ink: #83530b; }
-.creative-focus-card[data-tone='mint'] { --focus-bg: #dcf5ed; --focus-line: #c2e7da; --focus-ink: #146250; }
+.creative-focus-card[data-tone='coral'] { --focus-bg: rgba(244, 63, 94, 0.06); --focus-line: rgba(244, 63, 94, 0.16); --focus-ink: #be123c; }
+.creative-focus-card[data-tone='blue'] { --focus-bg: rgba(59, 130, 246, 0.06); --focus-line: rgba(59, 130, 246, 0.16); --focus-ink: #1d4ed8; }
+.creative-focus-card[data-tone='yellow'] { --focus-bg: rgba(245, 158, 11, 0.07); --focus-line: rgba(245, 158, 11, 0.18); --focus-ink: #b45309; }
+.creative-focus-card[data-tone='mint'] { --focus-bg: rgba(20, 184, 166, 0.07); --focus-line: rgba(20, 184, 166, 0.18); --focus-ink: #0f766e; }
 
 .creative-calendar { min-width: 0; overflow: hidden; border: 1px solid var(--creative-line); border-radius: 1.5rem; padding: clamp(.75rem, 2vw, 1.25rem); background: #fff; box-shadow: 0 8px 22px #163a6810; }
 .creative-calendar-heading, .creative-calendar-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; }
