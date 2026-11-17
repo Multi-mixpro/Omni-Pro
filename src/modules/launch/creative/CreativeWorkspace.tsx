@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Repeat, Search, ShieldCheck, Sparkles, Sun, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AtSign, BarChart3, Bell, CalendarDays, ClipboardCheck, Command, FileText, Images, LayoutDashboard, Lightbulb, ListTodo, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Repeat, Search, ShieldCheck, Sparkles, Sun, Trash2, TrendingUp, Users } from 'lucide-react';
 import { Link, useLocation, useNavigate } from '@/app/router/simpleRouter';
 import { AccountSignOut } from '@/core/auth/AccountSignOut';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,7 +43,7 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZ
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const date = (value: string | null) => value ? dateFormat.format(new Date(value + 'T00:00:00Z')) : '—';
 type Editor = { kind: 'campaign'; row?: Campaign } | { kind: 'task'; row?: Task; sourceIdea?: Idea; initialPreset?: TaskPresetSeed };
-type Section = 'overview' | 'work' | 'routines' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'budget' | 'assets' | 'access';
+type Section = 'overview' | 'work' | 'routines' | 'campaigns' | 'ideas' | 'ads' | 'calendar' | 'team' | 'accounts' | 'inbox' | 'decisions' | 'studio' | 'analytics' | 'assets' | 'access';
 const navigation = [
   { label: 'Ruang kerja', items: [
     { id: 'overview', label: 'Pusat Kerja', icon: LayoutDashboard },
@@ -64,8 +64,7 @@ const navigation = [
   { label: 'Kanal & hasil', items: [
     { id: 'accounts', label: 'Akun & Performa', icon: AtSign },
     { id: 'ads', label: 'Iklan & Evaluasi', icon: TrendingUp },
-    { id: 'budget', label: 'Anggaran Kanal', icon: Wallet },
-    { id: 'analytics', label: 'Analitik Creative', icon: BarChart3 },
+    { id: 'analytics', label: 'Analitik & Anggaran', icon: BarChart3 },
   ] },
   { label: 'Administrasi', items: [
     { id: 'team', label: 'Tim & PIC', icon: Users },
@@ -74,7 +73,7 @@ const navigation = [
 ] as const;
 const sectionColors: Record<Section, string> = {
   overview: 'blue', work: 'blue', routines: 'mint', studio: 'pink', decisions: 'green', campaigns: 'orange', calendar: 'red',
-  ideas: 'orange', accounts: 'mint', ads: 'pink', inbox: 'red', team: 'blue', analytics: 'pink', budget: 'green', assets: 'mint', access: 'mint',
+  ideas: 'orange', accounts: 'mint', ads: 'pink', inbox: 'red', team: 'blue', analytics: 'pink', assets: 'mint', access: 'mint',
 };
 const sectionDescriptions: Record<Section, string> = {
   overview: 'Lihat target, jadwal, dan pekerjaan yang perlu ditindak.',
@@ -89,8 +88,7 @@ const sectionDescriptions: Record<Section, string> = {
   ads: 'Pantau aktivitas kanal dan tindak lanjuti hasil evaluasi.',
   inbox: 'Lihat hambatan, keterlambatan, dan permintaan tindak lanjut.',
   team: 'Lihat beban kerja tim dan buka daftar tugas per PIC.',
-  analytics: 'Pantau hasil produksi, publikasi aktual, dan evaluasi kanal.',
-  budget: 'Bandingkan rencana dan realisasi biaya aktivitas kanal.',
+  analytics: 'Pantau hasil produksi, publikasi aktual, dan anggaran aktivitas kanal.',
   assets: 'Temukan tautan hasil produksi dan buka tugas asalnya.',
   access: 'Lihat izin akun dan aturan akses ruang kerja Creative.',
 };
@@ -150,6 +148,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const [showFilters, setShowFilters] = useState(false);
   const [taskView, setTaskView] = useState<'list' | 'board'>('board');
   const [taskSearch, setTaskSearch] = useState('');
+  const [campaignSearch, setCampaignSearch] = useState('');
   const [adsReview, setAdsReview] = useState('');
   const [adsActivation, setAdsActivation] = useState<string>();
   const [calendarDay, setCalendarDay] = useState(jakartaToday);
@@ -231,7 +230,7 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
   const campaignStats = new Map(performance.data?.map(item => [item.subject_id,item]));
   const adsScope = scope === 'standalone' ? 'all' : scope;
   const channels = useQuery({
-    enabled: section === 'ads' || (['overview','inbox','analytics','budget'].includes(section) && scope !== 'standalone'),
+    enabled: section === 'ads' || (['overview','inbox','analytics'].includes(section) && scope !== 'standalone'),
     queryKey: [...prefix, 'channel-summary', unit, adsScope, today],
     queryFn: ({ signal }) => channelSummary(unit, adsScope, today, signal),
   });
@@ -621,11 +620,11 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
 
       {!canEdit && section !== 'access' && <p className="text-sm text-slate-600">Akun Anda memiliki akses lihat.</p>}
       {section === 'access' && <Suspense fallback={sectionLoading}><CreativeAccess permissions={permissions} userName={userName} userId={userId} /></Suspense>}
-      {(section === 'analytics' || section === 'budget') && <Suspense fallback={sectionLoading}>
-        <CreativeManagement mode={section} counts={section === 'analytics' ? counts : undefined}
+      {section === 'analytics' && <Suspense fallback={sectionLoading}>
+        <CreativeManagement mode="analytics" counts={counts}
           channels={scope === 'standalone' ? undefined : channels.data} standalone={scope === 'standalone'}
-          pending={(section === 'analytics' && summaryQuery.isPending) || (scope !== 'standalone' && channels.isPending)}
-          error={(section === 'analytics' ? summaryQuery.error : null) ?? (scope === 'standalone' ? null : channels.error)}
+          pending={summaryQuery.isPending || (scope !== 'standalone' && channels.isPending)}
+          error={summaryQuery.error ?? (scope === 'standalone' ? null : channels.error)}
           onFocus={openFocus} onAds={() => openSection('ads')} />
       </Suspense>}
       {section === 'assets' && <Suspense fallback={sectionLoading}>
@@ -656,32 +655,48 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         setSection('work');
         window.scrollTo({ top: 0 });
       }} /> : <>
-      {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">Data belum dapat dimuat: {errorText(error)}</p>}
-      {navigationError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{navigationError}</p>}
-      {notice && <p className="text-sm font-medium text-teal-800" role="status">{notice}</p>}
+      {error && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300" role="alert">Data belum dapat dimuat: {errorText(error)}</p>}
+      {navigationError && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-500/10 dark:text-rose-300" role="alert">{navigationError}</p>}
+      {notice && <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300" role="status">{notice}</p>}
 
       {section === 'campaigns' && <section className="space-y-3" aria-label="Daftar kampanye">
-        <div><h2 className="text-lg font-bold">Portofolio kampanye</h2><p className="text-sm text-slate-600">Target tugas, PIC, anggaran, dan aksi berikutnya per kampanye.</p></div>
-        {performance.isError && <p role="alert" className="text-sm text-rose-800">Target kampanye belum dapat dimuat. Informasi kampanye tetap tersedia.</p>}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Portofolio kampanye</h2>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Target tugas, PIC, anggaran, dan aksi berikutnya per kampanye.</p>
+          </div>
+          <div className="relative min-w-[200px]">
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={campaignSearch}
+              onChange={e => setCampaignSearch(e.target.value)}
+              placeholder="Cari kampanye…"
+              aria-label="Cari kampanye"
+              className={`${field} !h-8 !rounded-full !pl-8 !pr-3 !py-1 !text-xs`}
+            />
+          </div>
+        </div>
+        {performance.isError && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">Target kampanye belum dapat dimuat. Informasi kampanye tetap tersedia.</p>}
         {campaignQuery.isPending && <p role="status" className={panel}>Memuat kampanye…</p>}
-        {campaignQuery.isSuccess && !campaignList.length && <p className={panel + ' text-sm text-slate-600'}>Belum ada kampanye pada unit ini.</p>}
+        {campaignQuery.isSuccess && !campaignList.length && <p className={panel + ' text-sm text-slate-500 dark:text-slate-400'}>Belum ada kampanye pada unit ini.</p>}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {campaignList.map(campaign => <article key={campaign.id} className={panel + ' min-w-0 space-y-3'}>
+          {campaignList.filter(c => !campaignSearch.trim() || `${c.name} ${c.objective}`.toLowerCase().includes(campaignSearch.trim().toLowerCase())).map(campaign => <article key={campaign.id} className={panel + ' min-w-0 space-y-3'}>
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <h3 className="min-w-0 break-words font-bold">{campaign.name}</h3>
-              <span className="rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-800">{campaignStatuses[campaign.status]}</span>
+              <h3 className="min-w-0 break-words font-bold text-slate-900 dark:text-slate-100">{campaign.name}</h3>
+              <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{campaignStatuses[campaign.status]}</span>
             </div>
-            <p className="text-sm text-slate-600">{unitName(campaign.business_unit_id)} · PIC: {person(campaign.owner_id)}</p>
-            <p className="text-xs text-slate-600">{date(campaign.starts_on)} – {date(campaign.ends_on)}</p>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{unitName(campaign.business_unit_id)} · PIC: {person(campaign.owner_id)}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{date(campaign.starts_on)} – {date(campaign.ends_on)}</p>
             {performance.data && <WeeklyProgress stats={campaignStats.get(campaign.id) ?? {
               subject_id:campaign.id,week_done:0,week_target:0,open_count:0,review_count:0,blocked_count:0,overdue_count:0,
             }} />}
-            {!!campaignStats.get(campaign.id)?.overdue_count && <p className="text-xs font-semibold text-rose-800">{campaignStats.get(campaign.id)?.overdue_count} tugas lewat deadline</p>}
-            {campaign.objective && <details className="text-sm"><summary className="cursor-pointer font-medium">Tujuan kampanye</summary><p className="mt-1 whitespace-pre-wrap break-words">{campaign.objective}</p></details>}
-            <dl className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs">
-              <div><dt>Anggaran</dt><dd className="font-semibold">{rupiah.format(campaign.budget_idr)}</dd></div>
-              <div><dt>Realisasi</dt><dd className="font-semibold">{rupiah.format(campaign.spent_idr)}</dd></div>
-              <div className="col-span-2"><dt>Sisa anggaran</dt><dd className={campaign.spent_idr > campaign.budget_idr ? 'font-semibold text-red-700' : 'font-semibold'}>{rupiah.format(campaign.budget_idr - campaign.spent_idr)}</dd></div>
+            {!!campaignStats.get(campaign.id)?.overdue_count && <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">{campaignStats.get(campaign.id)?.overdue_count} tugas lewat deadline</p>}
+            {campaign.objective && <details className="text-sm"><summary className="cursor-pointer font-medium text-slate-700 dark:text-slate-300">Tujuan kampanye</summary><p className="mt-1 whitespace-pre-wrap break-words text-slate-600 dark:text-slate-400">{campaign.objective}</p></details>}
+            <dl className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50/80 p-3 text-xs dark:bg-white/[0.04]">
+              <div><dt className="text-slate-500 dark:text-slate-400">Anggaran</dt><dd className="font-semibold text-slate-900 dark:text-slate-100">{rupiah.format(campaign.budget_idr)}</dd></div>
+              <div><dt className="text-slate-500 dark:text-slate-400">Realisasi</dt><dd className="font-semibold text-slate-900 dark:text-slate-100">{rupiah.format(campaign.spent_idr)}</dd></div>
+              <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Sisa anggaran</dt><dd className={campaign.spent_idr > campaign.budget_idr ? 'font-semibold text-rose-600 dark:text-rose-400' : 'font-semibold text-slate-900 dark:text-slate-100'}>{rupiah.format(campaign.budget_idr - campaign.spent_idr)}</dd></div>
             </dl>
             <div className="flex flex-wrap gap-2">
               <button className={button + ' inline-flex items-center gap-2'} onClick={() => { changeScope(campaign.id); openFocus('all'); }}>Lihat tugas <ArrowRight size={14} /></button>
@@ -716,17 +731,18 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         : <p role="status" className={panel + ' text-sm text-slate-600'}>{summaryQuery.isPending ? 'Memuat ringkasan…' : 'Ringkasan belum tersedia.'}</p>}
       <div className={panel + ' flex flex-wrap gap-2'} aria-label="Pintasan eksekusi">
         <button className={primary} onClick={() => { chooseFocus('all',true); changeFilter({ assignee:userId }); openSection('work'); }}>Tugas saya</button>
+        <button type="button" className={button} onClick={() => openSection('routines')}>Task &amp; Rutinitas</button>
         <button type="button" className={button} onClick={() => openSection('decisions')}>Review saya</button>
         <button className={button} onClick={() => openSection('inbox')}>Kotak tindakan</button>
       </div>
       {highlights.length > 0 && <section className={panel + ' space-y-2'} aria-label="Sorotan kampanye">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Sorotan kampanye</h2>
-          <button type="button" className="text-sm font-semibold text-teal-800 underline" onClick={() => openSection('campaigns')}>Lihat kampanye</button></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-slate-900 dark:text-slate-100">Sorotan kampanye</h2>
+          <button type="button" className="text-xs sm:text-sm font-semibold text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => openSection('campaigns')}>Lihat kampanye</button></div>
         {highlights.map(campaign => <button type="button" key={campaign.id} onClick={() => { changeScope(campaign.id); openFocus('all'); }}
-          className="flex w-full items-center justify-between gap-2 rounded-xl border border-teal-100 p-3 text-left hover:bg-teal-50">
-          <span className="min-w-0"><span className="block break-words text-sm font-bold">{campaign.name}</span>
-            <span className="text-xs text-slate-600">{unitName(campaign.business_unit_id)} · {campaignStatuses[campaign.status]} · {campaign.ends_on ? 'Sampai '+date(campaign.ends_on) : 'Tanpa tanggal akhir'}</span></span>
-          <ArrowRight size={16} className="shrink-0 text-teal-800" />
+          className="flex w-full items-center justify-between gap-2 rounded-xl border border-indigo-100 p-3 text-left transition-colors hover:bg-indigo-50/70 dark:border-white/[0.07] dark:hover:bg-white/[0.04]">
+          <span className="min-w-0"><span className="block break-words text-sm font-bold text-slate-900 dark:text-slate-100">{campaign.name}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{unitName(campaign.business_unit_id)} · {campaignStatuses[campaign.status]} · {campaign.ends_on ? 'Sampai '+date(campaign.ends_on) : 'Tanpa tanggal akhir'}</span></span>
+          <ArrowRight size={16} className="shrink-0 text-indigo-600 dark:text-indigo-400" />
         </button>)}
       </section>}
 
@@ -796,6 +812,9 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
                 className={`${field} !h-8 !rounded-full !pl-8 !pr-3 !py-1 !text-xs`}
               />
             </div>
+            <button className={button} aria-pressed={filters.workstream === 'creative'} onClick={() => changeFilter({ workstream: filters.workstream === 'creative' ? '' : 'creative' })}>
+              {filters.workstream === 'creative' ? 'Fokus Produksi' : 'Semua Pos'}
+            </button>
             <button className={button} aria-pressed={taskView === 'board'} onClick={() => { setTaskView('board'); setPage(0); }}>Kanban</button>
             <button className={button} aria-pressed={taskView === 'list'} onClick={() => { setTaskView('list'); setPage(0); }}>Daftar</button>
             <button className={button} aria-pressed={filters.assignee === userId} onClick={() => changeFilter({ assignee: filters.assignee === userId ? '' : userId })}>{filters.assignee === userId ? 'Semua PIC' : 'Tugas saya'}</button>

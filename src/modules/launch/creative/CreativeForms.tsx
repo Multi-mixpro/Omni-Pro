@@ -14,9 +14,9 @@ import {
   type Campaign, type CopyTemplate, type Idea, type RoutinePreset, type Task, type TeamMember,
 } from './repository';
 
-export const field = 'w-full rounded-xl border border-slate-200/90 bg-slate-50/70 px-3.5 py-2 text-sm text-slate-900 transition-all duration-150 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-3 focus:ring-blue-500/15 dark:border-slate-700/80 dark:bg-slate-900/70 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-slate-900';
-export const button = 'rounded-full border border-slate-200/90 bg-white px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50 dark:border-slate-700/80 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:border-slate-600';
-export const primary = 'rounded-full bg-[#1463ff] px-4 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-[0_6px_16px_-3px_rgba(20,99,255,0.35)] transition-all duration-150 hover:bg-[#0b52db] hover:shadow-[0_8px_20px_-4px_rgba(20,99,255,0.45)] active:scale-[0.98] disabled:opacity-50';
+export const field = 'w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-2 text-sm text-slate-900 transition-all duration-150 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-3 focus:ring-indigo-500/15 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:bg-[#0d1320]';
+export const button = 'rounded-full border border-slate-200/80 bg-white px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:bg-white/[0.09] dark:hover:border-white/15';
+export const primary = 'rounded-full bg-indigo-600 px-4 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-[0_6px_16px_-3px_rgba(79,70,229,0.35)] transition-all duration-150 hover:bg-indigo-700 hover:shadow-[0_8px_20px_-4px_rgba(79,70,229,0.45)] active:scale-[0.98] disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600';
 
 export function errorText(error: unknown) {
   if (error && typeof error === 'object' && 'code' in error && error.code === '42501') {
@@ -78,7 +78,7 @@ export function Editor({ title, children, onCancel, onSave, onSaved }: {
       setBusy(false);
     }
   }
-  return <form onSubmit={submit} aria-busy={busy} className="creative-editor space-y-4 rounded-xl border border-teal-200 bg-white p-4">
+  return <form onSubmit={submit} aria-busy={busy} className="creative-editor space-y-4 rounded-xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-[#0f1624]">
     <h2 className="text-lg font-bold">{title}</h2>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">{children}</fieldset>

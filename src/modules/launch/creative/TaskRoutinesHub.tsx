@@ -9,8 +9,11 @@ import {
   type Task,
 } from './repository';
 
-type HubTab = 'all' | 'daily' | 'optimization' | 'social_text';
+type HubTab = 'all' | 'pending_today' | 'done_today' | 'optimization' | 'social_text';
 type QuickFrequency = 'daily' | 'weekly' | 'once';
+type PlatformKey = Task['platform'];
+
+const QUICK_PLATFORM_KEYS: PlatformKey[] = ['threads', 'x', 'instagram', 'facebook', 'tiktok', 'youtube', 'whatsapp', 'marketplace', 'website', 'other'];
 
 const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZone: 'UTC' });
 const formatDate = (value: string | null) => value ? dateFormat.format(new Date(value + 'T00:00:00Z')) : '—';
@@ -67,8 +70,17 @@ export function TaskRoutinesHub({
 
   // Quick-add daily activity / optimization state
   const [quickTitle, setQuickTitle] = useState('');
-  const [quickPlatform, setQuickPlatform] = useState<Task['platform']>('threads');
+  const [quickPlatforms, setQuickPlatforms] = useState<PlatformKey[]>(['threads']);
   const [quickFreq, setQuickFreq] = useState<QuickFrequency>('daily');
+
+  const toggleQuickPlatform = (key: PlatformKey) => {
+    setQuickPlatforms(current => {
+      if (current.includes(key)) {
+        return current.length > 1 ? current.filter(item => item !== key) : current;
+      }
+      return [...current, key];
+    });
+  };
 
   const todayStamp = useMemo(() => new Date().toLocaleDateString('id-ID'), []);
 
@@ -94,6 +106,7 @@ export function TaskRoutinesHub({
       const title = quickTitle.trim();
       if (!title) throw new Error('Tulis nama aktivitas atau task terlebih dahulu.');
       const isRecurring = quickFreq !== 'once';
+      const [primaryPlatform = 'threads', ...extraPlatforms] = quickPlatforms;
       return saveTask({
         campaign_id: campaignId && campaignId !== 'all' ? campaignId : null,
         business_unit_id: unit !== 'all' && unit !== 'unassigned' ? unit : null,
@@ -108,8 +121,8 @@ export function TaskRoutinesHub({
         reviewer_id: null,
         approver_id: null,
         additional_assignee_ids: [],
-        additional_platforms: [],
-        platform: quickPlatform,
+        additional_platforms: primaryPlatform === 'internal' ? [] : extraPlatforms.filter(p => p !== 'internal' && p !== primaryPlatform),
+        platform: primaryPlatform,
         output_type: 'other',
         routine_mode: isRecurring ? 'scheduled_recurring' : 'once',
         routine_category: quickFreq === 'daily' ? 'daily_weekly' : quickFreq === 'weekly' ? 'channel_audit' : 'platform_optimization',
@@ -164,14 +177,18 @@ export function TaskRoutinesHub({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allRelevant.filter(task => {
-      if (tab === 'daily' && (!task.routine_mode || task.routine_mode === 'once')) return false;
-      if (tab === 'optimization' && task.routine_mode && task.routine_mode !== 'once') return false;
+      const isRecurring = Boolean(task.routine_mode && task.routine_mode !== 'once');
+      const doneToday = Boolean(task.routine_last_note?.includes(todayStamp));
+      if (tab === 'pending_today' && (!isRecurring || doneToday)) return false;
+      if (tab === 'done_today' && (!isRecurring || !doneToday)) return false;
+      if (tab === 'optimization' && isRecurring) return false;
       if (tab === 'social_text' && task.platform !== 'threads' && task.platform !== 'x' && !task.additional_platforms?.includes('threads') && !task.additional_platforms?.includes('x')) return false;
       if (!q) return true;
-      const haystack = `${task.title} ${task.brief} ${task.deliverable} ${task.format} ${platforms[task.platform] ?? ''}`.toLowerCase();
+      const allPlatformNames = [task.platform, ...(task.additional_platforms ?? [])].map(p => platforms[p] ?? '').join(' ');
+      const haystack = `${task.title} ${task.brief} ${task.deliverable} ${task.format} ${allPlatformNames}`.toLowerCase();
       return haystack.includes(q);
     });
-  }, [allRelevant, search, tab]);
+  }, [allRelevant, search, tab, todayStamp]);
 
   const counts = useMemo(() => {
     const dailyItems = allRelevant.filter(t => t.routine_mode && t.routine_mode !== 'once');
@@ -180,6 +197,7 @@ export function TaskRoutinesHub({
       total: allRelevant.length,
       daily: dailyItems.length,
       doneToday,
+      pendingToday: dailyItems.length - doneToday,
       optimization: allRelevant.filter(t => !t.routine_mode || t.routine_mode === 'once').length,
       socialText: allRelevant.filter(t => t.platform === 'threads' || t.platform === 'x' || t.additional_platforms?.includes('threads') || t.additional_platforms?.includes('x')).length,
     };
@@ -224,7 +242,7 @@ export function TaskRoutinesHub({
                 className={`${button} inline-flex items-center gap-1.5 !h-9 !px-3 !text-xs`}
                 onClick={() => onCreateTask({
                   workstream: 'operations',
-                  platform: quickPlatform,
+                  platform: quickPlatforms[0] ?? 'threads',
                   output_type: 'other',
                   routine_mode: 'scheduled_recurring',
                 })}
@@ -236,44 +254,59 @@ export function TaskRoutinesHub({
           </div>
         </div>
 
-        {/* Quick Add Bar (1-click daily task) */}
+        {/* Quick Add Bar (1-click daily task + multi-platform chips) */}
         {canEdit && (
-          <form onSubmit={handleQuickSubmit} className="mt-4 flex flex-col gap-2 rounded-2xl bg-slate-50/80 p-2.5 dark:bg-white/[0.03] sm:flex-row sm:items-center">
-            <input
-              type="text"
-              value={quickTitle}
-              onChange={e => setQuickTitle(e.target.value)}
-              maxLength={160}
-              placeholder="Tambah cepat: mis. Upload Reels IG + FB, Posting Threads & X, Balas komen…"
-              className={`${field} !h-9 flex-1 !border-0 !bg-white/90 !text-xs shadow-2xs dark:!bg-[#0d1320]`}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                aria-label="Platform aktivitas"
-                value={quickPlatform}
-                onChange={e => setQuickPlatform(e.target.value as Task['platform'])}
-                className={`${field} !h-9 w-auto !border-0 !bg-white/90 !py-1 !text-xs font-semibold shadow-2xs dark:!bg-[#0d1320]`}
-              >
-                <Options values={platforms} />
-              </select>
-              <select
-                aria-label="Frekuensi aktivitas"
-                value={quickFreq}
-                onChange={e => setQuickFreq(e.target.value as QuickFrequency)}
-                className={`${field} !h-9 w-auto !border-0 !bg-white/90 !py-1 !text-xs font-semibold shadow-2xs dark:!bg-[#0d1320]`}
-              >
-                <option value="daily">Harian (Daily)</option>
-                <option value="weekly">Mingguan / Berkala</option>
-                <option value="once">Optimasi / Sekali</option>
-              </select>
-              <button
-                type="submit"
-                disabled={quickAddMutation.isPending || !quickTitle.trim()}
-                className={`${primary} inline-flex h-9 items-center gap-1.5 !px-3.5 !text-xs`}
-              >
-                <Plus size={14} />
-                <span>{quickAddMutation.isPending ? 'Menambah…' : 'Tambah'}</span>
-              </button>
+          <form onSubmit={handleQuickSubmit} className="mt-4 space-y-2.5 rounded-2xl bg-slate-50/80 p-3 dark:bg-white/[0.03]">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="text"
+                value={quickTitle}
+                onChange={e => setQuickTitle(e.target.value)}
+                maxLength={160}
+                placeholder="Tambah cepat: mis. Upload Reels IG + FB sinkron, Posting Threads & X, Balas komen…"
+                className={`${field} !h-9 flex-1 !border-0 !bg-white/95 !text-xs shadow-2xs dark:!bg-[#0d1320]`}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  aria-label="Frekuensi aktivitas"
+                  value={quickFreq}
+                  onChange={e => setQuickFreq(e.target.value as QuickFrequency)}
+                  className={`${field} !h-9 w-auto !border-0 !bg-white/95 !py-1 !text-xs font-semibold shadow-2xs dark:!bg-[#0d1320]`}
+                >
+                  <option value="daily">Harian (Daily)</option>
+                  <option value="weekly">Mingguan / Berkala</option>
+                  <option value="once">Optimasi / Sekali</option>
+                </select>
+                <button
+                  type="submit"
+                  disabled={quickAddMutation.isPending || !quickTitle.trim()}
+                  className={`${primary} inline-flex h-9 items-center gap-1.5 !px-4 !text-xs`}
+                >
+                  <Plus size={14} />
+                  <span>{quickAddMutation.isPending ? 'Menambah…' : 'Tambah'}</span>
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mr-1">Platform (bisa pilih &gt;1):</span>
+              {QUICK_PLATFORM_KEYS.map(key => {
+                const active = quickPlatforms.includes(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleQuickPlatform(key)}
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all ${
+                      active
+                        ? 'bg-indigo-600 text-white shadow-2xs dark:bg-indigo-500'
+                        : 'bg-white/90 text-slate-600 hover:bg-slate-200/70 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/[0.12]'
+                    }`}
+                  >
+                    {platforms[key]}
+                  </button>
+                );
+              })}
             </div>
           </form>
         )}
@@ -285,7 +318,8 @@ export function TaskRoutinesHub({
           <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter kategori Task dan Rutinitas">
             {([
               { id: 'all', label: `Semua (${counts.total})` },
-              { id: 'daily', label: `Rutinitas Harian (${counts.daily})` },
+              { id: 'pending_today', label: `Belum Hari Ini (${counts.pendingToday})` },
+              { id: 'done_today', label: `Selesai Hari Ini (${counts.doneToday})` },
               { id: 'optimization', label: `Optimasi & Setup (${counts.optimization})` },
               { id: 'social_text', label: `Threads & X (${counts.socialText})` },
             ] as const).map(item => (
@@ -382,7 +416,9 @@ export function TaskRoutinesHub({
                       <div className="min-w-0">
                         <h3 className="break-words text-sm font-bold leading-snug text-slate-900 dark:text-slate-100">{task.title}</h3>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">{platforms[task.platform]}</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {[platforms[task.platform], ...(task.additional_platforms ?? []).map(p => platforms[p])].filter(Boolean).join(' + ')}
+                          </span>
                           <span>·</span>
                           <span>{workstreams[task.workstream ?? 'operations']}</span>
                           <span>·</span>
