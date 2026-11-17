@@ -37,9 +37,9 @@ export function SavedTaskViews({ userId, view, onApply }: { userId: string; view
       return false;
     }
   };
-  return <details className="rounded-lg border border-slate-200 p-3 text-sm">
-    <summary className="cursor-pointer font-semibold">Tampilan tersimpan</summary>
-    <p className="my-2 text-slate-600">Simpan filter, fokus, dan mode daftar atau kanban di browser ini. Unit dan kampanye mengikuti pilihan saat ini.</p>
+  return <details className="rounded-xl border border-slate-200/80 p-3 text-sm dark:border-white/10 dark:bg-white/[0.02]">
+    <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">Tampilan tersimpan</summary>
+    <p className="my-2 text-xs text-slate-500 dark:text-slate-400">Simpan filter, fokus, dan mode daftar atau kanban di browser ini. Unit dan kampanye mengikuti pilihan saat ini.</p>
     <form className="flex flex-wrap items-end gap-2" onSubmit={event => {
       event.preventDefault();
       const label = name.trim();

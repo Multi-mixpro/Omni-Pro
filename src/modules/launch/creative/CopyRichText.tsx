@@ -230,19 +230,19 @@ export function CopyRichTextEditor({
       <input type="hidden" name={name} value={htmlValue} />
 
       {/* Rich Text Formatting Toolbar */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-2.5 py-2 text-xs">
-        <span className="inline-flex items-center gap-1 font-bold text-slate-600 mr-1">
-          <Type className="w-3.5 h-3.5 text-teal-700" />
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-2.5 py-2 text-xs dark:border-white/10 dark:bg-white/[0.04]">
+        <span className="inline-flex items-center gap-1 font-bold text-slate-600 dark:text-slate-300 mr-1">
+          <Type className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
           <span>Text Tools:</span>
         </span>
 
         {/* Bold, Italic, Underline */}
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5 dark:border-white/10 dark:bg-[#0d1320]">
           <button
             type="button"
             title="Tebal (Bold)"
             onClick={() => runCommand('bold')}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 font-bold text-slate-700 hover:bg-teal-50 hover:text-teal-800"
+            className="inline-flex items-center gap-1 rounded px-2 py-1 font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-200 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-300"
           >
             <Bold className="w-3.5 h-3.5" />
             <span>B</span>
@@ -251,7 +251,7 @@ export function CopyRichTextEditor({
             type="button"
             title="Garis Miring (Italic)"
             onClick={() => runCommand('italic')}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 italic font-semibold text-slate-700 hover:bg-teal-50 hover:text-teal-800"
+            className="inline-flex items-center gap-1 rounded px-2 py-1 italic font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-200 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-300"
           >
             <Italic className="w-3.5 h-3.5" />
             <span>I</span>
@@ -260,7 +260,7 @@ export function CopyRichTextEditor({
             type="button"
             title="Garis Bawah (Underline)"
             onClick={() => runCommand('underline')}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 underline font-semibold text-slate-700 hover:bg-teal-50 hover:text-teal-800"
+            className="inline-flex items-center gap-1 rounded px-2 py-1 underline font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-200 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-300"
           >
             <Underline className="w-3.5 h-3.5" />
             <span>U</span>
@@ -268,13 +268,13 @@ export function CopyRichTextEditor({
         </div>
 
         {/* Font Size Selector */}
-        <label className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700">
+        <label className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 dark:border-white/10 dark:bg-[#0d1320] dark:text-slate-200">
           <span>Ukuran:</span>
           <select
             aria-label="Ukuran teks naskah"
             defaultValue="3"
             onChange={e => runCommand('fontSize', e.target.value)}
-            className="bg-transparent font-bold text-teal-800 focus:outline-none cursor-pointer"
+            className="bg-transparent font-bold text-indigo-700 dark:text-indigo-300 focus:outline-none cursor-pointer"
           >
             {FONT_SIZES.map(item => (
               <option key={item.cmdValue} value={item.cmdValue}>
@@ -353,8 +353,8 @@ export function CopyRichTextEditor({
       </div>
 
       {/* Quick Script Structure Chips */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 bg-teal-50/50 px-2.5 py-1.5 text-[11px]">
-        <span className="font-semibold text-teal-900">Sisipkan Struktur Cepat:</span>
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 bg-indigo-50/60 px-2.5 py-1.5 text-[11px] dark:border-white/10 dark:bg-indigo-500/10">
+        <span className="font-semibold text-indigo-900 dark:text-indigo-200">Sisipkan Struktur Cepat:</span>
         <button
           type="button"
           onClick={() => insertSnippet('<mark style="background-color:#fef08a"><b>[HOOK 0-3 Detik]</b></mark><br>')}
@@ -402,7 +402,7 @@ export function CopyRichTextEditor({
           onInput={syncFromDom}
           onBlur={syncFromDom}
           data-placeholder={placeholder}
-          className="min-h-[190px] max-h-[380px] overflow-y-auto p-3.5 text-sm leading-relaxed text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+          className="min-h-[190px] max-h-[380px] overflow-y-auto p-3.5 text-sm leading-relaxed text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
         />
       )}
     </div>
@@ -1004,7 +1004,7 @@ export function CopyScriptViewerModal({
             <button
               type="button"
               onClick={() => copyContent('full')}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-xs font-bold text-teal-900 hover:bg-teal-100"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-900 hover:bg-indigo-100"
             >
               {copiedMode === 'full' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
               <span>{copiedMode === 'full' ? 'Naskah + Penjelasan Tersalin!' : 'Salin Naskah + Penjelasan'}</span>
@@ -1019,7 +1019,7 @@ export function CopyScriptViewerModal({
                   onClose();
                   onUseForIdea(template);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-teal-300 bg-teal-50 px-3.5 py-2 text-xs font-bold text-teal-900 hover:bg-teal-100"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-300 bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-900 hover:bg-indigo-100"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>+ Buat Ide dari Skrip Ini</span>
@@ -1032,7 +1032,7 @@ export function CopyScriptViewerModal({
                   onClose();
                   onEdit(template);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-teal-800 px-4 py-2 text-xs font-bold text-white hover:bg-teal-900"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 <span>Edit Naskah &amp; Format</span>
@@ -1065,7 +1065,7 @@ export function OpenScriptReaderButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-900 hover:bg-teal-100 transition-colors"
+      className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-900 hover:bg-indigo-100 transition-colors dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
     >
       <Eye className="w-3.5 h-3.5" />
       <span>{label}</span>
