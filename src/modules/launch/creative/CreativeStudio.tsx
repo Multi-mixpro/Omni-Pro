@@ -229,16 +229,16 @@ export function CreativeStudio({ userId, unit, campaign, canEdit, onOpen, onEdit
                         tabIndex={0}
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setViewingTemplate(tpl); } }}
                         title="Klik untuk membuka Mode Lihat Nyaman"
-                        className="cursor-pointer max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 hover:border-teal-300 hover:bg-white p-3 transition-colors"
+                        className="cursor-pointer max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 hover:border-indigo-300 hover:bg-white p-3 transition-colors dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-indigo-500/40 dark:hover:bg-white/[0.06]"
                       >
-                        <CopyRichTextContent content={tpl.body} className="text-xs text-slate-800 leading-relaxed" />
+                        <CopyRichTextContent content={tpl.body} className="text-xs text-slate-800 leading-relaxed dark:text-slate-200" />
                       </div>
                     </td>
                     <td>
                       <div className="flex flex-wrap items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
+                          className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition-colors dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
                           onClick={() => setViewingTemplate(tpl)}
                           title="Buka Pratinjau Mode Dokumen PDF (A4) & Teleprompter"
                         >

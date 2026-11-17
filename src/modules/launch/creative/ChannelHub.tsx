@@ -6,7 +6,7 @@ import { channelActivations, channelPlatforms, channelStatus, createActivationFo
 import { accounts } from './commandRepository';
 import { CreativePager } from './CreativeAccounts';
 
-const panel = 'rounded-xl border border-slate-200 bg-white p-4';
+const panel = 'sa-surface p-4 sm:p-5';
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const number = new Intl.NumberFormat('id-ID');
 const shortDate = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZone: 'UTC' });
@@ -126,7 +126,7 @@ export function ChannelHub({ userId, unit, scope, today, canEdit, campaigns, mem
       <Label title="PIC"><People members={members} current={followup.assignee_id} required /></Label>
       <Label title="Deadline tindak lanjut"><input className={field} name="due" type="date" required /></Label>
     </Editor>}
-    {notice && <p role="status" className="text-sm text-teal-800">{notice}</p>}
+    {notice && <p role="status" className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{notice}</p>}
     {!!overview?.length && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Laporan per platform">
       {overview.map(item => <article key={item.platform} className={panel}>
         <h3 className="font-semibold">{channelPlatforms[item.platform]}</h3>
@@ -139,7 +139,7 @@ export function ChannelHub({ userId, unit, scope, today, canEdit, campaigns, mem
     </div>}
     <p className="text-xs text-slate-600">Ringkasan memakai seluruh lingkup kampanye terpilih. Anggaran kanal dicatat terpisah dari anggaran kampanye.</p>
     <div className={panel + ' space-y-3'}>
-      {activation && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-teal-50 p-3 text-sm">
+      {activation && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50 p-3 text-sm dark:bg-indigo-500/15 dark:text-indigo-200">
         <span>Aktivasi dipilih dari agenda</span><button className={button} onClick={() => { setActivation(undefined); setPage(0); }}>Tampilkan semua aktivasi</button>
       </div>}
       <div className="grid gap-2 sm:grid-cols-2">
@@ -161,7 +161,7 @@ export function ChannelHub({ userId, unit, scope, today, canEdit, campaigns, mem
               <p className={'text-sm ' + (overdue ? 'font-semibold text-rose-700' : 'text-slate-700')}>{channelStatus[row.status]} · Evaluasi {date(row.review_on)}{overdue ? ' (terlambat)' : ''} · {members.find(member => member.id === row.assignee_id)?.full_name ?? 'Belum ada PIC'}</p>
               <p className="text-sm">{metrics[row.metric]}: {number.format(row.actual_result)} / {number.format(row.target_result)}{row.target_result ? ' (' + Math.round(row.actual_result * 100 / row.target_result) + '%)' : ''}</p>
               {row.distribution === 'paid' && <p className="text-sm">Belanja {rupiah.format(row.spent_idr)} / {rupiah.format(row.budget_idr)}{row.actual_result > 0 ? ' · ' + rupiah.format(row.spent_idr / row.actual_result) + ' per hasil' : ''}</p>}
-              {row.decision && <p className="text-sm font-semibold text-teal-800">{decisions[row.decision]}</p>}
+              {row.decision && <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">{decisions[row.decision]}</p>}
               {row.evaluation && <details className="text-sm"><summary className="cursor-pointer">Catatan evaluasi</summary><p className="whitespace-pre-wrap break-words">{row.evaluation}</p></details>}
             </div>
             {canEdit && <div className="flex flex-wrap gap-2 self-start">

@@ -454,8 +454,8 @@ export function CreativeInbox({ userId, counts, evaluations, onFocus, onAds, onT
 }) {
   const [page, setPage] = useState(0);
   const query = useQuery({ queryKey: ['creative',userId,'task-events','inbox',page], queryFn: ({ signal }) => taskEvents('inbox',userId,signal,page) });
-  return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4" aria-label="Kotak tindakan">
-    <div><h2 className="text-lg font-bold">Kotak tindakan</h2><p className="text-sm text-slate-600">Antrean dari lingkup terpilih dan permintaan yang dikirim ke Anda.</p></div>
+  return <section className="sa-surface space-y-4 p-4 sm:p-5" aria-label="Kotak tindakan">
+    <div><h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Kotak tindakan</h2><p className="text-sm text-slate-600 dark:text-slate-400">Antrean dari lingkup terpilih dan permintaan yang dikirim ke Anda.</p></div>
     <div className="flex flex-wrap gap-2">
       <button type="button" className={button} onClick={onDecisions}>Review &amp; persetujuan saya</button>
       <button className={button} onClick={() => onFocus('ready')}>Buka antrean siap tayang</button>
@@ -483,12 +483,12 @@ export function CreativeDecisionQueue({ userId, unit, scope, onTask }: {
   const decisions = useQuery({ queryKey: ['creative', userId, 'tasks', 'waiting-for-me', unit, scope, page],
     queryFn: ({ signal }) => pendingTaskDecisions(userId, page, signal, unit, scope) });
 
-  return <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4" aria-label="Menunggu keputusan saya">
-    <div><h2 className="text-lg font-bold">Menunggu saya</h2><p className="text-sm text-slate-600">Tugas yang ditugaskan kepada Anda dalam unit dan kampanye terpilih.</p></div>
+  return <section className="sa-surface space-y-3 p-4 sm:p-5" aria-label="Menunggu keputusan saya">
+    <div><h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Menunggu saya</h2><p className="text-sm text-slate-600 dark:text-slate-400">Tugas yang ditugaskan kepada Anda dalam unit dan kampanye terpilih.</p></div>
     {decisions.isPending && <p role="status" className="text-sm">Memuat antrean keputusan…</p>}
-    {decisions.isError && <p role="alert" className="text-sm text-red-700">{errorText(decisions.error)}</p>}
-    {decisions.isSuccess && !decisions.data.length && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Tidak ada review atau persetujuan yang menunggu Anda di halaman ini.</p>}
-    <ul className="divide-y divide-slate-200">{decisions.data?.slice(0, PAGE_SIZE).map(item => <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+    {decisions.isError && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{errorText(decisions.error)}</p>}
+    {decisions.isSuccess && !decisions.data.length && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-white/[0.04] dark:text-slate-400">Tidak ada review atau persetujuan yang menunggu Anda di halaman ini.</p>}
+    <ul className="divide-y divide-slate-200 dark:divide-white/[0.06]">{decisions.data?.slice(0, PAGE_SIZE).map(item => <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
       <div><h3 className="font-semibold">{item.title}</h3><p className="text-sm text-slate-600">{item.status === 'review' ? 'Review' : 'Persetujuan akhir'}{item.due_on ? ` · Deadline ${item.due_on}` : ''}</p></div>
       <button type="button" className={button} onClick={() => onTask(item.id)}>Buka keputusan</button>
     </li>)}</ul>
