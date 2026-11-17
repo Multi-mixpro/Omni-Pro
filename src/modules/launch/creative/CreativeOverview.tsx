@@ -13,7 +13,7 @@ export function CreativeOverview({ counts, period, onFocus }: {
   ] as const;
   const percent = counts.target ? Math.round(100 * counts.closed / counts.target) : 0;
   return <div className="space-y-4">
-    <section className="creative-weekly-hero relative overflow-hidden space-y-4 rounded-[28px] p-5 text-white shadow-[0_18px_40px_-12px_rgba(20,99,255,0.35)] sm:p-6" aria-label="Target minggu ini">
+    <section className="creative-weekly-hero relative overflow-hidden space-y-3.5 rounded-[20px] p-5 text-white shadow-[0_16px_36px_-12px_rgba(37,99,235,0.34)] sm:p-6" aria-label="Target minggu ini">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-bold text-blue-100">
           <span className="grid h-7 w-7 place-items-center rounded-xl bg-white/15"><Flag size={15} /></span>
@@ -23,7 +23,7 @@ export function CreativeOverview({ counts, period, onFocus }: {
       </div>
       <p className="text-xs font-medium text-blue-100/80">{period} · WIB</p>
       <p className="flex items-baseline gap-2">
-        <strong className="font-mono text-4xl font-extrabold tracking-tight tabular-nums sm:text-5xl">{counts.closed}</strong>
+        <strong className="font-mono text-3xl font-extrabold tracking-tight tabular-nums sm:text-4xl">{counts.closed}</strong>
         <span className="font-mono text-xl font-semibold text-blue-200/80">/ {counts.target}</span>
         <span className="text-sm font-medium text-blue-100">tugas selesai</span>
       </p>
@@ -40,7 +40,7 @@ export function CreativeOverview({ counts, period, onFocus }: {
         Lihat tugas minggu ini <ArrowRight size={15} />
       </button>
     </section>
-    <section className="space-y-3.5 rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[#131926] sm:p-6" aria-label="Perlu ditindak">
+    <section className="space-y-3.5 rounded-[20px] border border-slate-200/80 bg-white p-4 shadow-[0_4px_20px_-4px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[#131926] sm:p-5" aria-label="Perlu ditindak">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">Perlu ditindak</h2>

@@ -35,7 +35,7 @@ function isOptimizationOrRoutine(task: Task): boolean {
   if (task.workstream !== 'creative') return true;
   if (task.routine_mode && task.routine_mode !== 'once') return true;
   if (task.output_type === 'other') return true;
-  return task.platform === 'threads' && /optimasi|profil|konsep|bio|audit/i.test(task.title);
+  return (task.platform === 'threads' || task.platform === 'x') && /optimasi|profil|konsep|bio|audit/i.test(task.title);
 }
 
 function presetToSeed(preset: RoutinePreset): TaskPresetSeed {
@@ -132,7 +132,7 @@ export function TaskRoutinesHub({
     return allRelevant.filter(task => {
       if (tab === 'optimization' && task.workstream === 'creative' && task.output_type !== 'other') return false;
       if (tab === 'recurring' && (!task.routine_mode || task.routine_mode === 'once')) return false;
-      if (tab === 'threads' && task.platform !== 'threads' && !task.additional_platforms?.includes('threads')) return false;
+      if (tab === 'threads' && task.platform !== 'threads' && task.platform !== 'x' && !task.additional_platforms?.includes('threads') && !task.additional_platforms?.includes('x')) return false;
       if (!q) return true;
       const haystack = `${task.title} ${task.brief} ${task.deliverable} ${task.format} ${platforms[task.platform] ?? ''}`.toLowerCase();
       return haystack.includes(q);
@@ -143,7 +143,7 @@ export function TaskRoutinesHub({
     total: allRelevant.length,
     optimization: allRelevant.filter(t => t.workstream !== 'creative' || t.output_type === 'other').length,
     recurring: allRelevant.filter(t => t.routine_mode && t.routine_mode !== 'once').length,
-    threads: allRelevant.filter(t => t.platform === 'threads' || t.additional_platforms?.includes('threads')).length,
+    threads: allRelevant.filter(t => t.platform === 'threads' || t.platform === 'x' || t.additional_platforms?.includes('threads') || t.additional_platforms?.includes('x')).length,
   }), [allRelevant]);
 
   const optimizationPresets = ROUTINE_PRESETS.filter(p =>
@@ -202,7 +202,7 @@ export function TaskRoutinesHub({
             <p className="mt-1 text-xl font-extrabold text-teal-700 dark:text-teal-300">{counts.recurring}</p>
           </div>
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/50">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Platform Threads</span>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Platform Threads &amp; X</span>
             <p className="mt-1 text-xl font-extrabold text-slate-900 dark:text-white">{counts.threads}</p>
           </div>
         </div>
@@ -264,7 +264,7 @@ export function TaskRoutinesHub({
               { id: 'all', label: `Semua (${counts.total})` },
               { id: 'optimization', label: `Optimasi & Operasional (${counts.optimization})` },
               { id: 'recurring', label: `Rutinitas Berulang (${counts.recurring})` },
-              { id: 'threads', label: `Threads (${counts.threads})` },
+              { id: 'threads', label: `Threads & X (${counts.threads})` },
             ] as const).map(item => (
               <button
                 key={item.id}

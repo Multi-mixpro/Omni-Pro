@@ -79,7 +79,7 @@ const sectionColors: Record<Section, string> = {
 const sectionDescriptions: Record<Section, string> = {
   overview: 'Lihat target, jadwal, dan pekerjaan yang perlu ditindak.',
   work: 'Kelola tugas dari brief dan produksi sampai bukti tayang.',
-  routines: 'Kelola tugas optimasi platform (termasuk Threads), setup profil, konsep postingan, dan rutinitas operasional di luar ide & konten.',
+  routines: 'Kelola tugas optimasi platform (Threads, X, IG, TikTok), setup profil, konsep postingan, dan rutinitas operasional di luar ide & konten.',
   studio: 'Siapkan brief dan kelola versi naskah dari tugas produksi konten.',
   decisions: 'Buka tugas yang menunggu review atau persetujuan Anda.',
   campaigns: 'Rencanakan kampanye dan pantau pekerjaan yang terkait.',
@@ -492,14 +492,14 @@ export default function CreativeWorkspace({ userId, userName, canEdit, canRemove
         </div>
       </aside>
       <div className="min-w-0 space-y-3.5">
-      <header className="creative-toolbar rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-4 lg:px-5 lg:py-3.5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[#111622]">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <header className="creative-toolbar rounded-2xl border border-slate-200/80 bg-white p-3 sm:px-4 sm:py-3 shadow-[0_4px_20px_-4px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[#111622]">
+        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <p className="creative-eyebrow mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest"><span /> Creative Hub</p>
+            <p className="creative-eyebrow mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest"><span /> Creative Hub</p>
             <div className="flex flex-wrap items-baseline gap-2">
-              <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl text-slate-900 dark:text-white">{activeSection}</h1>
+              <h1 className="text-lg font-extrabold tracking-tight sm:text-xl text-slate-900 dark:text-white">{activeSection}</h1>
               <span className="hidden text-xs text-slate-400 dark:text-slate-600 sm:inline">•</span>
-              <p className="text-xs text-slate-600 dark:text-slate-400 sm:text-sm">{sectionDescriptions[section]}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">{sectionDescriptions[section]}</p>
             </div>
           </div>
           <div className="creative-toolbar-actions flex flex-wrap items-center gap-2">

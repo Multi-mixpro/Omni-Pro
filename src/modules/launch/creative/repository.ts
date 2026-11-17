@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { mondayWeek, type Focus } from './schedule';
 
 export const platforms = {
-  instagram: 'Instagram', threads: 'Threads', tiktok: 'TikTok', youtube: 'YouTube', facebook: 'Facebook',
+  instagram: 'Instagram', threads: 'Threads', x: 'X', tiktok: 'TikTok', youtube: 'YouTube', facebook: 'Facebook',
   whatsapp: 'WhatsApp', marketplace: 'Marketplace', website: 'Website', internal: 'Internal', other: 'Lainnya',
 };
 export const taskStatuses = {
@@ -90,6 +90,47 @@ export const ROUTINE_PRESETS: RoutinePreset[] = [
       'Susun 5 template hook pembuka yang memancing balasan/komentar',
       'Jadwalkan posting rutin + sesi balas komentar/repost 15 menit setelah tayang',
       'Evaluasi topik dengan engagement tertinggi setiap akhir minggu',
+    ],
+  },
+  {
+    id: 'preset-x-profile-optimization',
+    label: 'Optimasi Akun & Profil X (Twitter)',
+    badge: 'X Profil',
+    mode: 'once',
+    category: 'platform_optimization',
+    output_type: 'other',
+    platform: 'x',
+    workstream: 'operations',
+    trigger: 'Setup awal atau pembaruan identitas akun X unit bisnis',
+    target: 'Profil X rapi, bio tajam & pinned post aktif',
+    format: 'Checklist Setup Profil, Banner & Pinned Post X',
+    deliverable: 'Profil X teroptimasi (avatar brand, header banner, bio CTA, tautan aktif, dan 1 pinned thread)',
+    acceptance_criteria: 'Bio ringkas & jelas, tautan order/web berfungsi, serta header visual selaras dengan identitas brand',
+    checklist: [
+      'Perbarui handle, display name, foto profil & banner header sesuai identitas brand',
+      'Tulis bio singkat yang menonjolkan positioning + CTA link',
+      'Buat & sematkan (pin) thread perkenalan produk / layanan utama',
+      'Rapikan daftar following & interaksi awal dengan audiens/komunitas relevan',
+    ],
+  },
+  {
+    id: 'preset-x-thread-concept',
+    label: 'Konsep Thread & Rutinitas Postingan X',
+    badge: 'Konsep X',
+    mode: 'scheduled_recurring',
+    category: 'account_concept',
+    output_type: 'post',
+    platform: 'x',
+    workstream: 'marketing',
+    trigger: 'Rutinitas harian / mingguan posting thread & reply di X',
+    target: '3–5 post/thread per minggu + interaksi balasan aktif',
+    format: 'Konsep Microblogging / Thread Edukasi / Diskusi X',
+    deliverable: 'Daftar pilar topik X, template hook pembuka thread, dan jadwal posting rutin',
+    acceptance_criteria: 'Hook kuat di kalimat pertama, format mudah dibaca (poin/thread), dan konsisten berinteraksi',
+    checklist: [
+      'Susun 3 pilar konten X (edukasi singkat, behind-the-scenes, insight/opini)',
+      'Siapkan template hook pembuka agar memancing bookmark & repost',
+      'Jadwalkan posting + pantau reply & mention harian',
     ],
   },
   {

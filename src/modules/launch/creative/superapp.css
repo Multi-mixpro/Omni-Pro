@@ -5,44 +5,47 @@
    ========================================================================== */
 
 .creative-shell {
-  --sa-radius-lg: 24px;
-  --sa-radius-md: 16px;
-  --sa-radius-sm: 12px;
+  --sa-radius-lg: 20px;
+  --sa-radius-md: 14px;
+  --sa-radius-sm: 10px;
   --sa-ease: cubic-bezier(.22, .8, .24, 1);
   --sa-card: #ffffff;
-  --sa-card-soft: #f6f9ff;
-  --sa-line: #e6edf7;
+  --sa-card-soft: #f5f8ff;
+  --sa-line: #e4ecf8;
   --sa-ink: #0f172a;
   --sa-muted: #64748b;
-  --sa-brand: #1463ff;
-  --sa-brand-2: #7c5cff;
-  --sa-shadow-sm: 0 1px 2px rgba(15, 23, 42, .04), 0 2px 8px -2px rgba(15, 23, 42, .05);
-  --sa-shadow-md: 0 10px 30px -10px rgba(30, 64, 175, .18), 0 2px 6px rgba(15, 23, 42, .04);
-  --sa-shadow-lg: 0 24px 60px -20px rgba(30, 64, 175, .28);
+  --sa-brand: #2563eb;
+  --sa-brand-2: #8b5cf6;
+  --sa-brand-3: #14b8a6;
+  --sa-shadow-sm: 0 1px 2px rgba(15, 23, 42, .03), 0 3px 10px -3px rgba(37, 99, 235, .06);
+  --sa-shadow-md: 0 10px 28px -12px rgba(37, 99, 235, .14), 0 2px 8px -2px rgba(15, 23, 42, .04);
+  --sa-shadow-lg: 0 22px 54px -18px rgba(30, 64, 175, .24);
   background:
-    radial-gradient(900px 500px at 0% -10%, #dbe9ff 0%, transparent 60%),
-    radial-gradient(800px 500px at 100% -5%, #efe4ff 0%, transparent 55%),
-    radial-gradient(700px 500px at 100% 100%, #dcf7ee 0%, transparent 55%),
-    #f5f8fe;
+    radial-gradient(880px 460px at 0% -8%, #dbeafe 0%, transparent 58%),
+    radial-gradient(760px 460px at 100% -4%, #ede9fe 0%, transparent 55%),
+    radial-gradient(680px 460px at 96% 96%, #ccfbf1 0%, transparent 52%),
+    #f6f8fd;
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 [data-theme='dark'] .creative-shell {
   --sa-card: #111622;
-  --sa-card-soft: #161d2c;
-  --sa-line: #1f2940;
+  --sa-card-soft: #161d2d;
+  --sa-line: #1e2840;
   --sa-ink: #f1f5f9;
   --sa-muted: #94a3b8;
   --sa-brand: #3b82f6;
-  --sa-brand-2: #8b5cf6;
-  --sa-shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
-  --sa-shadow-md: 0 14px 34px -12px rgba(0, 0, 0, .65);
-  --sa-shadow-lg: 0 28px 70px -20px rgba(0, 0, 0, .8);
+  --sa-brand-2: #a78bfa;
+  --sa-brand-3: #2dd4bf;
+  --sa-shadow-sm: 0 1px 3px rgba(0, 0, 0, .38);
+  --sa-shadow-md: 0 12px 30px -12px rgba(0, 0, 0, .65);
+  --sa-shadow-lg: 0 26px 64px -20px rgba(0, 0, 0, .82);
   background:
-    radial-gradient(800px 480px at 0% -10%, rgba(37, 99, 235, .13) 0%, transparent 60%),
-    radial-gradient(700px 480px at 100% 0%, rgba(139, 92, 246, .10) 0%, transparent 55%),
-    #090c12;
+    radial-gradient(820px 460px at 0% -8%, rgba(59, 130, 246, .14) 0%, transparent 58%),
+    radial-gradient(720px 440px at 100% 0%, rgba(167, 139, 250, .12) 0%, transparent 55%),
+    radial-gradient(620px 420px at 92% 98%, rgba(45, 212, 191, .08) 0%, transparent 52%),
+    #080b12;
   background-attachment: fixed;
 }
 
@@ -88,13 +91,20 @@
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
-  width: 5px;
-  background: linear-gradient(180deg, var(--sa-brand), var(--sa-brand-2));
-  border-radius: 24px 0 0 24px;
+  width: 4px;
+  background: linear-gradient(180deg, var(--sa-brand), var(--sa-brand-2), var(--sa-brand-3));
+  border-radius: 20px 0 0 20px;
 }
 .creative-shell .creative-toolbar h1 {
-  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem);
-  letter-spacing: -.04em;
+  font-size: clamp(1.125rem, 1rem + 0.45vw, 1.35rem);
+  line-height: 1.25;
+  letter-spacing: -.025em;
+}
+.creative-weekly-hero {
+  background: linear-gradient(135deg, #1d4ed8 0%, #4f46e5 52%, #0d9488 100%);
+}
+[data-theme='dark'] .creative-weekly-hero {
+  background: linear-gradient(135deg, #1e3a8a 0%, #4338ca 52%, #0f766e 100%);
 }
 .creative-eyebrow { letter-spacing: .14em; }
 .creative-eyebrow span { box-shadow: 0 0 0 4px color-mix(in srgb, var(--sa-brand) 22%, transparent); }
@@ -161,7 +171,7 @@
   transition: transform .22s var(--sa-ease), box-shadow .22s var(--sa-ease), border-color .22s;
 }
 .creative-task-card:hover { transform: translateY(-2px); box-shadow: var(--sa-shadow-md); }
-.creative-focus-card { border-radius: 20px !important; box-shadow: var(--sa-shadow-sm); }
+.creative-focus-card { border-radius: 16px !important; box-shadow: var(--sa-shadow-sm); transition: transform .2s var(--sa-ease), box-shadow .2s var(--sa-ease); }
 .creative-focus-card:hover { transform: translateY(-3px); box-shadow: var(--sa-shadow-md); }
 .creative-template-card, .creative-metric-card { border-radius: var(--sa-radius-md); }
 
@@ -176,7 +186,7 @@
 
 /* ---- Dialog / modal: sheet style ------------------------------------- */
 .creative-shell dialog {
-  border-radius: 28px;
+  border-radius: 22px;
   border: 1px solid var(--sa-line);
   box-shadow: var(--sa-shadow-lg);
   background: var(--sa-card);

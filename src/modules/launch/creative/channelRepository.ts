@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { isDemoText, PAGE_SIZE, platforms } from './repository';
 
 export const channelPlatforms = {
-  marketplace: platforms.marketplace, instagram: platforms.instagram, threads: platforms.threads, tiktok: platforms.tiktok,
+  marketplace: platforms.marketplace, instagram: platforms.instagram, threads: platforms.threads, x: platforms.x, tiktok: platforms.tiktok,
   facebook: platforms.facebook, youtube: platforms.youtube, whatsapp: platforms.whatsapp, website: platforms.website, other: platforms.other,
 };
 export const channelStatus = { planned: 'Direncanakan', running: 'Berjalan', review: 'Siap dievaluasi', evaluated: 'Sudah dievaluasi', cancelled: 'Dibatalkan' };
