@@ -30,7 +30,7 @@ export function ReferenceLinks({ urls }: { urls: string[] }) {
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
       {links.map((url, index) => (
         <li key={url}>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-teal-800 underline">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-indigo-600 underline dark:text-indigo-400">
             <span>Referensi {index + 1} · {new URL(url).hostname}</span>
             <ExternalLink size={12} aria-hidden="true" />
           </a>
@@ -204,7 +204,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
             <span>Ide Konten</span>
             {query.data && query.data.length > 0 && (
               <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
-                activeTab === 'ideas' ? 'bg-white/25 text-white' : 'bg-teal-100 text-teal-800'
+                activeTab === 'ideas' ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200'
               }`}>
                 {query.data.length}
               </span>
@@ -223,7 +223,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
             <span>List Copywriting &amp; Skrip (Tabel)</span>
             {templatesQuery.data && templatesQuery.data.length > 0 && (
               <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
-                activeTab === 'scripts' ? 'bg-white/25 text-white' : 'bg-teal-100 text-teal-800'
+                activeTab === 'scripts' ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200'
               }`}>
                 {templatesQuery.data.length}
               </span>
@@ -242,7 +242,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
             <span>Referensi Bank Ide</span>
             {referenceEntries.length > 0 && (
               <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
-                activeTab === 'references' ? 'bg-white/25 text-white' : 'bg-teal-100 text-teal-800'
+                activeTab === 'references' ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200'
               }`}>
                 {referenceEntries.length}
               </span>
@@ -311,7 +311,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
         </div>
       </div>
 
-      {notice && <p role="status" className="rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-sm font-semibold text-teal-800">{notice}</p>}
+      {notice && <p role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-sm font-semibold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">{notice}</p>}
 
       {/* TAB 1: DAFTAR IDE KONTEN */}
       {activeTab === 'ideas' && (
@@ -399,7 +399,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                           type="button"
                           onClick={() => setViewingTemplate(attachedScript)}
                           title="Buka Mode Lihat Nyaman untuk naskah ini"
-                          className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
+                          className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition-colors dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
                         >
                           <FileText size={12} />
                           <span>Naskah: {attachedScript.title}</span>
@@ -417,27 +417,27 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                     </p>
                     {idea.brief && <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{idea.brief}</p>}
                     {attachedScript && (
-                      <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
-                        <summary className="cursor-pointer font-bold text-teal-800">
+                      <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                        <summary className="cursor-pointer font-bold text-indigo-700 dark:text-indigo-300">
                           Lihat Lampiran Skrip ({copyFormats[attachedScript.format] ?? attachedScript.format} · {outputTypes[attachedScript.output_type] ?? attachedScript.output_type})
                         </summary>
                         <div className="mt-2.5 space-y-2">
                           {attachedScript.description && (
-                            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-950">
-                              <strong className="inline-flex items-center gap-1 font-bold text-amber-900">
+                            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-950 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                              <strong className="inline-flex items-center gap-1 font-bold text-amber-900 dark:text-amber-200">
                                 <Info className="w-3.5 h-3.5" /> Penjelasan Skrip:
                               </strong>
                               <p className="mt-0.5 whitespace-pre-wrap">{attachedScript.description}</p>
                             </div>
                           )}
-                          <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-                            <CopyRichTextContent content={attachedScript.body} className="text-xs text-slate-800" />
+                          <div className="rounded-lg border border-slate-200 bg-white p-2.5 dark:border-white/10 dark:bg-[#0d1320]">
+                            <CopyRichTextContent content={attachedScript.body} className="text-xs text-slate-800 dark:text-slate-200" />
                           </div>
                           <div className="flex flex-wrap items-center gap-2 pt-1">
                             <button
                               type="button"
                               onClick={() => setViewingTemplate(attachedScript)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100"
+                              className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
                             >
                               <Eye size={12} />
                               <span>Buka Mode Lihat Nyaman / Teleprompter</span>
@@ -445,7 +445,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                             <button
                               type="button"
                               onClick={() => copyToClipboard(stripCopyRichText(attachedScript.body), `idea-tpl-${idea.id}`)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-200"
                             >
                               <Copy size={12} />
                               <span>{copiedId === `idea-tpl-${idea.id}` ? 'Tersalin!' : 'Salin Naskah'}</span>
@@ -645,7 +645,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                       disabled={templatesQuery.isFetching}
                       className={button + ' inline-flex items-center gap-1.5'}
                     >
-                      <RefreshCw className={`w-3.5 h-3.5 ${templatesQuery.isFetching ? 'animate-spin text-teal-600' : ''}`} />
+                      <RefreshCw className={`w-3.5 h-3.5 ${templatesQuery.isFetching ? 'animate-spin text-indigo-600 dark:text-indigo-400' : ''}`} />
                       <span>{templatesQuery.isFetching ? 'Menyinkronkan…' : 'Segarkan Data'}</span>
                     </button>
                   </>
@@ -729,7 +729,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100 transition-colors"
+                            className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition-colors dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
                             onClick={() => setViewingTemplate(tpl)}
                             title="Buka Pratinjau Mode Dokumen PDF (A4) & Teleprompter"
                           >
@@ -857,7 +857,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 font-bold text-teal-800 underline break-all"
+                          className="inline-flex items-center gap-1.5 font-bold text-indigo-700 underline break-all dark:text-indigo-400"
                         >
                           <span>{hostname}</span>
                           <ExternalLink size={13} className="shrink-0" />
@@ -874,7 +874,7 @@ export function IdeaBank({ userId, canEdit, onConvert, unit }: { userId: string;
                         </span>
                       </td>
                       <td>
-                        <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-800">
+                        <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-200">
                           {idea.task ? 'Tugas: ' + taskStatuses[idea.task.status] : ideaQueues[idea.queue_state]}
                         </span>
                       </td>
