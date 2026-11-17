@@ -1,4 +1,4 @@
--- Add 'threads' platform to all Creative Workspace platform CHECK constraints
+-- Add 'threads' platform to all existing Creative Workspace platform CHECK constraints
 do $$
 declare
   rec record;
@@ -24,34 +24,44 @@ begin
   loop
     execute format('alter table public.%I drop constraint if exists %I', rec.relname, rec.conname);
   end loop;
+
+  if to_regclass('public.creative_tasks') is not null then
+    alter table public.creative_tasks
+      add constraint creative_tasks_platform_check
+        check (platform in ('instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','internal','other')),
+      add constraint creative_tasks_additional_platforms_check
+        check (
+          not ('internal' = any(additional_platforms))
+          and additional_platforms <@ array['instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','other']
+        );
+  end if;
+
+  if to_regclass('public.creative_ideas') is not null then
+    alter table public.creative_ideas
+      add constraint creative_ideas_platform_check
+        check (platform in ('instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','internal','other')),
+      add constraint creative_ideas_additional_platforms_check
+        check (
+          not ('internal' = any(additional_platforms))
+          and additional_platforms <@ array['instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','other']
+        );
+  end if;
+
+  if to_regclass('public.creative_channel_activations') is not null then
+    alter table public.creative_channel_activations
+      add constraint creative_channel_activations_platform_check
+        check (platform in ('marketplace','instagram','threads','tiktok','facebook','youtube','whatsapp','website','other'));
+  end if;
+
+  if to_regclass('public.creative_accounts') is not null then
+    alter table public.creative_accounts
+      add constraint creative_accounts_platform_check
+        check (platform in ('instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','other'));
+  end if;
+
+  if to_regclass('public.creative_copy_templates') is not null then
+    alter table public.creative_copy_templates
+      add constraint creative_copy_templates_platform_check
+        check (platform in ('instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','internal','other') or platform is null);
+  end if;
 end $$;
-
-alter table public.creative_tasks
-  add constraint creative_tasks_platform_check
-    check (platform in ('instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','internal','other')),
-  add constraint creative_tasks_additional_platforms_check
-    check (
-      not ('internal' = any(additional_platforms))
-      and additional_platforms <@ array['instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','other']
-    );
-
-alter table public.creative_ideas
-  add constraint creative_ideas_platform_check
-    check (platform in ('instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','internal','other')),
-  add constraint creative_ideas_additional_platforms_check
-    check (
-      not ('internal' = any(additional_platforms))
-      and additional_platforms <@ array['instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','other']
-    );
-
-alter table public.creative_channel_activations
-  add constraint creative_channel_activations_platform_check
-    check (platform in ('marketplace','instagram','threads','tiktok','facebook','youtube','whatsapp','website','other'));
-
-alter table public.creative_accounts
-  add constraint creative_accounts_platform_check
-    check (platform in ('instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','other'));
-
-alter table public.creative_copy_templates
-  add constraint creative_copy_templates_platform_check
-    check (platform in ('instagram','threads','tiktok','youtube','facebook','whatsapp','marketplace','website','internal','other') or platform is null);
