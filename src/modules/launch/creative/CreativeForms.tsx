@@ -301,8 +301,8 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
               }}
               className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition-all ${
                 active
-                  ? 'border-teal-700 bg-teal-800 text-white shadow-2xs'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50/50'
+                  ? 'border-indigo-600 bg-indigo-600 text-white shadow-2xs dark:border-indigo-500 dark:bg-indigo-500'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-indigo-500/40'
               }`}
             >
               <span className="block">{modeKey === 'once' ? '🎯 ' : modeKey === 'event_triggered' ? '🔁 ' : '📅 '}{modeLabel}</span>
@@ -325,8 +325,8 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
                   onClick={() => applyRoutinePreset(preset, false)}
                   className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
                     routineCategory === preset.category && routineMode === preset.mode
-                      ? 'border-teal-700 bg-teal-100 text-teal-950 font-bold'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-teal-50 hover:border-teal-200'
+                      ? 'border-indigo-600 bg-indigo-100 text-indigo-950 font-bold dark:border-indigo-400 dark:bg-indigo-500/20 dark:text-indigo-200'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-indigo-500/10'
                   }`}
                 >
                   + {preset.label}
@@ -386,13 +386,13 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
         </div>
       )}
     </div>
-    <div className="space-y-2.5 sm:col-span-2 rounded-xl border border-teal-200 bg-teal-50/70 p-3.5 text-sm">
+    <div className="space-y-2.5 sm:col-span-2 rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-3.5 text-sm dark:border-indigo-500/20 dark:bg-indigo-500/5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <label htmlFor="task-copy-template" className="font-bold text-slate-800">
+        <label htmlFor="task-copy-template" className="font-bold text-slate-800 dark:text-slate-100">
           Lampirkan Skrip &amp; Penjelasan dari Bank Ide / Copywriting (opsional)
         </label>
         {templates.data && templates.data.length > 0 && (
-          <span className="text-xs text-teal-800 font-semibold">{templates.data.length} template naskah siap pakai</span>
+          <span className="text-xs text-indigo-700 font-semibold dark:text-indigo-300">{templates.data.length} template naskah siap pakai</span>
         )}
       </div>
       <select
@@ -418,13 +418,13 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
         ))}
       </select>
       {selectedTemplate ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-2xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-2xs dark:border-white/10 dark:bg-[#0d1320]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-bold text-teal-900">
+              <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-900 dark:bg-indigo-500/20 dark:text-indigo-200">
                 {copyFormats[selectedTemplate.format] ?? selectedTemplate.format}
               </span>
-              <span className="text-xs font-bold text-slate-800">{selectedTemplate.title}</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{selectedTemplate.title}</span>
             </div>
             <OpenScriptReaderButton
               label="Mode Lihat Nyaman"
@@ -458,7 +458,7 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
             <span className="text-xs font-semibold text-slate-600 mr-1">Lampirkan ke Brief Tugas:</span>
             <button
               type="button"
-              className="rounded-full bg-teal-800 px-3 py-1 text-xs font-bold text-white hover:bg-teal-900 transition-colors"
+              className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700 transition-colors dark:bg-indigo-500 dark:hover:bg-indigo-600"
               onClick={() => {
                 const block = formatScriptForBrief(selectedTemplate, customScriptNote, 'all');
                 setBriefText(prev => prev.trim() ? `${prev.trim()}\n\n${block}` : block);
@@ -468,7 +468,7 @@ export function TaskForm({ task, sourceIdea, initialPreset, campaignId, campaign
             </button>
             <button
               type="button"
-              className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-900 hover:bg-teal-100 transition-colors"
+              className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-900 hover:bg-indigo-100 transition-colors dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
               onClick={() => {
                 const block = formatScriptForBrief(selectedTemplate, customScriptNote, 'body');
                 setBriefText(prev => prev.trim() ? `${prev.trim()}\n\n${block}` : block);
@@ -608,13 +608,13 @@ export function IdeaForm({ idea, defaultUnit, initialTemplate, onCancel, onSaved
       </div>
     </fieldset>
     <Label title="Antrean ide"><select name="queue" className={field} defaultValue={idea?.queue_state ?? (initialTemplate ? 'ready' : 'candidate')}><Options values={ideaQueues} /></select></Label>
-    <div className="space-y-2.5 sm:col-span-2 rounded-xl border border-teal-200 bg-teal-50/70 p-3.5 text-sm">
+    <div className="space-y-2.5 sm:col-span-2 rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-3.5 text-sm dark:border-indigo-500/20 dark:bg-indigo-500/5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <label htmlFor="idea-copy-template" className="font-bold text-slate-800">
+        <label htmlFor="idea-copy-template" className="font-bold text-slate-800 dark:text-slate-100">
           Lampirkan Naskah &amp; Penjelasan dari List Copywriting / Skrip (opsional)
         </label>
         {templates.data && templates.data.length > 0 && (
-          <span className="text-xs font-semibold text-teal-800">{templates.data.length} naskah di Bank Ide</span>
+          <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">{templates.data.length} naskah di Bank Ide</span>
         )}
       </div>
       <select
@@ -664,7 +664,7 @@ export function IdeaForm({ idea, defaultUnit, initialTemplate, onCancel, onSaved
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
-              className="rounded-full bg-teal-800 px-3 py-1 text-xs font-bold text-white hover:bg-teal-900 transition-colors"
+              className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700 transition-colors dark:bg-indigo-500 dark:hover:bg-indigo-600"
               onClick={() => {
                 const block = formatScriptForBrief(selectedScript, undefined, 'all');
                 setBriefText(prev => prev.trim() ? `${prev.trim()}\n\n${block}` : block);
@@ -674,7 +674,7 @@ export function IdeaForm({ idea, defaultUnit, initialTemplate, onCancel, onSaved
             </button>
             <button
               type="button"
-              className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-900 hover:bg-teal-100 transition-colors"
+              className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-900 hover:bg-indigo-100 transition-colors dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
               onClick={() => {
                 const block = formatScriptForBrief(selectedScript, undefined, 'body');
                 setBriefText(prev => prev.trim() ? `${prev.trim()}\n\n${block}` : block);

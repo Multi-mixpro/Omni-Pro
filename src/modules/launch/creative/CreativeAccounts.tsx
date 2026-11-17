@@ -164,7 +164,7 @@ export function CreativeAccounts({ userId, unit, today, canEdit, members, onActi
         <div><h2 className="text-lg font-bold">Akun &amp; Performa</h2><p className="text-sm text-slate-600">Pilih akun untuk melihat riwayat pengikut, views, klik, dan bukti tayang.</p></div>
         {canEdit && unit !== 'unassigned' && <button className={primary} onClick={() => setEditor('new')}>Tambah akun</button>}
       </div>
-      <div className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+      <div className="grid gap-2 rounded-xl bg-slate-50/80 p-3 dark:bg-white/[0.04] sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <Label title="Cari akun"><input className={field} type="search" value={search} maxLength={100} placeholder="Nama atau handle"
           onChange={event => { setSearch(event.target.value); setPage(0); setSelected(null); }} /></Label>
         <Label title="Platform"><select className={field} value={platform} onChange={event => { setPlatform(event.target.value); setPage(0); setSelected(null); }}>
@@ -193,9 +193,9 @@ export function CreativeAccounts({ userId, unit, today, canEdit, members, onActi
       {query.isPending && <p role="status" className="text-sm">Memuat akun…</p>}
       {query.isError && <p role="alert" className="text-sm text-red-700">{errorText(query.error)}</p>}
       {query.isSuccess && !query.data.length && <p className="text-sm text-slate-600">{search || platform || activeOnly ? 'Tidak ada akun yang cocok dengan filter.' : 'Belum ada akun pada unit ini.'}</p>}
-      <ul className="grid gap-2 sm:grid-cols-2">{query.data?.slice(0,PAGE_SIZE).map(item => <li className="space-y-2 rounded-lg border border-slate-200 p-3" key={item.id}>
+      <ul className="grid gap-2 sm:grid-cols-2">{query.data?.slice(0,PAGE_SIZE).map(item => <li className="space-y-2 rounded-xl border border-slate-200/80 p-3 dark:border-white/[0.08] dark:bg-white/[0.02]" key={item.id}>
         <AccountIdentity account={item} unit={units.data?.find(row => row.id === item.business_unit_id)} />
-        <p className="text-sm text-slate-600">PIC: {members.find(member => member.id === item.owner_id)?.full_name ?? 'Belum ditetapkan'}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">PIC: {members.find(member => member.id === item.owner_id)?.full_name ?? 'Belum ditetapkan'}</p>
         <div className="flex flex-wrap gap-2"><button className={selected === item.id ? primary : button} aria-expanded={selected === item.id} onClick={() => setSelected(selected === item.id ? null : item.id)}>{selected === item.id ? 'Tutup riwayat' : 'Lihat performa'}</button>
           {canEdit && <button className={button} onClick={() => setEditor(item)}>Edit</button>}
           {safeOutputUrl(item.profile_url) && <a className={button} href={safeOutputUrl(item.profile_url)} target="_blank" rel="noopener noreferrer">Profil</a>}</div>
